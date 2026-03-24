@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+// useRef kept for future mapRef usage
 import { motion, AnimatePresence } from 'framer-motion'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
+import RestaurantDetail from '../components/RestaurantDetail'
 
 // Fix Leaflet default icon paths broken by bundlers
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
@@ -224,74 +226,6 @@ export default function MapViewScreen() {
         </MapContainer>
       </div>
 
-      {/* ── Restaurant detail card (bottom sheet) ── */}
-      <AnimatePresence>
-        {selectedRestaurant && (
-          <motion.div
-            initial={{ y: 200, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 200, opacity: 0 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-            className="absolute bottom-24 left-4 right-4 z-20 rounded-2xl overflow-hidden"
-            style={{
-              background: '#0e1f42',
-              border: '1px solid rgba(69,118,239,0.25)',
-              boxShadow: '0 -4px 30px rgba(0,0,0,0.5)',
-            }}
-          >
-            <div className="flex gap-3 p-3">
-              <img
-                src={selectedRestaurant.image_url}
-                alt={selectedRestaurant.name}
-                className="w-20 h-20 rounded-xl object-cover flex-shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <p
-                  className="font-bold text-sm leading-tight mb-0.5 truncate"
-                  style={{ color: '#FAFBFF', fontFamily: 'Manrope, sans-serif' }}
-                >
-                  {selectedRestaurant.name}
-                </p>
-                <p
-                  className="text-xs mb-1 opacity-60"
-                  style={{ color: '#FAFBFF', fontFamily: 'Manrope, sans-serif' }}
-                >
-                  {selectedRestaurant.cuisine} · {selectedRestaurant.city}, {selectedRestaurant.state}
-                </p>
-                {selectedRestaurant.tier === 'pro' && (
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                    style={{ background: 'rgba(69,118,239,0.2)', color: '#4576EF' }}
-                  >
-                    PRO
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => setSelectedRestaurant(null)}
-                className="self-start opacity-50 hover:opacity-100"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M18 6L6 18M6 6l12 12" stroke="#FAFBFF" strokeWidth="2.5" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-            <div className="px-3 pb-3">
-              <button
-                onClick={() => navigate('/list', { state: { selectedId: selectedRestaurant.id } })}
-                className="w-full py-2.5 rounded-xl text-sm font-semibold"
-                style={{
-                  background: 'linear-gradient(135deg, #4576EF 0%, #2a56d4 100%)',
-                  color: '#fff',
-                  fontFamily: 'Manrope, sans-serif',
-                }}
-              >
-                View Details →
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ── Bottom bar ── */}
       <div
@@ -316,6 +250,16 @@ export default function MapViewScreen() {
           List View
         </button>
       </div>
+
+      {/* ── Full Restaurant Detail Popup ── */}
+      <AnimatePresence>
+        {selectedRestaurant && (
+          <RestaurantDetail
+            restaurant={selectedRestaurant}
+            onClose={() => setSelectedRestaurant(null)}
+          />
+        )}
+      </AnimatePresence>
 
     </div>
   )
