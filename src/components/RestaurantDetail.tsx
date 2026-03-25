@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
+import { fetchPlaceDetails } from '../lib/googlePlaces'
+import { fetchPexelsPhoto } from '../lib/pexels'
 import type { Restaurant, Event } from '../types'
 
 interface Props {
@@ -8,12 +10,38 @@ interface Props {
   onClose: () => void
 }
 
+interface PlaceInfo {
+  rating?: number
+  userRatingsTotal?: number
+  photoUrl?: string
+}
+
+// Star rating display
+function Stars({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <svg key={star} width="13" height="13" viewBox="0 0 24 24">
+          <path
+            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+            fill={star <= Math.round(rating) ? '#FBBF24' : '#374151'}
+          />
+        </svg>
+      ))}
+    </div>
+  )
+}
+
 export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
   const [events, setEvents] = useState<Event[]>([])
+  const [placeInfo, setPlaceInfo] = useState<PlaceInfo>({})
+  const [heroImage, setHeroImage] = useState(r.image_url)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [loadingPlace, setLoadingPlace] = useState(true)
 
   useEffect(() => {
     fetchEvents()
+    loadPlaceInfo()
   }, [r.id])
 
   async function fetchEvents() {
@@ -22,6 +50,27 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
       .select('*')
       .eq('restaurant_id', r.id)
     setEvents(data ?? [])
+  }
+
+  async function loadPlaceInfo() {
+    setLoadingPlace(true)
+
+    // Fetch Google Places data and Pexels photo in parallel
+    const [placeData, pexelsPhoto] = await Promise.all([
+      fetchPlaceDetails(r.name, r.city),
+      fetchPexelsPhoto(`${r.name} ${r.cuisine} restaurant`),
+    ])
+
+    setPlaceInfo(placeData)
+
+    // Priority: Google Places photo > Pexels photo > original Unsplash
+    if (placeData.photoUrl) {
+      setHeroImage(placeData.photoUrl)
+    } else if (pexelsPhoto?.url) {
+      setHeroImage(pexelsPhoto.url)
+    }
+
+    setLoadingPlace(false)
   }
 
   function getDirectionsUrl() {
@@ -37,7 +86,7 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-30"
-        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       />
 
@@ -50,8 +99,7 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
         className="fixed bottom-0 left-0 right-0 z-40 rounded-t-3xl overflow-hidden"
         style={{
           background: '#0e1f42',
-          border: '1px solid rgba(69,118,239,0.2)',
-          maxHeight: '88vh',
+          maxHeight: '90vh',
           overflowY: 'auto',
           scrollbarWidth: 'none',
         }}
@@ -62,15 +110,16 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
         </div>
 
         {/* Hero image */}
-        <div className="relative mx-4 mb-4 rounded-2xl overflow-hidden" style={{ height: 180 }}>
+        <div className="relative mx-4 mb-4 rounded-2xl overflow-hidden" style={{ height: 200 }}>
           <img
-            src={r.image_url}
+            src={heroImage}
             alt={r.name}
             className="w-full h-full object-cover"
+            onError={() => setHeroImage(r.image_url)}
           />
           <div
             className="absolute inset-0"
-            style={{ background: 'linear-gradient(to top, rgba(14,31,66,0.8) 0%, transparent 60%)' }}
+            style={{ background: 'linear-gradient(to top, rgba(14,31,66,0.85) 0%, transparent 55%)' }}
           />
           {r.tier === 'pro' && (
             <div
@@ -80,11 +129,10 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
               PRO
             </div>
           )}
-          {/* Close button */}
           <button
             onClick={onClose}
             className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.5)' }}
+            style={{ background: 'rgba(0,0,0,0.45)' }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <path d="M18 6L6 18M6 6l12 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
@@ -92,18 +140,20 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
           </button>
         </div>
 
-        {/* Info */}
-        <div className="px-4 mb-5">
+        {/* Name + rating */}
+        <div className="px-4 mb-4">
           <h2
-            className="font-bold text-xl mb-1"
+            className="font-bold text-xl mb-1 leading-tight"
             style={{ fontFamily: 'Bungee, cursive', color: '#FAFBFF', letterSpacing: '0.03em' }}
           >
             {r.name}
           </h2>
-          <div className="flex items-center gap-2 mb-2">
+
+          {/* Cuisine badge + location */}
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span
               className="text-xs px-2.5 py-1 rounded-full font-semibold"
-              style={{ background: 'rgba(69,118,239,0.15)', color: '#6B9EFF', fontFamily: 'Manrope' }}
+              style={{ background: 'rgba(69,118,239,0.18)', color: '#6B9EFF', fontFamily: 'Manrope' }}
             >
               {r.cuisine}
             </span>
@@ -117,9 +167,31 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
               {r.city}, {r.state}
             </span>
           </div>
+
+          {/* Rating row */}
+          {loadingPlace ? (
+            <div className="h-5 w-40 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)' }} />
+          ) : placeInfo.rating ? (
+            <div className="flex items-center gap-2">
+              <Stars rating={placeInfo.rating} />
+              <span
+                className="text-sm font-bold"
+                style={{ color: '#FBBF24', fontFamily: 'Manrope' }}
+              >
+                {placeInfo.rating.toFixed(1)}
+              </span>
+              {placeInfo.userRatingsTotal && (
+                <span className="text-xs opacity-40" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
+                  ({placeInfo.userRatingsTotal.toLocaleString()} reviews)
+                </span>
+              )}
+            </div>
+          ) : null}
+
+          {/* Description */}
           {r.description && (
             <p
-              className="text-sm leading-relaxed opacity-60"
+              className="text-sm leading-relaxed mt-3 opacity-60"
               style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}
             >
               {r.description}
@@ -127,17 +199,38 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
           )}
         </div>
 
-        {/* Action buttons */}
+        {/* Upcoming event preview (if any) */}
+        {events.length > 0 && (
+          <div className="mx-4 mb-4 rounded-xl p-3 flex items-center gap-3"
+            style={{ background: 'rgba(69,118,239,0.12)', border: '1px solid rgba(69,118,239,0.25)' }}
+          >
+            <span style={{ fontSize: 22 }}>🎟️</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
+                {events[0].event_name}
+              </p>
+              <p className="text-xs opacity-50" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
+                {events[0].event_date} · {events[0].event_time}
+              </p>
+            </div>
+            {events.length > 1 && (
+              <span className="text-xs font-bold px-2 py-1 rounded-full"
+                style={{ background: '#4576EF', color: '#fff', fontFamily: 'Manrope' }}>
+                +{events.length - 1}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Action buttons — 2 column grid */}
         <div className="px-4 mb-4 grid grid-cols-2 gap-3">
-          {/* View Menu */}
-          {r.platepost_menu_url || r.website_url ? (
-            <ActionButton
-              icon="🍽️"
-              label="View Menu"
-              onClick={() => setMenuOpen(true)}
-              primary
-            />
-          ) : null}
+          {/* View Menu — dark navy, primary */}
+          <ActionButton
+            icon="🍽️"
+            label="View Menu"
+            primary
+            onClick={() => setMenuOpen(true)}
+          />
 
           {/* View Website */}
           {r.website_url && (
@@ -161,19 +254,18 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
               icon="🎟️"
               label={`Events (${events.length})`}
               onClick={() => {
-                const el = document.getElementById('events-section')
-                el?.scrollIntoView({ behavior: 'smooth' })
+                document.getElementById('events-section')?.scrollIntoView({ behavior: 'smooth' })
               }}
             />
           )}
         </div>
 
-        {/* Events section */}
+        {/* Full events list */}
         {events.length > 0 && (
           <div id="events-section" className="px-4 mb-8">
             <h3
-              className="text-sm font-bold mb-3 opacity-60 uppercase tracking-widest"
-              style={{ fontFamily: 'Manrope', color: '#FAFBFF', fontSize: 11 }}
+              className="text-xs font-bold mb-3 uppercase tracking-widest opacity-40"
+              style={{ fontFamily: 'Manrope', color: '#FAFBFF' }}
             >
               Upcoming Events
             </h3>
@@ -198,16 +290,10 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
                     🎟️
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p
-                      className="text-sm font-semibold truncate"
-                      style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}
-                    >
+                    <p className="text-sm font-semibold truncate" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
                       {ev.event_name}
                     </p>
-                    <p
-                      className="text-xs opacity-50"
-                      style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}
-                    >
+                    <p className="text-xs opacity-50" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
                       {ev.event_date} · {ev.event_time}
                     </p>
                   </div>
@@ -233,12 +319,9 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
   )
 }
 
-// ── Action button ────────────────────────────────────────────────────────────
+// ── Action button ──────────────────────────────────────────────────────────
 function ActionButton({
-  icon,
-  label,
-  onClick,
-  primary = false,
+  icon, label, onClick, primary = false,
 }: {
   icon: string
   label: string
@@ -251,9 +334,9 @@ function ActionButton({
       className="flex items-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition-all active:scale-95"
       style={{
         fontFamily: 'Manrope, sans-serif',
-        background: primary ? 'linear-gradient(135deg, #4576EF 0%, #2a56d4 100%)' : 'rgba(255,255,255,0.07)',
+        background: primary ? '#071126' : 'rgba(255,255,255,0.07)',
         color: '#FAFBFF',
-        border: primary ? 'none' : '1px solid rgba(255,255,255,0.1)',
+        border: primary ? '1px solid rgba(69,118,239,0.4)' : '1px solid rgba(255,255,255,0.1)',
       }}
     >
       <span>{icon}</span>
@@ -262,7 +345,7 @@ function ActionButton({
   )
 }
 
-// ── In-app menu browser ──────────────────────────────────────────────────────
+// ── In-app menu browser ────────────────────────────────────────────────────
 function MenuBrowser({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
   return (
     <motion.div
@@ -281,10 +364,8 @@ function MenuBrowser({ url, name, onClose }: { url: string; name: string; onClos
           <span style={{ fontFamily: 'Bungee, cursive', color: '#4576EF', fontSize: 16 }}>
             PlatePost
           </span>
-          <span
-            className="text-xs opacity-40 truncate max-w-32"
-            style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}
-          >
+          <span className="text-xs opacity-40 truncate max-w-[140px]"
+            style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
             · {name}
           </span>
         </div>
@@ -298,14 +379,7 @@ function MenuBrowser({ url, name, onClose }: { url: string; name: string; onClos
           </svg>
         </button>
       </div>
-
-      {/* iframe */}
-      <iframe
-        src={url}
-        title={`${name} menu`}
-        className="flex-1 w-full"
-        style={{ border: 'none' }}
-      />
+      <iframe src={url} title={`${name} menu`} className="flex-1 w-full" style={{ border: 'none' }} />
     </motion.div>
   )
 }
