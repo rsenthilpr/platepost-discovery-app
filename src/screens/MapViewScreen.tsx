@@ -17,33 +17,54 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-// Custom pin icon factory
-function makeIcon(color: string) {
+// Custom pin icon factory — emoji varies by cuisine
+function makeIcon(color: string, emoji: string) {
   return L.divIcon({
     className: '',
     html: `
       <div style="
-        width:36px; height:44px; position:relative; display:flex;
+        width:40px; height:50px; position:relative; display:flex;
         flex-direction:column; align-items:center;
       ">
         <div style="
-          width:36px; height:36px; border-radius:50% 50% 50% 0;
+          width:40px; height:40px; border-radius:50% 50% 50% 0;
           transform:rotate(-45deg);
           background:${color};
-          box-shadow:0 4px 14px rgba(0,0,0,0.35);
+          box-shadow:0 4px 16px rgba(0,0,0,0.3);
           display:flex; align-items:center; justify-content:center;
+          border:2px solid white;
         ">
-          <div style="transform:rotate(45deg); font-size:16px; line-height:1;">🍽️</div>
+          <div style="transform:rotate(45deg); font-size:18px; line-height:1;">${emoji}</div>
         </div>
+        <div style="
+          width:0; height:0;
+          border-left:6px solid transparent;
+          border-right:6px solid transparent;
+          border-top:8px solid ${color};
+          margin-top:-2px;
+        "></div>
       </div>`,
-    iconSize: [36, 44],
-    iconAnchor: [18, 44],
-    popupAnchor: [0, -44],
+    iconSize: [40, 50],
+    iconAnchor: [20, 50],
+    popupAnchor: [0, -50],
   })
 }
 
-const PRO_ICON = makeIcon('#4576EF')
-const BASIC_ICON = makeIcon('#6B7EBF')
+function getIcon(cuisine: string, tier: string) {
+  const isPro = tier === 'pro'
+  const color = isPro ? '#4576EF' : '#FF6B35'
+  const emojiMap: Record<string, string> = {
+    Coffee: '☕',
+    Cafe: '☕',
+    Japanese: '🍣',
+    Italian: '🍕',
+    American: '🍔',
+    Music: '🎵',
+    Jazz: '🎷',
+  }
+  const emoji = emojiMap[cuisine] ?? '🍽️'
+  return makeIcon(color, emoji)
+}
 
 // Location presets
 const LOCATIONS = {
@@ -93,18 +114,22 @@ export default function MapViewScreen() {
   })
 
   return (
-    <div className="fixed inset-0 flex flex-col" style={{ background: '#071126' }}>
+    <div className="fixed inset-0 flex flex-col" style={{ background: '#f5f5f5' }}>
 
       {/* ── Top bar ── */}
       <div
         className="absolute top-0 left-0 right-0 z-20 pt-12 px-4 pb-3 flex flex-col gap-3"
-        style={{ background: 'linear-gradient(to bottom, rgba(7,17,38,0.95) 70%, transparent)' }}
+        style={{
+          background: 'rgba(255,255,255,0.96)',
+          backdropFilter: 'blur(12px)',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.10)',
+        }}
       >
         {/* Header row */}
         <div className="flex items-center justify-between">
           <h1
             className="text-lg"
-            style={{ fontFamily: 'Bungee, cursive', color: '#FAFBFF', letterSpacing: '0.05em' }}
+            style={{ fontFamily: 'Bungee, cursive', color: '#071126', letterSpacing: '0.05em' }}
           >
             PlatePost
           </h1>
@@ -115,9 +140,9 @@ export default function MapViewScreen() {
               onClick={() => setShowLocationPicker((p) => !p)}
               className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
               style={{
-                background: 'rgba(69,118,239,0.15)',
-                border: '1px solid rgba(69,118,239,0.4)',
-                color: '#FAFBFF',
+                background: '#EEF2FF',
+                border: '1px solid #c7d2fe',
+                color: '#071126',
                 fontFamily: 'Manrope, sans-serif',
               }}
             >
@@ -127,7 +152,7 @@ export default function MapViewScreen() {
               </svg>
               {activeLocation}
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                <path d="M6 9l6 6 6-6" stroke="#FAFBFF" strokeWidth="2.5" strokeLinecap="round" />
+                <path d="M6 9l6 6 6-6" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </button>
 
@@ -140,24 +165,24 @@ export default function MapViewScreen() {
                   transition={{ duration: 0.15 }}
                   className="absolute right-0 top-10 rounded-xl overflow-hidden z-50"
                   style={{
-                    background: '#0e1f42',
-                    border: '1px solid rgba(69,118,239,0.3)',
+                    background: '#fff',
+                    border: '1px solid #e0e7ff',
                     minWidth: 180,
-                    boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
                   }}
                 >
-                  {(Object.keys(LOCATIONS) as LocationKey[]).map((loc) => (
+                  {(Object.keys(LOCATIONS) as LocationKey[]).map((locKey) => (
                     <button
-                      key={loc}
-                      onClick={() => { setActiveLocation(loc); setShowLocationPicker(false) }}
+                      key={locKey}
+                      onClick={() => { setActiveLocation(locKey); setShowLocationPicker(false) }}
                       className="w-full text-left px-4 py-3 text-sm transition-colors"
                       style={{
                         fontFamily: 'Manrope, sans-serif',
-                        color: activeLocation === loc ? '#4576EF' : '#FAFBFF',
-                        background: activeLocation === loc ? 'rgba(69,118,239,0.12)' : 'transparent',
+                        color: activeLocation === locKey ? '#4576EF' : '#071126',
+                        background: activeLocation === locKey ? '#EEF2FF' : 'transparent',
                       }}
                     >
-                      {loc}
+                      {locKey}
                     </button>
                   ))}
                 </motion.div>
@@ -167,17 +192,18 @@ export default function MapViewScreen() {
         </div>
 
         {/* Filter chips */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {FILTERS.map((f) => (
             <button
               key={f}
               onClick={() => setActiveFilter(f)}
-              className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all"
+              className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95"
               style={{
                 fontFamily: 'Manrope, sans-serif',
-                background: activeFilter === f ? '#4576EF' : 'rgba(255,255,255,0.08)',
-                color: activeFilter === f ? '#fff' : 'rgba(250,251,255,0.6)',
-                border: activeFilter === f ? '1px solid #4576EF' : '1px solid rgba(255,255,255,0.1)',
+                background: activeFilter === f ? '#4576EF' : '#fff',
+                color: activeFilter === f ? '#fff' : '#444',
+                border: activeFilter === f ? '1px solid #4576EF' : '1px solid #ddd',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
               }}
             >
               {f}
@@ -197,8 +223,8 @@ export default function MapViewScreen() {
           attributionControl={false}
         >
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
 
           <MapController center={[loc.lat, loc.lng]} zoom={loc.zoom} />
@@ -207,7 +233,7 @@ export default function MapViewScreen() {
             <Marker
               key={r.id}
               position={[r.latitude, r.longitude]}
-              icon={r.tier === 'pro' ? PRO_ICON : BASIC_ICON}
+              icon={getIcon(r.cuisine, r.tier)}
               eventHandlers={{
                 click: () => setSelectedRestaurant(r),
               }}
@@ -230,22 +256,22 @@ export default function MapViewScreen() {
       {/* ── Bottom bar ── */}
       <div
         className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-center pb-10 pt-4"
-        style={{ background: 'linear-gradient(to top, rgba(7,17,38,0.95) 60%, transparent)' }}
+        style={{ background: 'linear-gradient(to top, rgba(255,255,255,0.97) 55%, transparent)' }}
       >
         <button
           onClick={() => navigate('/list')}
-          className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold shadow-lg"
+          className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold"
           style={{
-            background: '#FAFBFF',
-            color: '#071126',
+            background: '#071126',
+            color: '#FAFBFF',
             fontFamily: 'Manrope, sans-serif',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
           }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="5" width="18" height="2" rx="1" fill="#071126" />
-            <rect x="3" y="11" width="18" height="2" rx="1" fill="#071126" />
-            <rect x="3" y="17" width="18" height="2" rx="1" fill="#071126" />
+            <rect x="3" y="5" width="18" height="2" rx="1" fill="#FAFBFF" />
+            <rect x="3" y="11" width="18" height="2" rx="1" fill="#FAFBFF" />
+            <rect x="3" y="17" width="18" height="2" rx="1" fill="#FAFBFF" />
           </svg>
           List View
         </button>
