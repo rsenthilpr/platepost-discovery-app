@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fetchPlaceDetails } from '../lib/googlePlaces'
 import { fetchPexelsPhoto } from '../lib/pexels'
+import { searchEventbriteEvents } from '../lib/eventbrite'
 import type { Restaurant, Event } from '../types'
 
 interface Props {
@@ -15,6 +16,16 @@ interface PlaceInfo {
   rating?: number
   userRatingsTotal?: number
   photoUrl?: string
+}
+
+// Normalised event — works for both Supabase rows and live Eventbrite results
+interface DisplayEvent {
+  key: string
+  name: string
+  date: string
+  time: string
+  url: string
+  source: 'eventbrite' | 'supabase'
 }
 
 // Star rating display
@@ -34,11 +45,12 @@ function Stars({ rating }: { rating: number }) {
 }
 
 export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
-  const [events, setEvents] = useState<Event[]>([])
   const navigate = useNavigate()
+  const [events, setEvents] = useState<DisplayEvent[]>([])
   const [placeInfo, setPlaceInfo] = useState<PlaceInfo>({})
   const [heroImage, setHeroImage] = useState(r.image_url)
   const [loadingPlace, setLoadingPlace] = useState(true)
+  const [loadingEvents, setLoadingEvents] = useState(true)
 
   useEffect(() => {
     fetchEvents()
@@ -46,11 +58,43 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
   }, [r.id])
 
   async function fetchEvents() {
+    setLoadingEvents(true)
+
+    // Try Eventbrite first for live events
+    const liveEvents = await searchEventbriteEvents(r.name, r.city, r.state)
+
+    if (liveEvents.length > 0) {
+      setEvents(
+        liveEvents.map((ev) => ({
+          key: ev.id,
+          name: ev.name,
+          date: ev.date,
+          time: ev.time,
+          url: ev.url,
+          source: 'eventbrite' as const,
+        })),
+      )
+      setLoadingEvents(false)
+      return
+    }
+
+    // Fall back to seeded Supabase events
     const { data } = await supabase
       .from('events')
       .select('*')
       .eq('restaurant_id', r.id)
-    setEvents(data ?? [])
+
+    const supabaseEvents: DisplayEvent[] = (data ?? []).map((ev: Event) => ({
+      key: String(ev.id),
+      name: ev.event_name,
+      date: ev.event_date,
+      time: ev.event_time,
+      url: ev.eventbrite_url,
+      source: 'supabase' as const,
+    }))
+
+    setEvents(supabaseEvents)
+    setLoadingEvents(false)
   }
 
   async function loadPlaceInfo() {
@@ -201,25 +245,33 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
         </div>
 
         {/* Upcoming event preview (if any) */}
-        {events.length > 0 && (
+        {!loadingEvents && events.length > 0 && (
           <div className="mx-4 mb-4 rounded-xl p-3 flex items-center gap-3"
             style={{ background: 'rgba(69,118,239,0.12)', border: '1px solid rgba(69,118,239,0.25)' }}
           >
             <span style={{ fontSize: 22 }}>🎟️</span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
-                {events[0].event_name}
+                {events[0].name}
               </p>
               <p className="text-xs opacity-50" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
-                {events[0].event_date} · {events[0].event_time}
+                {events[0].date} · {events[0].time}
               </p>
             </div>
-            {events.length > 1 && (
-              <span className="text-xs font-bold px-2 py-1 rounded-full"
-                style={{ background: '#4576EF', color: '#fff', fontFamily: 'Manrope' }}>
-                +{events.length - 1}
-              </span>
-            )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {events[0].source === 'eventbrite' && (
+                <span className="text-xs font-bold px-1.5 py-0.5 rounded-md"
+                  style={{ background: '#F05537', color: '#fff', fontFamily: 'Manrope', fontSize: 9 }}>
+                  LIVE
+                </span>
+              )}
+              {events.length > 1 && (
+                <span className="text-xs font-bold px-2 py-1 rounded-full"
+                  style={{ background: '#4576EF', color: '#fff', fontFamily: 'Manrope' }}>
+                  +{events.length - 1}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -249,8 +301,8 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
             onClick={() => window.open(getDirectionsUrl(), '_blank')}
           />
 
-          {/* Events — only if Eventbrite events exist */}
-          {events.length > 0 && (
+          {/* Events — only shown if events found (live Eventbrite or seeded) */}
+          {!loadingEvents && events.length > 0 && (
             <ActionButton
               icon="🎟️"
               label={`Events (${events.length})`}
@@ -262,19 +314,27 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
         </div>
 
         {/* Full events list */}
-        {events.length > 0 && (
+        {!loadingEvents && events.length > 0 && (
           <div id="events-section" className="px-4 mb-8">
-            <h3
-              className="text-xs font-bold mb-3 uppercase tracking-widest opacity-40"
-              style={{ fontFamily: 'Manrope', color: '#FAFBFF' }}
-            >
-              Upcoming Events
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3
+                className="text-xs font-bold uppercase tracking-widest opacity-40"
+                style={{ fontFamily: 'Manrope', color: '#FAFBFF' }}
+              >
+                Upcoming Events
+              </h3>
+              {events[0].source === 'eventbrite' && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                  style={{ background: '#F05537', color: '#fff', fontFamily: 'Manrope', fontSize: 9 }}>
+                  LIVE FROM EVENTBRITE
+                </span>
+              )}
+            </div>
             <div className="flex flex-col gap-2">
               {events.map((ev) => (
                 <a
-                  key={ev.id}
-                  href={ev.eventbrite_url}
+                  key={ev.key}
+                  href={ev.url}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center gap-3 rounded-xl p-3"
@@ -292,10 +352,10 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
-                      {ev.event_name}
+                      {ev.name}
                     </p>
                     <p className="text-xs opacity-50" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
-                      {ev.event_date} · {ev.event_time}
+                      {ev.date} · {ev.time}
                     </p>
                   </div>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
