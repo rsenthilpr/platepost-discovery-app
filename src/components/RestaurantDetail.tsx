@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fetchPlaceDetails } from '../lib/googlePlaces'
 import { fetchPexelsPhoto } from '../lib/pexels'
@@ -34,9 +35,9 @@ function Stars({ rating }: { rating: number }) {
 
 export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
   const [events, setEvents] = useState<Event[]>([])
+  const navigate = useNavigate()
   const [placeInfo, setPlaceInfo] = useState<PlaceInfo>({})
   const [heroImage, setHeroImage] = useState(r.image_url)
-  const [menuOpen, setMenuOpen] = useState(false)
   const [loadingPlace, setLoadingPlace] = useState(true)
 
   useEffect(() => {
@@ -229,7 +230,7 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
             icon="🍽️"
             label="View Menu"
             primary
-            onClick={() => setMenuOpen(true)}
+            onClick={() => { onClose(); navigate(`/menu/${r.id}`) }}
           />
 
           {/* View Website */}
@@ -307,14 +308,6 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
         )}
       </motion.div>
 
-      {/* In-app menu browser */}
-      {menuOpen && (
-        <MenuBrowser
-          url={r.platepost_menu_url || r.website_url}
-          name={r.name}
-          onClose={() => setMenuOpen(false)}
-        />
-      )}
     </>
   )
 }
@@ -345,41 +338,3 @@ function ActionButton({
   )
 }
 
-// ── In-app menu browser ────────────────────────────────────────────────────
-function MenuBrowser({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
-  return (
-    <motion.div
-      initial={{ y: '100%' }}
-      animate={{ y: 0 }}
-      exit={{ y: '100%' }}
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{ background: '#071126' }}
-    >
-      {/* PlatePost branding bar */}
-      <div
-        className="flex items-center justify-between px-4 py-3 flex-shrink-0"
-        style={{ background: '#0e1f42', borderBottom: '1px solid rgba(69,118,239,0.2)' }}
-      >
-        <div className="flex items-center gap-2">
-          <span style={{ fontFamily: 'Bungee, cursive', color: '#4576EF', fontSize: 16 }}>
-            PlatePost
-          </span>
-          <span className="text-xs opacity-40 truncate max-w-[140px]"
-            style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
-            · {name}
-          </span>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-8 h-8 rounded-full flex items-center justify-center"
-          style={{ background: 'rgba(255,255,255,0.1)' }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="M18 6L6 18M6 6l12 12" stroke="#FAFBFF" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
-      <iframe src={url} title={`${name} menu`} className="flex-1 w-full" style={{ border: 'none' }} />
-    </motion.div>
-  )
-}
