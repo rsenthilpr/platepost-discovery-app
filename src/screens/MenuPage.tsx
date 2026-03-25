@@ -275,6 +275,7 @@ function MenuItemCard({
   onClick: () => void
 }) {
   const fallback = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80'
+  const [imgLoaded, setImgLoaded] = useState(false)
   return (
     <motion.button
       onClick={onClick}
@@ -284,12 +285,19 @@ function MenuItemCard({
     >
       {/* Square photo */}
       <div className="relative w-full" style={{ paddingTop: '100%' }}>
+        {/* Shimmer skeleton shown while photo loads */}
+        {!imgLoaded && (
+          <div className="absolute inset-0" style={{ background: '#f0f0f0', animation: 'shimmer 1.4s infinite',
+            backgroundImage: 'linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)', backgroundSize: '200% 100%' }} />
+        )}
         <img
           src={photoUrl ?? fallback}
           alt={item.name}
           className="absolute inset-0 w-full h-full object-cover"
+          style={{ opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
           loading="lazy"
-          onError={(e) => { (e.target as HTMLImageElement).src = fallback }}
+          onLoad={() => setImgLoaded(true)}
+          onError={(e) => { (e.target as HTMLImageElement).src = fallback; setImgLoaded(true) }}
         />
         {item.popular && (
           <div

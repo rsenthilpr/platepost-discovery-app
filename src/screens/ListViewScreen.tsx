@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
+import LazyRestaurantImage from '../components/LazyRestaurantImage'
 
 const FILTERS = ['All', 'Coffee', 'Jazz', 'Music', 'DJs', 'Japanese', 'Italian', 'American', 'Cafe']
 
@@ -239,13 +240,14 @@ function RestaurantCard({
         border: '1px solid rgba(255,255,255,0.08)',
       }}
     >
-      {/* Photo */}
+      {/* Photo — lazy upgrades from Unsplash → Pexels when scrolled into view */}
       <div className="relative flex-shrink-0">
-        <img
-          src={r.image_url}
+        <LazyRestaurantImage
+          fallbackUrl={r.image_url}
+          query={`${r.name} ${r.cuisine} restaurant food`}
           alt={r.name}
-          className="w-20 h-20 rounded-xl object-cover"
-          loading="lazy"
+          className="w-20 h-20 rounded-xl flex-shrink-0"
+          style={{ width: 80, height: 80, borderRadius: 12 }}
         />
         {r.tier === 'pro' && (
           <div
