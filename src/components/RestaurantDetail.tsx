@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -10,6 +10,7 @@ import type { Restaurant, Event } from '../types'
 interface Props {
   restaurant: Restaurant
   onClose: () => void
+  initialSection?: 'events' | 'directions' | 'menu' | null
 }
 
 interface PlaceInfo {
@@ -18,7 +19,6 @@ interface PlaceInfo {
   photoUrl?: string
 }
 
-// Normalised event — works for both Supabase rows and live Eventbrite results
 interface DisplayEvent {
   key: string
   name: string
@@ -28,7 +28,6 @@ interface DisplayEvent {
   source: 'eventbrite' | 'supabase'
 }
 
-// Star rating display
 function Stars({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-0.5">
@@ -44,46 +43,52 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
+export default function RestaurantDetail({ restaurant: r, onClose, initialSection }: Props) {
   const navigate = useNavigate()
   const [events, setEvents] = useState<DisplayEvent[]>([])
   const [placeInfo, setPlaceInfo] = useState<PlaceInfo>({})
   const [heroImage, setHeroImage] = useState(r.image_url)
   const [loadingPlace, setLoadingPlace] = useState(true)
   const [loadingEvents, setLoadingEvents] = useState(true)
+  const eventsSectionRef = useRef<HTMLDivElement>(null)
+  const sheetRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetchEvents()
     loadPlaceInfo()
   }, [r.id])
 
+  // Auto-scroll to section if initialSection is passed from feed card buttons
+  useEffect(() => {
+    if (!initialSection || loadingEvents) return
+    if (initialSection === 'events' && eventsSectionRef.current) {
+      setTimeout(() => {
+        eventsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 400)
+    }
+    if (initialSection === 'directions') {
+      window.open(getDirectionsUrl(), '_blank')
+    }
+  }, [initialSection, loadingEvents])
+
   async function fetchEvents() {
     setLoadingEvents(true)
-
-    // Try Eventbrite first for live events
     const liveEvents = await searchEventbriteEvents(r.name, r.city, r.state)
 
     if (liveEvents.length > 0) {
-      setEvents(
-        liveEvents.map((ev) => ({
-          key: ev.id,
-          name: ev.name,
-          date: ev.date,
-          time: ev.time,
-          url: ev.url,
-          source: 'eventbrite' as const,
-        })),
-      )
+      setEvents(liveEvents.map((ev) => ({
+        key: ev.id,
+        name: ev.name,
+        date: ev.date,
+        time: ev.time,
+        url: ev.url,
+        source: 'eventbrite' as const,
+      })))
       setLoadingEvents(false)
       return
     }
 
-    // Fall back to seeded Supabase events
-    const { data } = await supabase
-      .from('events')
-      .select('*')
-      .eq('restaurant_id', r.id)
-
+    const { data } = await supabase.from('events').select('*').eq('restaurant_id', r.id)
     const supabaseEvents: DisplayEvent[] = (data ?? []).map((ev: Event) => ({
       key: String(ev.id),
       name: ev.event_name,
@@ -92,29 +97,22 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
       url: ev.eventbrite_url,
       source: 'supabase' as const,
     }))
-
     setEvents(supabaseEvents)
     setLoadingEvents(false)
   }
 
   async function loadPlaceInfo() {
     setLoadingPlace(true)
-
-    // Fetch Google Places data and Pexels photo in parallel
     const [placeData, pexelsPhoto] = await Promise.all([
       fetchPlaceDetails(r.name, r.city),
       fetchPexelsPhoto(`${r.name} ${r.cuisine} restaurant`),
     ])
-
     setPlaceInfo(placeData)
-
-    // Priority: Google Places photo > Pexels photo > original Unsplash
     if (placeData.photoUrl) {
       setHeroImage(placeData.photoUrl)
     } else if (pexelsPhoto?.url) {
       setHeroImage(pexelsPhoto.url)
     }
-
     setLoadingPlace(false)
   }
 
@@ -137,6 +135,7 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
 
       {/* Sheet */}
       <motion.div
+        ref={sheetRef}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -194,7 +193,6 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
             {r.name}
           </h2>
 
-          {/* Cuisine badge + location */}
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span
               className="text-xs px-2.5 py-1 rounded-full font-semibold"
@@ -213,16 +211,12 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
             </span>
           </div>
 
-          {/* Rating row */}
           {loadingPlace ? (
             <div className="h-5 w-40 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)' }} />
           ) : placeInfo.rating ? (
             <div className="flex items-center gap-2">
               <Stars rating={placeInfo.rating} />
-              <span
-                className="text-sm font-bold"
-                style={{ color: '#FBBF24', fontFamily: 'Manrope' }}
-              >
+              <span className="text-sm font-bold" style={{ color: '#FBBF24', fontFamily: 'Manrope' }}>
                 {placeInfo.rating.toFixed(1)}
               </span>
               {placeInfo.userRatingsTotal && (
@@ -233,7 +227,6 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
             </div>
           ) : null}
 
-          {/* Description */}
           {r.description && (
             <p
               className="text-sm leading-relaxed mt-3 opacity-60"
@@ -244,11 +237,10 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
           )}
         </div>
 
-        {/* Upcoming event preview (if any) */}
+        {/* Upcoming event preview */}
         {!loadingEvents && events.length > 0 && (
           <div className="mx-4 mb-4 rounded-xl p-3 flex items-center gap-3"
-            style={{ background: 'rgba(69,118,239,0.12)', border: '1px solid rgba(69,118,239,0.25)' }}
-          >
+            style={{ background: 'rgba(69,118,239,0.12)', border: '1px solid rgba(69,118,239,0.25)' }}>
             <span style={{ fontSize: 22 }}>🎟️</span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
@@ -277,50 +269,31 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
 
         {/* Action buttons — 2 column grid */}
         <div className="px-4 mb-4 grid grid-cols-2 gap-3">
-          {/* View Menu — dark navy, primary */}
-          <ActionButton
-            icon="🍽️"
-            label="View Menu"
-            primary
-            onClick={() => { onClose(); navigate(`/menu/${r.id}`) }}
-          />
+          <ActionButton icon="🍽️" label="View Menu" primary
+            onClick={() => { onClose(); navigate(`/menu/${r.id}`) }} />
 
-          {/* View Website */}
           {r.website_url && (
-            <ActionButton
-              icon="🌐"
-              label="View Website"
-              onClick={() => window.open(r.website_url, '_blank')}
-            />
+            <ActionButton icon="🌐" label="View Website"
+              onClick={() => window.open(r.website_url, '_blank')} />
           )}
 
-          {/* Get Directions */}
-          <ActionButton
-            icon="🗺️"
-            label="Get Directions"
-            onClick={() => window.open(getDirectionsUrl(), '_blank')}
-          />
+          <ActionButton icon="🗺️" label="Get Directions"
+            onClick={() => window.open(getDirectionsUrl(), '_blank')} />
 
-          {/* Events — only shown if events found (live Eventbrite or seeded) */}
           {!loadingEvents && events.length > 0 && (
-            <ActionButton
-              icon="🎟️"
-              label={`Events (${events.length})`}
+            <ActionButton icon="🎟️" label={`Events (${events.length})`}
               onClick={() => {
-                document.getElementById('events-section')?.scrollIntoView({ behavior: 'smooth' })
-              }}
-            />
+                eventsSectionRef.current?.scrollIntoView({ behavior: 'smooth' })
+              }} />
           )}
         </div>
 
         {/* Full events list */}
         {!loadingEvents && events.length > 0 && (
-          <div id="events-section" className="px-4 mb-8">
+          <div id="events-section" ref={eventsSectionRef} className="px-4 mb-8">
             <div className="flex items-center justify-between mb-3">
-              <h3
-                className="text-xs font-bold uppercase tracking-widest opacity-40"
-                style={{ fontFamily: 'Manrope', color: '#FAFBFF' }}
-              >
+              <h3 className="text-xs font-bold uppercase tracking-widest opacity-40"
+                style={{ fontFamily: 'Manrope', color: '#FAFBFF' }}>
                 Upcoming Events
               </h3>
               {events[0].source === 'eventbrite' && (
@@ -332,22 +305,15 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
             </div>
             <div className="flex flex-col gap-2">
               {events.map((ev) => (
-                <a
-                  key={ev.key}
-                  href={ev.url}
-                  target="_blank"
-                  rel="noreferrer"
+                <a key={ev.key} href={ev.url} target="_blank" rel="noreferrer"
                   className="flex items-center gap-3 rounded-xl p-3"
                   style={{
                     background: 'rgba(69,118,239,0.1)',
                     border: '1px solid rgba(69,118,239,0.2)',
                     textDecoration: 'none',
-                  }}
-                >
-                  <div
-                    className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ background: 'rgba(69,118,239,0.2)', fontSize: 18 }}
-                  >
+                  }}>
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
+                    style={{ background: 'rgba(69,118,239,0.2)', fontSize: 18 }}>
                     🎟️
                   </div>
                   <div className="flex-1 min-w-0">
@@ -367,12 +333,10 @@ export default function RestaurantDetail({ restaurant: r, onClose }: Props) {
           </div>
         )}
       </motion.div>
-
     </>
   )
 }
 
-// ── Action button ──────────────────────────────────────────────────────────
 function ActionButton({
   icon, label, onClick, primary = false,
 }: {
@@ -397,4 +361,3 @@ function ActionButton({
     </button>
   )
 }
-

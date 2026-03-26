@@ -24,6 +24,7 @@ export default function ListViewScreen() {
   const [activeFilter, setActiveFilter] = useState(state.filter ?? 'All')
   const [loading, setLoading] = useState(true)
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
+  const [detailMode, setDetailMode] = useState<'events' | 'directions' | 'menu' | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const filterRowRef = useRef<HTMLDivElement>(null)
 
@@ -31,7 +32,6 @@ export default function ListViewScreen() {
     fetchRestaurants()
   }, [])
 
-  // Auto-open restaurant if navigated from map pin
   useEffect(() => {
     if (state.selectedId && restaurants.length > 0) {
       const found = restaurants.find((r) => r.id === state.selectedId)
@@ -39,7 +39,6 @@ export default function ListViewScreen() {
     }
   }, [state.selectedId, restaurants])
 
-  // Scroll active filter chip into view
   useEffect(() => {
     const row = filterRowRef.current
     if (!row) return
@@ -63,22 +62,22 @@ export default function ListViewScreen() {
       r.cuisine.toLowerCase().includes(q) ||
       r.city.toLowerCase().includes(q) ||
       r.state.toLowerCase().includes(q)
-
     const matchesFilter =
       activeFilter === 'All' ||
       (activeFilter === 'DJs' ? r.cuisine === 'Music' : r.cuisine.toLowerCase() === activeFilter.toLowerCase())
-
     return matchesSearch && matchesFilter
   })
+
+  function openDetail(r: Restaurant, mode: 'events' | 'directions' | 'menu' | null = null) {
+    setSelectedRestaurant(r)
+    setDetailMode(mode)
+  }
 
   return (
     <div className="fixed inset-0 flex flex-col" style={{ background: '#071126' }}>
 
       {/* ── Header ── */}
-      <div
-        className="flex-shrink-0 pt-12 px-4 pb-3"
-        style={{ background: '#071126' }}
-      >
+      <div className="flex-shrink-0 pt-12 px-4 pb-3" style={{ background: '#071126' }}>
         <div className="flex items-center gap-3 mb-4">
           <button onClick={() => navigate('/')} className="opacity-50 hover:opacity-100 transition-opacity">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -90,7 +89,7 @@ export default function ListViewScreen() {
           </h1>
         </div>
 
-        {/* Search bar */}
+        {/* Search */}
         <div
           className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-3"
           style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
@@ -117,11 +116,7 @@ export default function ListViewScreen() {
         </div>
 
         {/* Filter chips */}
-        <div
-          ref={filterRowRef}
-          className="flex gap-2 overflow-x-auto pb-1"
-          style={{ scrollbarWidth: 'none' }}
-        >
+        <div ref={filterRowRef} className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {FILTERS.map((f) => (
             <button
               key={f}
@@ -141,7 +136,7 @@ export default function ListViewScreen() {
         </div>
       </div>
 
-      {/* ── Results count ── */}
+      {/* Results count */}
       <div className="px-4 py-2 flex-shrink-0">
         <p className="text-xs opacity-40" style={{ fontFamily: 'Manrope, sans-serif', color: '#FAFBFF' }}>
           {loading ? 'Loading…' : `${filtered.length} place${filtered.length !== 1 ? 's' : ''}`}
@@ -153,16 +148,12 @@ export default function ListViewScreen() {
       <div className="flex-1 overflow-y-auto px-4 pb-28" style={{ scrollbarWidth: 'none' }}>
         {loading ? (
           <div className="flex flex-col gap-3 mt-2">
-            {[...Array(5)].map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
+            {[...Array(5)].map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3 opacity-40">
             <span style={{ fontSize: 40 }}>🍽️</span>
-            <p style={{ fontFamily: 'Manrope, sans-serif', color: '#FAFBFF', fontSize: 14 }}>
-              No places found
-            </p>
+            <p style={{ fontFamily: 'Manrope, sans-serif', color: '#FAFBFF', fontSize: 14 }}>No places found</p>
           </div>
         ) : (
           <motion.div
@@ -175,7 +166,10 @@ export default function ListViewScreen() {
               <RestaurantCard
                 key={r.id}
                 restaurant={r}
-                onClick={() => setSelectedRestaurant(r)}
+                onTap={() => openDetail(r, null)}
+                onEvents={() => openDetail(r, 'events')}
+                onDirections={() => openDetail(r, 'directions')}
+                onMenu={() => navigate(`/menu/${r.id}`)}
               />
             ))}
           </motion.div>
@@ -210,7 +204,8 @@ export default function ListViewScreen() {
         {selectedRestaurant && (
           <RestaurantDetail
             restaurant={selectedRestaurant}
-            onClose={() => setSelectedRestaurant(null)}
+            initialSection={detailMode}
+            onClose={() => { setSelectedRestaurant(null); setDetailMode(null) }}
           />
         )}
       </AnimatePresence>
@@ -218,103 +213,135 @@ export default function ListViewScreen() {
   )
 }
 
-// ── Restaurant card ──────────────────────────────────────────────────────────
+// ── Restaurant card with 3 action buttons ──────────────────────────────────
 function RestaurantCard({
   restaurant: r,
-  onClick,
+  onTap,
+  onEvents,
+  onDirections,
+  onMenu,
 }: {
   restaurant: Restaurant
-  onClick: () => void
+  onTap: () => void
+  onEvents: () => void
+  onDirections: () => void
+  onMenu: () => void
 }) {
   return (
-    <motion.button
-      variants={{
-        hidden: { opacity: 0, y: 16 },
-        visible: { opacity: 1, y: 0 },
-      }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className="w-full flex items-center gap-3 rounded-2xl p-3 text-left"
-      style={{
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(255,255,255,0.08)',
-      }}
+    <motion.div
+      variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
+      className="rounded-2xl overflow-hidden"
+      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
     >
-      {/* Photo — lazy upgrades from Unsplash → Pexels when scrolled into view */}
-      <div className="relative flex-shrink-0">
-        <LazyRestaurantImage
-          fallbackUrl={r.image_url}
-          query={`${r.name} ${r.cuisine} restaurant food`}
-          alt={r.name}
-          className="w-20 h-20 rounded-xl flex-shrink-0"
-          style={{ width: 80, height: 80, borderRadius: 12 }}
-        />
-        {r.tier === 'pro' && (
-          <div
-            className="absolute top-1.5 left-1.5 text-xs font-bold px-1.5 py-0.5 rounded-md"
-            style={{ background: '#4576EF', color: '#fff', fontSize: 9, fontFamily: 'Manrope' }}
-          >
-            PRO
-          </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p
-          className="font-bold text-sm leading-snug mb-0.5 truncate"
-          style={{ color: '#FAFBFF', fontFamily: 'Manrope, sans-serif' }}
-        >
-          {r.name}
-        </p>
-        <div className="flex items-center gap-1.5 mb-1">
-          <span
-            className="text-xs px-2 py-0.5 rounded-full"
-            style={{
-              background: 'rgba(69,118,239,0.15)',
-              color: '#6B9EFF',
-              fontFamily: 'Manrope, sans-serif',
-            }}
-          >
-            {r.cuisine}
-          </span>
+      {/* Top row — tappable restaurant info */}
+      <button onClick={onTap} className="w-full flex items-center gap-3 p-3 text-left">
+        {/* Photo */}
+        <div className="relative flex-shrink-0">
+          <LazyRestaurantImage
+            fallbackUrl={r.image_url}
+            query={`${r.name} ${r.cuisine} restaurant food`}
+            alt={r.name}
+            className="w-20 h-20 rounded-xl flex-shrink-0"
+            style={{ width: 80, height: 80, borderRadius: 12 }}
+          />
+          {r.tier === 'pro' && (
+            <div
+              className="absolute top-1.5 left-1.5 text-xs font-bold px-1.5 py-0.5 rounded-md"
+              style={{ background: '#4576EF', color: '#fff', fontSize: 9, fontFamily: 'Manrope' }}
+            >
+              PRO
+            </div>
+          )}
         </div>
-        <p
-          className="text-xs opacity-50 flex items-center gap-1"
-          style={{ color: '#FAFBFF', fontFamily: 'Manrope, sans-serif' }}
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="currentColor" />
-          </svg>
-          {r.city}, {r.state}
-        </p>
-      </div>
 
-      {/* Arrow */}
-      <div
-        className="flex-shrink-0 flex items-center justify-center rounded-full w-8 h-8"
-        style={{ background: 'rgba(69,118,239,0.15)' }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path d="M9 18l6-6-6-6" stroke="#4576EF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm leading-snug mb-0.5 truncate"
+            style={{ color: '#FAFBFF', fontFamily: 'Manrope, sans-serif' }}>
+            {r.name}
+          </p>
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-xs px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(69,118,239,0.15)', color: '#6B9EFF', fontFamily: 'Manrope, sans-serif' }}>
+              {r.cuisine}
+            </span>
+          </div>
+          <p className="text-xs opacity-50 flex items-center gap-1"
+            style={{ color: '#FAFBFF', fontFamily: 'Manrope, sans-serif' }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="currentColor" />
+            </svg>
+            {r.city}, {r.state}
+          </p>
+        </div>
+
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0 opacity-30">
+          <path d="M9 18l6-6-6-6" stroke="#FAFBFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
+      </button>
+
+      {/* ── 3 action buttons ── */}
+      <div
+        className="flex border-t"
+        style={{ borderColor: 'rgba(255,255,255,0.07)' }}
+      >
+        {/* Events */}
+        <button
+          onClick={onEvents}
+          className="flex-1 flex flex-col items-center gap-1 py-2.5 transition-all active:bg-white/5"
+          style={{ borderRight: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          <span style={{ fontSize: 15 }}>🎟️</span>
+          <span style={{ fontFamily: 'Manrope, sans-serif', color: 'rgba(250,251,255,0.5)', fontSize: 10, fontWeight: 600 }}>
+            Events
+          </span>
+        </button>
+
+        {/* Directions */}
+        <button
+          onClick={onDirections}
+          className="flex-1 flex flex-col items-center gap-1 py-2.5 transition-all active:bg-white/5"
+          style={{ borderRight: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          <span style={{ fontSize: 15 }}>🗺️</span>
+          <span style={{ fontFamily: 'Manrope, sans-serif', color: 'rgba(250,251,255,0.5)', fontSize: 10, fontWeight: 600 }}>
+            Directions
+          </span>
+        </button>
+
+        {/* View Menu */}
+        <button
+          onClick={onMenu}
+          className="flex-1 flex flex-col items-center gap-1 py-2.5 transition-all active:bg-white/5"
+        >
+          <span style={{ fontSize: 15 }}>🍽️</span>
+          <span style={{ fontFamily: 'Manrope, sans-serif', color: 'rgba(250,251,255,0.5)', fontSize: 10, fontWeight: 600 }}>
+            Menu
+          </span>
+        </button>
       </div>
-    </motion.button>
+    </motion.div>
   )
 }
 
 // ── Skeleton loader ──────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div
-      className="flex items-center gap-3 rounded-2xl p-3"
-      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-    >
-      <div className="w-20 h-20 rounded-xl flex-shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }} />
-      <div className="flex-1 flex flex-col gap-2">
-        <div className="h-4 rounded-lg w-3/4" style={{ background: 'rgba(255,255,255,0.08)' }} />
-        <div className="h-3 rounded-lg w-1/3" style={{ background: 'rgba(255,255,255,0.06)' }} />
-        <div className="h-3 rounded-lg w-1/2" style={{ background: 'rgba(255,255,255,0.06)' }} />
+    <div className="rounded-2xl overflow-hidden"
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex items-center gap-3 p-3">
+        <div className="w-20 h-20 rounded-xl flex-shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }} />
+        <div className="flex-1 flex flex-col gap-2">
+          <div className="h-4 rounded-lg w-3/4" style={{ background: 'rgba(255,255,255,0.08)' }} />
+          <div className="h-3 rounded-lg w-1/3" style={{ background: 'rgba(255,255,255,0.06)' }} />
+          <div className="h-3 rounded-lg w-1/2" style={{ background: 'rgba(255,255,255,0.06)' }} />
+        </div>
+      </div>
+      <div className="flex border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex-1 h-12"
+            style={{ background: 'rgba(255,255,255,0.03)', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none' }} />
+        ))}
       </div>
     </div>
   )
