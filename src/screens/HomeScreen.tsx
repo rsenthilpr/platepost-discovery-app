@@ -10,58 +10,71 @@ const VIDEO_QUERIES = [
   'burger grill american food',
 ]
 
-const PRIMARY_SUGGESTIONS = [
-  { label: '🍣 Best sushi near me', query: 'Japanese' },
-  { label: '🕯️ Dinner for two', query: 'Italian' },
-  { label: '☕ Coffee & vibes', query: 'Coffee' },
-  { label: '🎷 Live jazz tonight', query: 'Jazz' },
-  { label: '🍔 Late night bites', query: 'American' },
-  { label: '🎵 DJ sets', query: 'DJs' },
-  { label: '🌮 Street food', query: 'American' },
-  { label: '🍕 Pizza spots', query: 'Italian' },
+const LA_NEIGHBORHOODS = [
+  'DTLA', 'Silver Lake', 'Los Feliz', 'Echo Park', 'Koreatown',
+  'West Hollywood', 'Culver City', 'Venice', 'Santa Monica', 'Arts District',
+  'Highland Park', 'Fairfax', 'Mid-City', 'Brentwood', 'Larchmont',
 ]
 
-const MORE_SUGGESTIONS = [
-  { label: '🥂 Special occasion', query: 'Italian' },
-  { label: '🍜 Ramen & noodles', query: 'Japanese' },
-  { label: '🎉 Events this week', query: 'Music' },
-  { label: '🌅 Brunch spots', query: 'Cafe' },
-  { label: '🍦 Dessert runs', query: 'Cafe' },
-  { label: '🎸 Live music', query: 'Music' },
-  { label: '🍱 Bento & poke', query: 'Japanese' },
-  { label: '🥩 Steakhouses', query: 'American' },
-  { label: '🍷 Wine bars', query: 'Italian' },
-  { label: '🌙 Midnight snacks', query: 'American' },
-  { label: '👨‍👩‍👧 Family friendly', query: 'American' },
-  { label: '🏃 Quick lunch', query: 'Cafe' },
-  { label: '📱 Trendy & new', query: 'All' },
-  { label: '🎭 Date night', query: 'Italian' },
-  { label: '🌿 Healthy options', query: 'Cafe' },
-  { label: '🔥 Open now', query: 'All' },
+const VIBE_PLACEHOLDERS = [
+  'romantic dinner with live jazz...',
+  'best coffee spot to work from...',
+  'late night music and cocktails...',
+  'casual brunch with friends...',
+  'date night with great ambiance...',
 ]
+
+// Recently viewed — stored in localStorage
+function getRecentlyViewed(): number[] {
+  try {
+    return JSON.parse(localStorage.getItem('pp_recently_viewed') ?? '[]')
+  } catch { return [] }
+}
+
+export function addToRecentlyViewed(id: number) {
+  try {
+    const existing = getRecentlyViewed().filter(i => i !== id)
+    const updated = [id, ...existing].slice(0, 10)
+    localStorage.setItem('pp_recently_viewed', JSON.stringify(updated))
+  } catch {}
+}
 
 export default function HomeScreen() {
   const navigate = useNavigate()
   const [heroVideos, setHeroVideos] = useState<string[]>([])
   const [videoIndex, setVideoIndex] = useState(0)
   const [nextVideoIndex, setNextVideoIndex] = useState(1)
-  const [showMore, setShowMore] = useState(false)
   const [transitioning, setTransitioning] = useState(false)
   const [currentOpacity, setCurrentOpacity] = useState(1)
-  const currentVideoRef = useRef<HTMLVideoElement>(null)
-  const nextVideoRef = useRef<HTMLVideoElement>(null)
 
-  // Fetch videos from Pexels using the app's existing API key
+  // Vibe Match
+  const [vibeQuery, setVibeQuery] = useState('')
+  const [vibeFocused, setVibeFocused] = useState(false)
+  const [placeholderIndex, setPlaceholderIndex] = useState(0)
+  const vibeInputRef = useRef<HTMLInputElement>(null)
+
+  // Feature panels
+  const [showNeighborhoods, setShowNeighborhoods] = useState(false)
+  const [recentlyViewed] = useState<number[]>(getRecentlyViewed)
+
   useEffect(() => {
     async function loadVideos() {
-      const results = await Promise.all(VIDEO_QUERIES.map((q) => fetchPexelsVideo(q)))
-      const urls = results.map((r) => r?.url).filter((url): url is string => !!url)
+      const results = await Promise.all(VIDEO_QUERIES.map(q => fetchPexelsVideo(q)))
+      const urls = results.map(r => r?.url).filter((url): url is string => !!url)
       if (urls.length > 0) setHeroVideos(urls)
     }
     loadVideos()
   }, [])
 
-  // Crossfade every 6s — only when we have videos
+  // Rotate placeholder text
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIndex(i => (i + 1) % VIBE_PLACEHOLDERS.length)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Crossfade videos
   useEffect(() => {
     if (heroVideos.length < 2) return
     const interval = setInterval(() => {
@@ -73,8 +86,8 @@ export default function HomeScreen() {
         setCurrentOpacity(Math.max(0, opacity))
         if (opacity <= 0) {
           clearInterval(fadeOut)
-          setVideoIndex((prev) => (prev + 1) % heroVideos.length)
-          setNextVideoIndex((prev) => (prev + 1) % heroVideos.length)
+          setVideoIndex(v => (v + 1) % heroVideos.length)
+          setNextVideoIndex(v => (v + 1) % heroVideos.length)
           setCurrentOpacity(1)
           setTransitioning(false)
         }
@@ -83,8 +96,14 @@ export default function HomeScreen() {
     return () => clearInterval(interval)
   }, [heroVideos.length, transitioning])
 
-  function handleChipTap(query: string) {
-    navigate('/list', { state: { filter: query === 'All' ? 'All' : query, listView: true } })
+  function handleVibeSubmit() {
+    if (!vibeQuery.trim()) return
+    navigate('/vibe', { state: { query: vibeQuery } })
+  }
+
+  function handleNeighborhoodTap(neighborhood: string) {
+    setShowNeighborhoods(false)
+    navigate('/list', { state: { filter: 'All', neighborhood, listView: true } })
   }
 
   return (
@@ -95,7 +114,6 @@ export default function HomeScreen() {
         {heroVideos.length > 0 ? (
           <>
             <video
-              ref={currentVideoRef}
               key={`cur-${videoIndex}`}
               src={heroVideos[videoIndex]}
               autoPlay muted loop playsInline
@@ -104,36 +122,23 @@ export default function HomeScreen() {
             />
             {heroVideos[nextVideoIndex] && (
               <video
-                ref={nextVideoRef}
                 key={`next-${nextVideoIndex}`}
                 src={heroVideos[nextVideoIndex]}
                 autoPlay muted loop playsInline
                 className="absolute inset-0 w-full h-full object-cover"
-                style={{
-                  opacity: transitioning ? 1 - currentOpacity : 0,
-                  transition: 'opacity 1.2s ease',
-                }}
+                style={{ opacity: transitioning ? 1 - currentOpacity : 0, transition: 'opacity 1.2s ease' }}
               />
             )}
           </>
         ) : (
-          // Fallback while videos load — dark gradient
-          <div
-            className="absolute inset-0"
-            style={{
-              background: 'linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #071126 100%)',
-            }}
-          />
+          <div className="absolute inset-0"
+            style={{ background: 'linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #071126 100%)' }} />
         )}
       </div>
 
-      {/* ── Gradient overlay ── */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.05) 30%, rgba(0,0,0,0.5) 65%, rgba(0,0,0,0.92) 100%)',
-        }}
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 pointer-events-none"
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.55) 65%, rgba(0,0,0,0.95) 100%)' }}
       />
 
       {/* ── Top bar ── */}
@@ -149,138 +154,153 @@ export default function HomeScreen() {
         <button
           onClick={() => navigate('/map')}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-          style={{
-            background: 'rgba(255,255,255,0.15)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.25)',
-          }}
+          style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.25)' }}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
           </svg>
-          <span style={{ fontFamily: 'Manrope, sans-serif', color: '#fff', fontSize: 11, fontWeight: 600 }}>
-            Los Angeles
-          </span>
+          <span style={{ fontFamily: 'Manrope, sans-serif', color: '#fff', fontSize: 11, fontWeight: 600 }}>Los Angeles</span>
         </button>
       </div>
 
-      {/* ── Main content — bottom anchored ── */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 px-6 pb-16">
+      {/* ── Main content ── */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 px-5 pb-10">
 
         {/* Headline */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="mb-2"
-        >
-          <p style={{
-            fontFamily: 'Manrope, sans-serif',
-            color: 'rgba(255,255,255,0.6)',
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            marginBottom: 6,
-          }}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="mb-5">
+          <p style={{ fontFamily: 'Manrope, sans-serif', color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>
             Discover
           </p>
-          <h1 style={{
-            fontFamily: 'Bungee, cursive',
-            color: '#fff',
-            fontSize: 'clamp(2.2rem, 10vw, 3.4rem)',
-            lineHeight: 1.05,
-            letterSpacing: '0.02em',
-            textShadow: '0 2px 20px rgba(0,0,0,0.4)',
-          }}>
+          <h1 style={{ fontFamily: 'Bungee, cursive', color: '#fff', fontSize: 'clamp(2rem, 9vw, 3.2rem)', lineHeight: 1.05, letterSpacing: '0.02em', textShadow: '0 2px 20px rgba(0,0,0,0.4)' }}>
             LA's best<br />restaurants
           </h1>
         </motion.div>
 
-        {/* ── AI Suggestion Carousel ── */}
+        {/* ── Conversational Vibe Match ── */}
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
-          className="mt-6 mb-5"
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="mb-4"
         >
           <div
-            className="flex gap-2 overflow-x-auto pb-1"
+            className="rounded-2xl overflow-hidden"
             style={{
-              scrollbarWidth: 'none',
-              maskImage: 'linear-gradient(to right, transparent 0%, black 5%, black 88%, transparent 100%)',
-            } as React.CSSProperties}
+              background: vibeFocused ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.1)',
+              backdropFilter: 'blur(20px)',
+              border: vibeFocused ? '1.5px solid rgba(139,92,246,0.7)' : '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s',
+            }}
           >
-            {PRIMARY_SUGGESTIONS.map((chip, i) => (
-              <motion.button
-                key={chip.label}
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 + i * 0.04 }}
-                whileTap={{ scale: 0.93 }}
-                onClick={() => handleChipTap(chip.query)}
-                className="flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold"
-                style={{
-                  fontFamily: 'Manrope, sans-serif',
-                  background: 'rgba(255,255,255,0.14)',
-                  backdropFilter: 'blur(16px)',
-                  border: '1px solid rgba(255,255,255,0.28)',
-                  color: '#fff',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {chip.label}
-              </motion.button>
-            ))}
-
-            {/* More ideas chip */}
-            <motion.button
-              initial={{ opacity: 0, scale: 0.85 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.55 }}
-              whileTap={{ scale: 0.93 }}
-              onClick={() => setShowMore(true)}
-              className="flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1"
-              style={{
-                fontFamily: 'Manrope, sans-serif',
-                background: 'rgba(69,118,239,0.35)',
-                backdropFilter: 'blur(16px)',
-                border: '1px solid rgba(69,118,239,0.6)',
-                color: '#fff',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              More ideas
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                <path d="M6 9l6 6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-            </motion.button>
+            <div className="flex items-center gap-3 px-4 py-3.5">
+              <span style={{ fontSize: 18, flexShrink: 0 }}>✨</span>
+              <input
+                ref={vibeInputRef}
+                value={vibeQuery}
+                onChange={e => setVibeQuery(e.target.value)}
+                onFocus={() => setVibeFocused(true)}
+                onBlur={() => setVibeFocused(false)}
+                onKeyDown={e => e.key === 'Enter' && handleVibeSubmit()}
+                className="flex-1 bg-transparent outline-none"
+                style={{ color: '#fff', fontFamily: 'Manrope, sans-serif', fontSize: 14 }}
+              />
+              {!vibeQuery && !vibeFocused && (
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={placeholderIndex}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute"
+                    style={{
+                      color: 'rgba(255,255,255,0.4)',
+                      fontFamily: 'Manrope, sans-serif',
+                      fontSize: 14,
+                      pointerEvents: 'none',
+                      left: 72,
+                    }}
+                  >
+                    {VIBE_PLACEHOLDERS[placeholderIndex]}
+                  </motion.span>
+                </AnimatePresence>
+              )}
+              {vibeQuery ? (
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleVibeSubmit}
+                  className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold"
+                  style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)', color: '#fff', fontFamily: 'Manrope' }}
+                >
+                  Match →
+                </motion.button>
+              ) : (
+                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, fontFamily: 'Manrope', flexShrink: 0 }}>
+                  What's your vibe?
+                </span>
+              )}
+            </div>
           </div>
         </motion.div>
 
-        {/* ── Vibe Match AI button ── */}
-        <motion.button
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.25 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => navigate('/vibe')}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold mb-3"
-          style={{
-            fontFamily: 'Manrope, sans-serif',
-            background: 'linear-gradient(135deg, rgba(69,118,239,0.5) 0%, rgba(139,92,246,0.5) 100%)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(139,92,246,0.4)',
-            color: '#fff',
-          }}
-        >
-          <span style={{ fontSize: 16 }}>✨</span>
-          Match My Vibe with AI
-        </motion.button>
-
-        {/* ── Bottom action buttons ── */}
+        {/* ── Quick action chips ── */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="flex gap-2 mb-4 overflow-x-auto"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {/* Open Now */}
+          <motion.button
+            whileTap={{ scale: 0.93 }}
+            onClick={() => navigate('/list', { state: { filter: 'All', openNow: true, listView: true } })}
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
+            style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', color: '#fff', fontFamily: 'Manrope', backdropFilter: 'blur(12px)' }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#10b981' }} />
+            Open Now
+          </motion.button>
+
+          {/* Tonight */}
+          <motion.button
+            whileTap={{ scale: 0.93 }}
+            onClick={() => navigate('/list', { state: { filter: 'Music', tonight: true, listView: true } })}
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
+            style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.4)', color: '#fff', fontFamily: 'Manrope', backdropFilter: 'blur(12px)' }}
+          >
+            <span style={{ fontSize: 12 }}>🎟️</span>
+            Tonight
+          </motion.button>
+
+          {/* Neighborhoods */}
+          <motion.button
+            whileTap={{ scale: 0.93 }}
+            onClick={() => setShowNeighborhoods(true)}
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
+            style={{ background: 'rgba(69,118,239,0.2)', border: '1px solid rgba(69,118,239,0.4)', color: '#fff', fontFamily: 'Manrope', backdropFilter: 'blur(12px)' }}
+          >
+            <span style={{ fontSize: 12 }}>📍</span>
+            Neighborhoods
+          </motion.button>
+
+          {/* Recently Viewed */}
+          {recentlyViewed.length > 0 && (
+            <motion.button
+              whileTap={{ scale: 0.93 }}
+              onClick={() => navigate('/list', { state: { recentIds: recentlyViewed, listView: true } })}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
+              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontFamily: 'Manrope', backdropFilter: 'blur(12px)' }}
+            >
+              <span style={{ fontSize: 12 }}>🕐</span>
+              Recent
+            </motion.button>
+          )}
+        </motion.div>
+
+        {/* ── Bottom buttons ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
           className="flex gap-3"
@@ -296,17 +316,10 @@ export default function HomeScreen() {
             </svg>
             Explore Map
           </button>
-
           <button
             onClick={() => navigate('/list')}
             className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-            style={{
-              fontFamily: 'Manrope, sans-serif',
-              background: 'rgba(255,255,255,0.12)',
-              backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(255,255,255,0.22)',
-              color: '#fff',
-            }}
+            style={{ fontFamily: 'Manrope, sans-serif', background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.22)', color: '#fff' }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <polygon points="5,3 19,12 5,21" fill="white" />
@@ -316,63 +329,41 @@ export default function HomeScreen() {
         </motion.div>
       </div>
 
-      {/* ── More Ideas Sheet ── */}
+      {/* ── Neighborhoods Sheet ── */}
       <AnimatePresence>
-        {showMore && (
+        {showNeighborhoods && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 z-30"
               style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-              onClick={() => setShowMore(false)}
+              onClick={() => setShowNeighborhoods(false)}
             />
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
               className="absolute bottom-0 left-0 right-0 z-40 rounded-t-3xl px-5 pt-4 pb-14"
-              style={{ background: '#0d1b35', maxHeight: '75vh', overflowY: 'auto', scrollbarWidth: 'none' }}
+              style={{ background: '#0d1b35', maxHeight: '70vh', overflowY: 'auto', scrollbarWidth: 'none' }}
             >
-              <div className="flex justify-center mb-5">
+              <div className="flex justify-center mb-4">
                 <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }} />
               </div>
-              <p style={{
-                fontFamily: 'Bungee, cursive',
-                color: '#fff',
-                fontSize: 18,
-                letterSpacing: '0.04em',
-                marginBottom: 16,
-              }}>
-                What are you looking for?
+              <p style={{ fontFamily: 'Bungee, cursive', color: '#fff', fontSize: 18, letterSpacing: '0.04em', marginBottom: 16 }}>
+                Browse by Neighborhood
               </p>
-              <div className="flex flex-wrap gap-2 mb-6">
-                {[...PRIMARY_SUGGESTIONS, ...MORE_SUGGESTIONS].map((chip) => (
+              <div className="flex flex-wrap gap-2">
+                {LA_NEIGHBORHOODS.map(n => (
                   <motion.button
-                    key={chip.label}
+                    key={n}
                     whileTap={{ scale: 0.93 }}
-                    onClick={() => { setShowMore(false); handleChipTap(chip.query) }}
+                    onClick={() => handleNeighborhoodTap(n)}
                     className="px-4 py-2 rounded-full text-xs font-semibold"
-                    style={{
-                      fontFamily: 'Manrope, sans-serif',
-                      background: 'rgba(255,255,255,0.07)',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      color: '#fff',
-                    }}
+                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontFamily: 'Manrope' }}
                   >
-                    {chip.label}
+                    📍 {n}
                   </motion.button>
                 ))}
               </div>
-              <button
-                onClick={() => { setShowMore(false); navigate('/list') }}
-                className="w-full py-3.5 rounded-2xl text-sm font-bold"
-                style={{ fontFamily: 'Manrope, sans-serif', background: '#4576EF', color: '#fff' }}
-              >
-                Browse everything →
-              </button>
             </motion.div>
           </>
         )}

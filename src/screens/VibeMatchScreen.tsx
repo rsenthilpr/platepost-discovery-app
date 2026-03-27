@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
@@ -34,7 +34,9 @@ const EXAMPLE_VIBES = [
 
 export default function VibeMatchScreen() {
   const navigate = useNavigate()
-  const [query, setQuery] = useState('')
+  const location = useLocation()
+  const navState = (location.state ?? {}) as { query?: string }
+  const [query, setQuery] = useState(navState.query ?? '')
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [results, setResults] = useState<VibeResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -42,6 +44,13 @@ export default function VibeMatchScreen() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Only auto-search once restaurants have loaded AND query was passed
+    if (navState.query && restaurants.length > 0 && !searched) {
+      handleSearch()
+    }
+  }, [restaurants.length])
 
   useEffect(() => {
     supabase.from('restaurants').select('*').then(({ data }) => {

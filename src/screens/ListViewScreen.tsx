@@ -24,6 +24,10 @@ interface LocationState {
   filter?: string
   selectedId?: number
   listView?: boolean
+  openNow?: boolean
+  tonight?: boolean
+  neighborhood?: string
+  recentIds?: number[]
 }
 
 function getVideoQuery(cuisine: string): string {

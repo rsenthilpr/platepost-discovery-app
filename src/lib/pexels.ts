@@ -49,23 +49,24 @@ export async function fetchPexelsVideo(query: string): Promise<PexelsVideo | nul
   }
 }
 
-// Used for reels feed (ListViewScreen) — portrait orientation for vertical display
+// Used for reels feed (ListViewScreen) — any orientation, CSS handles cropping
 export async function fetchPexelsPortraitVideo(query: string): Promise<PexelsVideo | null> {
   try {
+    // Try landscape first (more results), CSS object-cover handles vertical cropping
     const res = await fetch(
-      `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=3&orientation=portrait`,
+      `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=5`,
       { headers: { Authorization: PEXELS_KEY } }
     )
     if (!res.ok) return null
     const data = await res.json()
-    // Try each video until we find one with a valid file
     const videos = data?.videos ?? []
     for (const video of videos) {
+      // Prefer SD/HD files under 10MB for fast mobile loading
       const file =
-        video.video_files?.find((f: { quality: string; width: number }) =>
-          f.quality === 'hd' && f.width <= 1080
+        video.video_files?.find((f: { quality: string; height: number }) =>
+          f.quality === 'sd' && f.height >= 480
         ) ??
-        video.video_files?.find((f: { quality: string }) => f.quality === 'sd') ??
+        video.video_files?.find((f: { quality: string }) => f.quality === 'hd') ??
         video.video_files?.[0]
       if (file?.link) return { url: file.link }
     }

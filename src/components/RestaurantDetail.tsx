@@ -45,6 +45,27 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
+function trackRecentlyViewed(id: number) {
+  try {
+    const existing = JSON.parse(localStorage.getItem('pp_recently_viewed') ?? '[]') as number[]
+    const updated = [id, ...existing.filter((i: number) => i !== id)].slice(0, 10)
+    localStorage.setItem('pp_recently_viewed', JSON.stringify(updated))
+  } catch {}
+}
+
+async function shareRestaurant(name: string, city: string) {
+  const text = `Check out ${name} in ${city} on PlatePost! 🍽️`
+  const url = window.location.origin
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: name, text, url })
+    } catch {}
+  } else {
+    await navigator.clipboard.writeText(`${text} ${url}`)
+    alert('Link copied to clipboard!')
+  }
+}
+
 export default function RestaurantDetail({ restaurant: r, onClose, initialSection, isFavorite = false, onToggleFavorite }: Props) {
   const navigate = useNavigate()
   const [events, setEvents] = useState<DisplayEvent[]>([])
@@ -58,6 +79,7 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
   useEffect(() => {
     fetchEvents()
     loadPlaceInfo()
+    trackRecentlyViewed(r.id)
   }, [r.id])
 
   // Auto-scroll to section if initialSection is passed from feed card buttons
@@ -182,6 +204,17 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <path d="M18 6L6 18M6 6l12 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          </button>
+          {/* Share button */}
+          <button
+            onClick={() => shareRestaurant(r.name, r.city)}
+            className="absolute top-3 right-12 w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.45)' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
             </svg>
           </button>
           {/* Favorite button */}
