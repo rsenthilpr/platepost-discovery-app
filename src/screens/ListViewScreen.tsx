@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
-import { fetchPexelsVideo } from '../lib/pexels'
+import { fetchPexelsPortraitVideo } from '../lib/pexels'
 import { fetchPlaceDetails } from '../lib/googlePlaces'
 import { searchEventbriteEvents } from '../lib/eventbrite'
 import type { Restaurant } from '../types'
@@ -151,7 +151,7 @@ export default function ListViewScreen() {
     loadedIndices.current.add(index)
 
     const [videoResult, placeResult, events] = await Promise.all([
-      fetchPexelsVideo(getVideoQuery(r.cuisine)),
+      fetchPexelsPortraitVideo(getVideoQuery(r.cuisine)),
       fetchPlaceDetails(r.name, r.city),
       searchEventbriteEvents(r.name, r.city, r.state),
     ])

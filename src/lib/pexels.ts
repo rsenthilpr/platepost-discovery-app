@@ -28,6 +28,7 @@ export async function fetchPexelsPhoto(query: string): Promise<PexelsPhoto | nul
   }
 }
 
+// Used for hero videos (MenuPage, HomeScreen) — landscape orientation
 export async function fetchPexelsVideo(query: string): Promise<PexelsVideo | null> {
   try {
     const res = await fetch(
@@ -38,12 +39,37 @@ export async function fetchPexelsVideo(query: string): Promise<PexelsVideo | nul
     const data = await res.json()
     const video = data?.videos?.[0]
     if (!video) return null
-    // Pick the HD or SD file
     const file =
       video.video_files?.find((f: { quality: string }) => f.quality === 'hd') ??
       video.video_files?.[0]
     if (!file?.link) return null
     return { url: file.link }
+  } catch {
+    return null
+  }
+}
+
+// Used for reels feed (ListViewScreen) — portrait orientation for vertical display
+export async function fetchPexelsPortraitVideo(query: string): Promise<PexelsVideo | null> {
+  try {
+    const res = await fetch(
+      `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=3&orientation=portrait`,
+      { headers: { Authorization: PEXELS_KEY } }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    // Try each video until we find one with a valid file
+    const videos = data?.videos ?? []
+    for (const video of videos) {
+      const file =
+        video.video_files?.find((f: { quality: string; width: number }) =>
+          f.quality === 'hd' && f.width <= 1080
+        ) ??
+        video.video_files?.find((f: { quality: string }) => f.quality === 'sd') ??
+        video.video_files?.[0]
+      if (file?.link) return { url: file.link }
+    }
+    return null
   } catch {
     return null
   }
