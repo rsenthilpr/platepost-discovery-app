@@ -440,13 +440,15 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
   const r = slide.restaurant
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  // Play when active AND when videoUrl first becomes available
+  // Play whenever isActive or videoUrl changes
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-    if (isActive && slide.videoUrl) {
-      video.load()
-      video.play().catch(() => {})
+    if (isActive) {
+      const t = setTimeout(() => {
+        video.play().catch(() => {})
+      }, 100)
+      return () => clearTimeout(t)
     } else {
       video.pause()
       video.currentTime = 0
@@ -465,6 +467,7 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
         <video
           ref={videoRef}
           src={slide.videoUrl}
+          autoPlay
           muted
           loop
           playsInline

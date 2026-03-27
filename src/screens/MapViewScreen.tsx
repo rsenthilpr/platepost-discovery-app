@@ -148,8 +148,8 @@ export default function MapViewScreen() {
             onClick={() => navigate('/')}
             style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer' }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <polygon points="5,3 19,12 5,21" fill="#071126" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="#071126" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span style={{ fontFamily: 'Bungee, cursive', color: '#071126', fontSize: 15, letterSpacing: '0.05em' }}>
               PlatePost
