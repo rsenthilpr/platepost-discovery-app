@@ -6,7 +6,7 @@ export default async function handler(req: Request) {
     return new Response('Method not allowed', { status: 405 })
   }
 
-  const ANTHROPIC_KEY = process.env.VITE_ANTHROPIC_API_KEY
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY ?? process.env.VITE_ANTHROPIC_API_KEY
   if (!ANTHROPIC_KEY) {
     return new Response(JSON.stringify({ error: 'API key not configured' }), {
       status: 500,

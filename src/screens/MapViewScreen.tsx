@@ -42,7 +42,6 @@ function getIcon(cuisine: string, isFavorite: boolean) {
 const LOCATIONS = {
   'Los Angeles, CA': { lat: 34.0522, lng: -118.2437, zoom: 11 },
   'Orange County, CA': { lat: 33.7175, lng: -117.8311, zoom: 11 },
-  'Minneapolis, MN': { lat: 44.9778, lng: -93.265, zoom: 12 },
 }
 type LocationKey = keyof typeof LOCATIONS
 
