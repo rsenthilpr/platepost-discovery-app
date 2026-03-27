@@ -8,6 +8,18 @@ import { searchEventbriteEvents } from '../lib/eventbrite'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 
+// ── Favorites helpers (shared with MapViewScreen via localStorage) ────────────
+function loadFavorites(): Set<number> {
+  try {
+    const raw = localStorage.getItem('pp_favorites')
+    if (!raw) return new Set()
+    return new Set(JSON.parse(raw) as number[])
+  } catch { return new Set() }
+}
+function saveFavorites(favs: Set<number>) {
+  localStorage.setItem('pp_favorites', JSON.stringify([...favs]))
+}
+
 interface LocationState {
   filter?: string
   selectedId?: number
@@ -97,8 +109,19 @@ export default function ListViewScreen() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState(state.filter ?? 'All')
+  const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const loadedIndices = useRef<Set<number>>(new Set())
+
+  function toggleFavorite(id: number) {
+    setFavorites((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      saveFavorites(next)
+      return next
+    })
+  }
 
   const FILTERS = ['All', 'Coffee', 'Jazz', 'Music', 'DJs', 'Japanese', 'Italian', 'American', 'Cafe']
 
@@ -335,6 +358,8 @@ export default function ListViewScreen() {
             slide={slide}
             index={index}
             isActive={index === currentIndex}
+            isFavorite={favorites.has(slide.restaurant.id)}
+            onToggleFavorite={() => toggleFavorite(slide.restaurant.id)}
             slideRef={(el: HTMLDivElement | null) => { slideRefs.current[index] = el }}
             onMoreInfo={() => setSelectedRestaurant(slide.restaurant)}
             onDirections={() => {
@@ -388,6 +413,8 @@ export default function ListViewScreen() {
           <RestaurantDetail
             restaurant={selectedRestaurant}
             onClose={() => setSelectedRestaurant(null)}
+            isFavorite={favorites.has(selectedRestaurant.id)}
+            onToggleFavorite={() => toggleFavorite(selectedRestaurant.id)}
           />
         )}
       </AnimatePresence>
@@ -400,6 +427,8 @@ interface ReelSlideProps {
   slide: ReelSlide
   index: number
   isActive: boolean
+  isFavorite: boolean
+  onToggleFavorite: () => void
   slideRef: (el: HTMLDivElement | null) => void
   onMoreInfo: () => void
   onDirections: () => void
@@ -407,7 +436,7 @@ interface ReelSlideProps {
   onEvents: () => void
 }
 
-function ReelSlide({ slide, index, isActive, slideRef, onMoreInfo, onDirections, onMenu, onEvents }: ReelSlideProps) {
+function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slideRef, onMoreInfo, onDirections, onMenu, onEvents }: ReelSlideProps) {
   const r = slide.restaurant
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -456,7 +485,7 @@ function ReelSlide({ slide, index, isActive, slideRef, onMoreInfo, onDirections,
         style={{ height: '60%', background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.55) 55%, transparent 100%)' }} />
 
       {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 z-10 pt-12 px-5 flex items-center">
+      <div className="absolute top-0 left-0 right-0 z-10 pt-12 px-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <polygon points="5,3 19,12 5,21" fill="white" />
@@ -465,6 +494,21 @@ function ReelSlide({ slide, index, isActive, slideRef, onMoreInfo, onDirections,
             PlatePost
           </span>
         </div>
+        {/* Heart / favorite button */}
+        <motion.button
+          whileTap={{ scale: 0.8 }}
+          onClick={onToggleFavorite}
+          className="w-9 h-9 flex items-center justify-center rounded-full"
+          style={{
+            background: 'rgba(0,0,0,0.35)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill={isFavorite ? '#E11D48' : 'none'} stroke={isFavorite ? '#E11D48' : 'white'} strokeWidth="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+        </motion.button>
       </div>
 
       {/* Bottom content */}

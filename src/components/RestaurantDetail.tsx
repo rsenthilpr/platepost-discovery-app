@@ -11,6 +11,8 @@ interface Props {
   restaurant: Restaurant
   onClose: () => void
   initialSection?: 'events' | 'directions' | 'menu' | null
+  isFavorite?: boolean
+  onToggleFavorite?: () => void
 }
 
 interface PlaceInfo {
@@ -43,7 +45,7 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-export default function RestaurantDetail({ restaurant: r, onClose, initialSection }: Props) {
+export default function RestaurantDetail({ restaurant: r, onClose, initialSection, isFavorite = false, onToggleFavorite }: Props) {
   const navigate = useNavigate()
   const [events, setEvents] = useState<DisplayEvent[]>([])
   const [placeInfo, setPlaceInfo] = useState<PlaceInfo>({})
@@ -182,6 +184,21 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
               <path d="M18 6L6 18M6 6l12 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           </button>
+          {/* Favorite button */}
+          {onToggleFavorite && (
+            <button
+              onClick={onToggleFavorite}
+              className="absolute top-3 left-3 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(0,0,0,0.45)' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24"
+                fill={isFavorite ? '#E11D48' : 'none'}
+                stroke={isFavorite ? '#E11D48' : 'white'}
+                strokeWidth="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Name + rating */}
