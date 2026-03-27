@@ -84,7 +84,7 @@ export default function HomeScreen() {
   }, [heroVideos.length, transitioning])
 
   function handleChipTap(query: string) {
-    navigate('/list', { state: { filter: query === 'All' ? 'All' : query } })
+    navigate('/list', { state: { filter: query === 'All' ? 'All' : query, listView: true } })
   }
 
   return (
