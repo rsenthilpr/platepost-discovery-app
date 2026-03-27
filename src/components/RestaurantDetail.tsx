@@ -294,7 +294,7 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
               onClick={() => window.open(r.website_url, '_blank')} />
           )}
 
-          <ActionButton icon="🗺️" label="Get Directions"
+          <ActionButton icon="nav" label="Get Directions"
             onClick={() => window.open(getDirectionsUrl(), '_blank')} />
 
           {!loadingEvents && events.length > 0 && (
@@ -354,6 +354,14 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
   )
 }
 
+function NavIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+    </svg>
+  )
+}
+
 function ActionButton({
   icon, label, onClick, primary = false,
 }: {
@@ -373,7 +381,7 @@ function ActionButton({
         border: primary ? '1px solid rgba(69,118,239,0.4)' : '1px solid rgba(255,255,255,0.1)',
       }}
     >
-      <span>{icon}</span>
+      {icon === 'nav' ? <NavIcon /> : <span>{icon}</span>}
       <span className="truncate">{label}</span>
     </button>
   )

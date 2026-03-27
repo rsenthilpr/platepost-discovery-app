@@ -332,15 +332,16 @@ export default function ListViewScreen() {
   return (
     <div className="fixed inset-0" style={{ background: '#000' }}>
 
-      {/* Close button — top right, goes to home */}
+      {/* Back button — top left, goes to home */}
       <button
         onClick={() => navigate('/')}
-        className="absolute top-12 right-5 z-50 w-9 h-9 flex items-center justify-center rounded-full"
+        className="absolute top-12 left-5 z-50 flex items-center gap-2 px-3 py-2 rounded-full"
         style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+          <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
+        <span style={{ fontFamily: 'Manrope, sans-serif', color: 'white', fontSize: 12, fontWeight: 600 }}>Home</span>
       </button>
 
       {/* Scrollable reel container */}
@@ -487,16 +488,8 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
       <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
         style={{ height: '60%', background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.55) 55%, transparent 100%)' }} />
 
-      {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 z-10 pt-12 px-5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <polygon points="5,3 19,12 5,21" fill="white" />
-          </svg>
-          <span style={{ fontFamily: 'Bungee, cursive', color: '#fff', fontSize: 14, letterSpacing: '0.04em' }}>
-            PlatePost
-          </span>
-        </div>
+      {/* Top bar — heart only (back button is rendered at container level) */}
+      <div className="absolute top-0 left-0 right-0 z-10 pt-12 px-5 flex items-center justify-end">
         {/* Heart / favorite button */}
         <motion.button
           whileTap={{ scale: 0.8 }}
@@ -593,7 +586,7 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
               border: '1px solid rgba(255,255,255,0.18)',
             }}
           >
-            <span style={{ fontSize: 20 }}>🗺️</span>
+            <span style={{ fontSize: 18 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></span>
             <span style={{ fontFamily: 'Manrope', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>
               Directions
             </span>
