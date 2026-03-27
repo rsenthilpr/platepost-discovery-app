@@ -4,6 +4,7 @@ import VoiceSearchScreen from './screens/VoiceSearchScreen'
 import MapViewScreen from './screens/MapViewScreen'
 import ListViewScreen from './screens/ListViewScreen'
 import MenuPage from './screens/MenuPage'
+import VibeMatchScreen from './screens/VibeMatchScreen'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="/map" element={<MapViewScreen />} />
         <Route path="/list" element={<ListViewScreen />} />
         <Route path="/menu/:id" element={<MenuPage />} />
+        <Route path="/vibe" element={<VibeMatchScreen />} />
       </Routes>
     </BrowserRouter>
   )

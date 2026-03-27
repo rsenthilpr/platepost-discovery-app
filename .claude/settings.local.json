@@ -15,7 +15,8 @@
       "Bash(do echo:*)",
       "Bash(npx vercel:*)",
       "Bash(printf \"https://gmkwkqalnyywkabzdasv.supabase.co\")",
-      "WebFetch(domain:platepost-discovery-app.vercel.app)"
+      "WebFetch(domain:platepost-discovery-app.vercel.app)",
+      "Bash(npx supabase:*)"
     ]
   }
 }

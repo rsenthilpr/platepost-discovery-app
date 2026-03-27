@@ -258,6 +258,26 @@ export default function HomeScreen() {
           </div>
         </motion.div>
 
+        {/* ── Vibe Match AI button ── */}
+        <motion.button
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.25 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => navigate('/vibe')}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold mb-3"
+          style={{
+            fontFamily: 'Manrope, sans-serif',
+            background: 'linear-gradient(135deg, rgba(69,118,239,0.5) 0%, rgba(139,92,246,0.5) 100%)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(139,92,246,0.4)',
+            color: '#fff',
+          }}
+        >
+          <span style={{ fontSize: 16 }}>✨</span>
+          Match My Vibe with AI
+        </motion.button>
+
         {/* ── Bottom action buttons ── */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}

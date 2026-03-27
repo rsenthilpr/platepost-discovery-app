@@ -46,7 +46,7 @@ const LOCATIONS = {
 }
 type LocationKey = keyof typeof LOCATIONS
 
-const FILTERS = ['All', 'Favorites', 'Coffee', 'Japanese', 'Italian', 'American', 'Music', 'Jazz']
+const FILTERS = ['All', 'Favorites', 'Coffee', 'Music', 'Jazz', 'American', 'Italian', 'Japanese', 'Cafe']
 
 function MapController({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap()
