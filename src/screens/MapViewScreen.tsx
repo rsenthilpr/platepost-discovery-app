@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-// useRef kept for future mapRef usage
 import { motion, AnimatePresence } from 'framer-motion'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 
-// Fix Leaflet default icon paths broken by bundlers
+// Fix Leaflet default icon paths
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -17,42 +16,30 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-// Custom pin icon factory — emoji varies by cuisine
+// Clean circular pin icon
 function makeIcon(color: string, emoji: string) {
   return L.divIcon({
     className: '',
     html: `
       <div style="
-        width:40px; height:50px; position:relative; display:flex;
-        flex-direction:column; align-items:center;
-      ">
-        <div style="
-          width:40px; height:40px; border-radius:50% 50% 50% 0;
-          transform:rotate(-45deg);
-          background:${color};
-          box-shadow:0 4px 16px rgba(0,0,0,0.3);
-          display:flex; align-items:center; justify-content:center;
-          border:2px solid white;
-        ">
-          <div style="transform:rotate(45deg); font-size:18px; line-height:1;">${emoji}</div>
-        </div>
-        <div style="
-          width:0; height:0;
-          border-left:6px solid transparent;
-          border-right:6px solid transparent;
-          border-top:8px solid ${color};
-          margin-top:-2px;
-        "></div>
-      </div>`,
-    iconSize: [40, 50],
-    iconAnchor: [20, 50],
-    popupAnchor: [0, -50],
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: ${color};
+        border: 3px solid white;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        cursor: pointer;
+      ">${emoji}</div>`,
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
   })
 }
 
-function getIcon(cuisine: string, tier: string) {
-  const isPro = tier === 'pro'
-  const color = isPro ? '#4576EF' : '#FF6B35'
+function getIcon(cuisine: string) {
   const emojiMap: Record<string, string> = {
     Coffee: '☕',
     Cafe: '☕',
@@ -61,21 +48,21 @@ function getIcon(cuisine: string, tier: string) {
     American: '🍔',
     Music: '🎵',
     Jazz: '🎷',
+    Mexican: '🌮',
   }
   const emoji = emojiMap[cuisine] ?? '🍽️'
-  return makeIcon(color, emoji)
+  return makeIcon('#071126', emoji)
 }
 
-// Location presets
 const LOCATIONS = {
+  'Los Angeles, CA': { lat: 34.0522, lng: -118.2437, zoom: 11 },
   'Orange County, CA': { lat: 33.7175, lng: -117.8311, zoom: 11 },
   'Minneapolis, MN': { lat: 44.9778, lng: -93.265, zoom: 12 },
 }
 type LocationKey = keyof typeof LOCATIONS
 
-const FILTERS = ['All', 'Coffee', 'DJs', 'Jazz', 'Music']
+const FILTERS = ['All', 'Coffee', 'Japanese', 'Italian', 'American', 'Music', 'Jazz']
 
-// Animates map to a new center/zoom
 function MapController({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap()
   useEffect(() => {
@@ -88,7 +75,7 @@ export default function MapViewScreen() {
   const navigate = useNavigate()
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [activeFilter, setActiveFilter] = useState('All')
-  const [activeLocation, setActiveLocation] = useState<LocationKey>('Orange County, CA')
+  const [activeLocation, setActiveLocation] = useState<LocationKey>('Los Angeles, CA')
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   const mapRef = useRef<L.Map | null>(null)
@@ -100,9 +87,7 @@ export default function MapViewScreen() {
   }, [])
 
   async function fetchRestaurants() {
-    const { data, error } = await supabase
-      .from('restaurants')
-      .select('*')
+    const { data, error } = await supabase.from('restaurants').select('*')
     if (error) console.error(error)
     else setRestaurants(data ?? [])
   }
@@ -122,17 +107,22 @@ export default function MapViewScreen() {
         style={{
           background: 'rgba(255,255,255,0.96)',
           backdropFilter: 'blur(12px)',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.10)',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
         }}
       >
-        {/* Header row */}
         <div className="flex items-center justify-between">
-          <h1
-            className="text-lg"
-            style={{ fontFamily: 'Bungee, cursive', color: '#071126', letterSpacing: '0.05em' }}
+          {/* Back to home */}
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2"
           >
-            PlatePost
-          </h1>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <polygon points="5,3 19,12 5,21" fill="#071126" />
+            </svg>
+            <span style={{ fontFamily: 'Bungee, cursive', color: '#071126', fontSize: 16, letterSpacing: '0.05em' }}>
+              PlatePost
+            </span>
+          </button>
 
           {/* Location switcher */}
           <div className="relative">
@@ -146,9 +136,8 @@ export default function MapViewScreen() {
                 fontFamily: 'Manrope, sans-serif',
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#4576EF" />
-                <circle cx="12" cy="9" r="2.5" fill="white" />
               </svg>
               {activeLocation}
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
@@ -167,7 +156,7 @@ export default function MapViewScreen() {
                   style={{
                     background: '#fff',
                     border: '1px solid #e0e7ff',
-                    minWidth: 180,
+                    minWidth: 200,
                     boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
                   }}
                 >
@@ -197,13 +186,12 @@ export default function MapViewScreen() {
             <button
               key={f}
               onClick={() => setActiveFilter(f)}
-              className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95"
+              className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all"
               style={{
                 fontFamily: 'Manrope, sans-serif',
-                background: activeFilter === f ? '#4576EF' : '#fff',
+                background: activeFilter === f ? '#071126' : '#fff',
                 color: activeFilter === f ? '#fff' : '#444',
-                border: activeFilter === f ? '1px solid #4576EF' : '1px solid #ddd',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                border: activeFilter === f ? '1px solid #071126' : '1px solid #ddd',
               }}
             >
               {f}
@@ -224,60 +212,76 @@ export default function MapViewScreen() {
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution='&copy; OpenStreetMap contributors'
           />
-
           <MapController center={[loc.lat, loc.lng]} zoom={loc.zoom} />
 
           {filtered.map((r) => (
             <Marker
               key={r.id}
               position={[r.latitude, r.longitude]}
-              icon={getIcon(r.cuisine, r.tier)}
+              icon={getIcon(r.cuisine)}
               eventHandlers={{
                 click: () => setSelectedRestaurant(r),
               }}
-            >
-              <Popup className="platepost-popup">
-                <div
-                  className="p-2"
-                  style={{ fontFamily: 'Manrope, sans-serif', minWidth: 160 }}
-                >
-                  <p className="font-bold text-sm">{r.name}</p>
-                  <p className="text-xs opacity-70">{r.cuisine} · {r.city}</p>
-                </div>
-              </Popup>
-            </Marker>
+            />
           ))}
         </MapContainer>
       </div>
 
-
-      {/* ── Bottom bar ── */}
+      {/* ── Bottom tab bar ── */}
       <div
-        className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-center pb-10 pt-4"
+        className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-center pb-8 pt-4"
         style={{ background: 'linear-gradient(to top, rgba(255,255,255,0.97) 55%, transparent)' }}
       >
-        <button
-          onClick={() => navigate('/list')}
-          className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold"
+        <div
+          className="flex items-center rounded-full overflow-hidden"
           style={{
-            background: '#071126',
-            color: '#FAFBFF',
-            fontFamily: 'Manrope, sans-serif',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+            background: 'rgba(255,255,255,0.9)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(0,0,0,0.1)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="5" width="18" height="2" rx="1" fill="#FAFBFF" />
-            <rect x="3" y="11" width="18" height="2" rx="1" fill="#FAFBFF" />
-            <rect x="3" y="17" width="18" height="2" rx="1" fill="#FAFBFF" />
-          </svg>
-          List View
-        </button>
+          {/* Map tab — active */}
+          <div
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full"
+            style={{
+              background: '#071126',
+              fontFamily: 'Manrope, sans-serif',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 700,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
+            </svg>
+            Map
+          </div>
+
+          <div style={{ width: 1, height: 18, background: 'rgba(0,0,0,0.1)' }} />
+
+          {/* Feed tab */}
+          <button
+            onClick={() => navigate('/list')}
+            className="flex items-center gap-2 px-5 py-2.5"
+            style={{
+              fontFamily: 'Manrope, sans-serif',
+              color: 'rgba(0,0,0,0.45)',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+              <polygon points="5,3 19,12 5,21" fill="currentColor" />
+            </svg>
+            Feed
+          </button>
+        </div>
       </div>
 
-      {/* ── Full Restaurant Detail Popup ── */}
+      {/* ── Restaurant Detail Sheet ── */}
       <AnimatePresence>
         {selectedRestaurant && (
           <RestaurantDetail
@@ -286,7 +290,6 @@ export default function MapViewScreen() {
           />
         )}
       </AnimatePresence>
-
     </div>
   )
 }

@@ -17,8 +17,8 @@ import type { MenuItem } from '../lib/menuData'
 // We use the Fusion API v3: https://api.yelp.com/v3/businesses/search
 // ─────────────────────────────────────────────────────────────────────────────
 
-const YELP_API_KEY = 'YOUR_YELP_API_KEY' // 🔑 Plug your key here
-const YELP_ENABLED = YELP_API_KEY !== 'YOUR_YELP_API_KEY'
+const YELP_API_KEY = import.meta.env.VITE_YELP_API_KEY ?? ''
+const YELP_ENABLED = !!YELP_API_KEY && YELP_API_KEY.length > 10
 
 interface YelpMenuItem {
   id: string
@@ -305,20 +305,6 @@ export default function MenuPage() {
       {/* ── Menu grid ── */}
       <div className="flex-1 px-4 pt-4 pb-24">
         {/* Yelp placeholder notice — remove once Yelp key is plugged in */}
-        {!YELP_ENABLED && (
-          <div
-            className="mb-4 px-4 py-3 rounded-xl text-xs"
-            style={{
-              background: '#fff8f0',
-              border: '1px solid #ffe0b2',
-              color: '#b45309',
-              fontFamily: 'Manrope',
-            }}
-          >
-            📋 Menu data is from our template. Add your Yelp API key to show real menu items.
-          </div>
-        )}
-
         <div className="grid grid-cols-2 gap-3">
           {currentItems.map((item) => (
             <MenuItemCard
