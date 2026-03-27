@@ -84,6 +84,17 @@ export default function MapViewScreen() {
 
   const loc = LOCATIONS[activeLocation]
 
+  // Auto-fit map to show all filtered pins when filter changes
+  function AutoFitMap({ restaurants }: { restaurants: Restaurant[] }) {
+    const map = useMap()
+    useEffect(() => {
+      if (restaurants.length === 0) return
+      const bounds = L.latLngBounds(restaurants.map(r => [r.latitude, r.longitude]))
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 13 })
+    }, [restaurants.length])
+    return null
+  }
+
   useEffect(() => {
     fetchRestaurants()
   }, [])
@@ -246,6 +257,7 @@ export default function MapViewScreen() {
         >
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <MapController center={[loc.lat, loc.lng]} zoom={loc.zoom} />
+          <AutoFitMap restaurants={filtered} />
 
           {filtered.map((r) => (
             <Marker
