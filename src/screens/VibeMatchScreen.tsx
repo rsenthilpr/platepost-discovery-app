@@ -86,7 +86,7 @@ Return the TOP 4 best matches as a JSON array. Each item must have:
 Sort by matchScore descending. Return ONLY valid JSON array, no other text.
 Example: [{"id":1,"reason":"Perfect jazz vibes with intimate dinner setting","matchScore":95}]`
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/claude', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
