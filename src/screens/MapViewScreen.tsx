@@ -83,13 +83,23 @@ export default function MapViewScreen() {
 
   const loc = LOCATIONS[activeLocation]
 
-  // Auto-fit map to show all filtered pins when filter changes
+  // Auto-fit map to show filtered pins — only within LA/OC area
   function AutoFitMap({ restaurants }: { restaurants: Restaurant[] }) {
     const map = useMap()
     useEffect(() => {
-      if (restaurants.length === 0) return
-      const bounds = L.latLngBounds(restaurants.map(r => [r.latitude, r.longitude]))
-      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 13 })
+      // Only fit to restaurants in CA (lat 32-35, lng -119 to -116)
+      const caRestaurants = restaurants.filter(r =>
+        r.latitude >= 32 && r.latitude <= 35.5 &&
+        r.longitude >= -119.5 && r.longitude <= -116
+      )
+      const toFit = caRestaurants.length > 0 ? caRestaurants : restaurants
+      if (toFit.length === 0) return
+      if (toFit.length === 1) {
+        map.setView([toFit[0].latitude, toFit[0].longitude], 13)
+        return
+      }
+      const bounds = L.latLngBounds(toFit.map(r => [r.latitude, r.longitude]))
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 14 })
     }, [restaurants.length])
     return null
   }

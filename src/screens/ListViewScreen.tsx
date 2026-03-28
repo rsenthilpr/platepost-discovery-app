@@ -150,12 +150,32 @@ export default function ListViewScreen() {
   }
 
   function applyFilter(list: Restaurant[], filter: string): Restaurant[] {
-    if (!filter || filter === 'All') return list
-    return list.filter((r) =>
-      filter === 'DJs'
-        ? r.cuisine === 'Music'
-        : r.cuisine.toLowerCase() === filter.toLowerCase()
-    )
+    let result = list
+    // Cuisine filter
+    if (filter && filter !== 'All') {
+      result = result.filter((r) =>
+        filter === 'DJs'
+          ? r.cuisine === 'Music'
+          : r.cuisine.toLowerCase() === filter.toLowerCase()
+      )
+    }
+    // Neighborhood filter
+    if (state.neighborhood) {
+      result = result.filter((r) =>
+        r.city?.toLowerCase().includes(state.neighborhood!.toLowerCase()) ||
+        r.description?.toLowerCase().includes(state.neighborhood!.toLowerCase()) ||
+        r.name?.toLowerCase().includes(state.neighborhood!.toLowerCase())
+      )
+      // If neighborhood filter returns nothing, show all (neighborhood data may not match)
+      if (result.length === 0) result = list
+    }
+    // Recently viewed filter
+    if (state.recentIds && state.recentIds.length > 0) {
+      const recentSet = new Set(state.recentIds)
+      result = result.filter((r) => recentSet.has(r.id))
+      if (result.length === 0) result = list
+    }
+    return result
   }
 
   function initSlides(filtered: Restaurant[]) {
@@ -561,7 +581,7 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
         </div>
 
         {/* 3 action buttons — Events only shown if hasEvents */}
-        <div className="flex gap-2.5 mb-3">
+        <div className="flex gap-2.5 mb-3" style={{ alignItems: 'stretch' }}>
           {slide.hasEvents && (
             <motion.button
               whileTap={{ scale: 0.92 }}
@@ -590,7 +610,7 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
               border: '1px solid rgba(255,255,255,0.18)',
             }}
           >
-            <span style={{ fontSize: 18 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></span>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></span>
             <span style={{ fontFamily: 'Manrope', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>
               Directions
             </span>
