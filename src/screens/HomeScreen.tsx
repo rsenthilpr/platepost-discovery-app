@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { PlatePostLogo } from '../components/PlatePostLogo'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchPexelsVideo } from '../lib/pexels'
@@ -124,14 +125,7 @@ export default function HomeScreen() {
 
       {/* ── Top bar ── */}
       <div className="absolute top-0 left-0 right-0 z-20 pt-14 px-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <polygon points="5,3 19,12 5,21" fill="white" />
-          </svg>
-          <span style={{ fontFamily: 'Bungee, cursive', color: '#fff', fontSize: 17, letterSpacing: '0.04em' }}>
-            PlatePost
-          </span>
-        </div>
+        <PlatePostLogo size="md" color="white" />
         <button
           onClick={() => navigate('/map')}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
@@ -252,19 +246,32 @@ export default function HomeScreen() {
         transition={{ delay: 0.8, type: 'spring', stiffness: 200 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => navigate('/concierge')}
-        className="absolute z-30"
-        style={{ bottom: 120, right: 20 }}
+        className="absolute z-30 flex flex-col items-center gap-1"
+        style={{ bottom: 130, right: 16 }}
       >
+        {/* Pulse ring */}
         <motion.div
-          animate={{ boxShadow: ['0 0 20px rgba(69,118,239,0.4)', '0 0 40px rgba(139,92,246,0.6)', '0 0 20px rgba(69,118,239,0.4)'] }}
+          className="absolute rounded-full"
+          style={{ width: 64, height: 64, background: 'rgba(69,118,239,0.3)', top: -4, left: -4 }}
+          animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.div
+          animate={{ boxShadow: ['0 0 20px rgba(69,118,239,0.5)', '0 0 40px rgba(139,92,246,0.7)', '0 0 20px rgba(69,118,239,0.5)'] }}
           transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-          className="w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5"
-          style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)', border: '2px solid rgba(255,255,255,0.2)' }}
+          className="w-14 h-14 rounded-full flex items-center justify-center"
+          style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)', border: '2.5px solid rgba(255,255,255,0.35)' }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <polygon points="5,3 19,12 5,21" fill="white" />
           </svg>
         </motion.div>
+        <span style={{
+          color: '#fff', fontSize: 9, fontWeight: 700,
+          fontFamily: 'Manrope', letterSpacing: '0.1em',
+          textTransform: 'uppercase', opacity: 0.8,
+          textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+        }}>Concierge</span>
       </motion.button>
 
       {/* ── Neighborhoods Sheet ── */}

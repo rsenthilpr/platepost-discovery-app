@@ -80,8 +80,10 @@ const FALLBACK: Record<string, string> = {
 
 // Real PlatePost menu URLs for current customers
 const PLATEPOST_MENU_URLS: Record<number, string> = {
-  4: 'https://platepost.io/kch',         // Kei Coffee House
-  5: 'https://platepost.io/wywhcoffee',  // Wish You Were Here Coffee Roasters
+  4: 'https://platepost.io/kch',                    // Kei Coffee House
+  5: 'https://platepost.io/wywhcoffee',             // Wish You Were Here
+  17: 'https://platepost.io/apecoffeeorange',       // Ape Coffee - Orange
+  18: 'https://platepost.io/apecoffeeplacentia',    // Ape Coffee - Placentia
 }
 // Note: Ape Coffee (Orange & Placentia) not yet in DB — add when Brandon adds them
 

@@ -41,6 +41,14 @@ const VIDEO_QUERY_POOLS: Record<string, string[]> = {
   Mexican: ['tacos street food', 'guacamole fresh made', 'mexican grill cooking', 'tortilla making', 'margarita cocktail'],
 }
 
+// PlatePost customers with real video menus
+const PLATEPOST_MENU_URLS: Record<number, string> = {
+  4: 'https://platepost.io/kch',                    // Kei Coffee House
+  5: 'https://platepost.io/wywhcoffee',             // Wish You Were Here
+  17: 'https://platepost.io/apecoffeeorange',       // Ape Coffee - Orange
+  18: 'https://platepost.io/apecoffeeplacentia',    // Ape Coffee - Placentia
+}
+
 function getVideoQuery(cuisine: string, restaurantName: string): string {
   const pool = VIDEO_QUERY_POOLS[cuisine]
   if (pool) {
@@ -151,7 +159,7 @@ export default function ListViewScreen() {
     const list = data ?? []
     setAllRestaurants(list)
 
-    const PLATEPOST_CUSTOMER_IDS = new Set([4, 5]) // Kei Coffee House, Wish You Were Here
+    const PLATEPOST_CUSTOMER_IDS = new Set([4, 5, 17, 18]) // Kei, Wish You Were Here, Ape Coffee
     const baseFiltered = applyFilter(list, state.filter ?? 'All')
     // PlatePost customers always appear first
     const filtered = [
@@ -546,8 +554,8 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
 
       {/* Bottom content */}
       <div className="absolute bottom-0 left-0 right-0 z-10 px-5 pb-28">
-        {/* Cuisine tag */}
-        <div className="mb-2.5">
+        {/* Cuisine tag + PlatePost badge */}
+        <div className="mb-2.5 flex items-center gap-2">
           <span className="text-xs font-bold px-3 py-1 rounded-full"
             style={{
               background: 'rgba(69,118,239,0.3)',
@@ -558,6 +566,12 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
             }}>
             {r.cuisine}
           </span>
+          {PLATEPOST_MENU_URLS[r.id] && (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+              style={{ background: 'rgba(69,118,239,0.8)', color: '#fff', fontFamily: 'Manrope', fontSize: 9 }}>
+              🔷 PlatePost
+            </span>
+          )}
         </div>
 
         {/* Name */}
@@ -629,21 +643,41 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
             </span>
           </motion.button>
 
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            onClick={onMenu}
-            className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
-            style={{
-              background: 'rgba(255,255,255,0.1)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.18)',
-            }}
-          >
-            <span style={{ fontSize: 20 }}>🍽️</span>
-            <span style={{ fontFamily: 'Manrope', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>
-              Menu
-            </span>
-          </motion.button>
+          {PLATEPOST_MENU_URLS[r.id] ? (
+            <a
+              href={PLATEPOST_MENU_URLS[r.id]}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
+              style={{
+                background: 'rgba(69,118,239,0.25)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(69,118,239,0.5)',
+                textDecoration: 'none',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>🔷</span>
+              <span style={{ fontFamily: 'Manrope', color: '#fff', fontSize: 11, fontWeight: 700 }}>
+                Video Menu
+              </span>
+            </a>
+          ) : (
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={onMenu}
+              className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255,255,255,0.18)',
+              }}
+            >
+              <span style={{ fontSize: 20 }}>🍽️</span>
+              <span style={{ fontFamily: 'Manrope', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>
+                Menu
+              </span>
+            </motion.button>
+          )}
         </div>
 
         {/* More Info */}

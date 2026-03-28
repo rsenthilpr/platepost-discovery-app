@@ -100,7 +100,7 @@ CRITICAL RULES:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-5',
           max_tokens: 1000,
           system: systemPrompt,
           messages: conversationHistory.current,
@@ -129,11 +129,12 @@ CRITICAL RULES:
       }
 
       setMessages(prev => [...prev.filter(m => m.id !== 'loading'), assistantMsg])
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Unknown error'
       setMessages(prev => [...prev.filter(m => m.id !== 'loading'), {
         id: Date.now().toString(),
         role: 'assistant',
-        text: "Sorry, something went wrong. Please try again.",
+        text: `Sorry, something went wrong: ${errMsg}. Please try again.`,
       }])
     } finally {
       setLoading(false)
