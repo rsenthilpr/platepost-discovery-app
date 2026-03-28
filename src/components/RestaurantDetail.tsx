@@ -356,13 +356,15 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
             </div>
             <div className="flex flex-col gap-2">
               {events.map((ev) => (
-                <a key={ev.key} href={ev.url} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-3 rounded-xl p-3"
+                <button
+                  key={ev.key}
+                  onClick={() => setIframeUrl(ev.url)}
+                  className="flex items-center gap-3 rounded-xl p-3 w-full text-left"
                   style={{
                     background: 'rgba(69,118,239,0.1)',
                     border: '1px solid rgba(69,118,239,0.2)',
-                    textDecoration: 'none',
-                  }}>
+                  }}
+                >
                   <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
                     style={{ background: 'rgba(69,118,239,0.2)', fontSize: 18 }}>
                     🎟️
@@ -378,7 +380,7 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                     <path d="M9 18l6-6-6-6" stroke="#4576EF" strokeWidth="2" strokeLinecap="round" />
                   </svg>
-                </a>
+                </button>
               ))}
             </div>
           </div>

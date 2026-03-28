@@ -581,9 +581,14 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
             {r.cuisine}
           </span>
           {PLATEPOST_MENU_URLS[r.id] && (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
-              style={{ background: 'rgba(69,118,239,0.8)', color: '#fff', fontFamily: 'Manrope', fontSize: 9 }}>
-              🔷 PlatePost
+            <span className="font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+              style={{ background: 'rgba(69,118,239,0.85)', color: '#fff', fontFamily: 'Manrope', fontSize: 9, fontWeight: 700 }}>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+                <path d="M5 3.5L20 12L5 20.5V3.5Z" fill="white"/>
+                <ellipse cx="11" cy="9.2" rx="2.5" ry="3.2" fill="#4576EF"/>
+                <rect x="9.9" y="12" width="2.2" height="4" rx="1.1" fill="#4576EF"/>
+              </svg>
+              PlatePost
             </span>
           )}
         </div>
