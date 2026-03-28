@@ -5,6 +5,8 @@ import MapViewScreen from './screens/MapViewScreen'
 import ListViewScreen from './screens/ListViewScreen'
 import MenuPage from './screens/MenuPage'
 import VibeMatchScreen from './screens/VibeMatchScreen'
+import ConciergeScreen from './screens/ConciergeScreen'
+import TonightScreen from './screens/TonightScreen'
 
 function App() {
   return (
@@ -16,6 +18,8 @@ function App() {
         <Route path="/list" element={<ListViewScreen />} />
         <Route path="/menu/:id" element={<MenuPage />} />
         <Route path="/vibe" element={<VibeMatchScreen />} />
+        <Route path="/concierge" element={<ConciergeScreen />} />
+        <Route path="/tonight" element={<TonightScreen />} />
       </Routes>
     </BrowserRouter>
   )

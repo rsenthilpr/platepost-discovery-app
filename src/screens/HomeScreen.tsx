@@ -235,9 +235,18 @@ export default function HomeScreen() {
                   Match →
                 </motion.button>
               ) : (
-                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, fontFamily: 'Manrope', flexShrink: 0 }}>
-                  What's your vibe?
-                </span>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => navigate('/voice')}
+                  className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full"
+                  style={{ background: 'rgba(69,118,239,0.25)', border: '1px solid rgba(69,118,239,0.4)' }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <rect x="9" y="2" width="6" height="11" rx="3" fill="white" />
+                    <path d="M5 10a7 7 0 0014 0" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                    <line x1="12" y1="17" x2="12" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </motion.button>
               )}
             </div>
           </div>
@@ -265,7 +274,7 @@ export default function HomeScreen() {
           {/* Tonight */}
           <motion.button
             whileTap={{ scale: 0.93 }}
-            onClick={() => navigate('/list', { state: { filter: 'Music', tonight: true, listView: true } })}
+            onClick={() => navigate('/tonight')}
             className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
             style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.4)', color: '#fff', fontFamily: 'Manrope', backdropFilter: 'blur(12px)' }}
           >
@@ -328,6 +337,27 @@ export default function HomeScreen() {
           </button>
         </motion.div>
       </div>
+
+      {/* ── Floating Concierge Orb ── */}
+      <motion.button
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.8, type: 'spring', stiffness: 200 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => navigate('/concierge')}
+        className="absolute z-30"
+        style={{ bottom: 120, right: 20 }}
+      >
+        <motion.div
+          animate={{ boxShadow: ['0 0 20px rgba(69,118,239,0.4)', '0 0 40px rgba(139,92,246,0.6)', '0 0 20px rgba(69,118,239,0.4)'] }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+          className="w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5"
+          style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)', border: '2px solid rgba(255,255,255,0.2)' }}
+        >
+          <span style={{ fontSize: 20 }}>✨</span>
+          <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, fontFamily: 'Manrope', letterSpacing: '0.05em' }}>AI</span>
+        </motion.div>
+      </motion.button>
 
       {/* ── Neighborhoods Sheet ── */}
       <AnimatePresence>
