@@ -78,6 +78,13 @@ const FALLBACK: Record<string, string> = {
   Jazz: 'https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=400&q=80',
 }
 
+// Real PlatePost menu URLs for current customers
+const PLATEPOST_MENU_URLS: Record<number, string> = {
+  4: 'https://platepost.io/kch',         // Kei Coffee House
+  5: 'https://platepost.io/wywhcoffee',  // Wish You Were Here Coffee Roasters
+}
+// Note: Ape Coffee (Orange & Placentia) not yet in DB — add when Brandon adds them
+
 export default function MenuPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -252,13 +259,25 @@ export default function MenuPage() {
               </svg>
               Directions
             </a>
-            <button
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold"
-              style={{ background: '#4576EF', color: '#fff', border: 'none' }}
-              onClick={() => alert('Coming soon — contact restaurant to order')}
-            >
-              Order Online
-            </button>
+            {restaurant && PLATEPOST_MENU_URLS[restaurant.id] ? (
+              <a
+                href={PLATEPOST_MENU_URLS[restaurant.id]}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold"
+                style={{ background: '#4576EF', color: '#fff', textDecoration: 'none' }}
+              >
+                🔷 View Video Menu
+              </a>
+            ) : (
+              <button
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold"
+                style={{ background: '#4576EF', color: '#fff', border: 'none' }}
+                onClick={() => alert('Coming soon — contact restaurant to order')}
+              >
+                Order Online
+              </button>
+            )}
             {restaurant.website_url && (
               <a
                 href={restaurant.website_url}

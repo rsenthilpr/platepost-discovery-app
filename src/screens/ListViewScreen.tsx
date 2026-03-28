@@ -30,18 +30,25 @@ interface LocationState {
   recentIds?: number[]
 }
 
-function getVideoQuery(cuisine: string): string {
-  const map: Record<string, string> = {
-    Japanese: 'sushi japanese food preparation',
-    Italian: 'italian pasta cooking',
-    American: 'burger american food grill',
-    Coffee: 'coffee barista espresso',
-    Cafe: 'cafe brunch food',
-    Music: 'nightclub dj music concert',
-    Jazz: 'jazz live music performance',
-    Mexican: 'tacos mexican food street',
+const VIDEO_QUERY_POOLS: Record<string, string[]> = {
+  Japanese: ['sushi chef knife skills', 'ramen noodles cooking', 'japanese food plating', 'sashimi fresh fish', 'tempura frying'],
+  Italian: ['pasta dough kneading', 'pizza wood fired oven', 'italian cooking sauce', 'risotto stirring', 'tiramisu dessert'],
+  American: ['burger grilling flames', 'bbq smoke grill meat', 'fried chicken crispy', 'cocktail bartender mixing', 'smash burger cooking'],
+  Coffee: ['latte art pouring', 'coffee espresso machine', 'barista pour over', 'coffee roasting beans', 'cappuccino foam milk'],
+  Cafe: ['brunch avocado toast', 'pastry bakery morning', 'cafe interior cozy', 'eggs benedict breakfast', 'french press coffee'],
+  Music: ['concert crowd lights', 'dj turntable nightclub', 'live band performance', 'music venue stage', 'nightclub dancing'],
+  Jazz: ['jazz band performance', 'saxophone jazz music', 'piano jazz bar', 'trumpet musician', 'jazz club atmosphere'],
+  Mexican: ['tacos street food', 'guacamole fresh made', 'mexican grill cooking', 'tortilla making', 'margarita cocktail'],
+}
+
+function getVideoQuery(cuisine: string, restaurantName: string): string {
+  const pool = VIDEO_QUERY_POOLS[cuisine]
+  if (pool) {
+    // Use restaurant name hash to pick consistently but differently per restaurant
+    const hash = restaurantName.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+    return pool[hash % pool.length]
   }
-  return map[cuisine] ?? `${cuisine} restaurant food cooking`
+  return `${cuisine} restaurant food cooking`
 }
 
 interface ReelSlide {
@@ -144,7 +151,13 @@ export default function ListViewScreen() {
     const list = data ?? []
     setAllRestaurants(list)
 
-    const filtered = applyFilter(list, state.filter ?? 'All')
+    const PLATEPOST_CUSTOMER_IDS = new Set([4, 5]) // Kei Coffee House, Wish You Were Here
+    const baseFiltered = applyFilter(list, state.filter ?? 'All')
+    // PlatePost customers always appear first
+    const filtered = [
+      ...baseFiltered.filter(r => PLATEPOST_CUSTOMER_IDS.has(r.id)),
+      ...baseFiltered.filter(r => !PLATEPOST_CUSTOMER_IDS.has(r.id)),
+    ]
     initSlides(filtered)
     setLoading(false)
   }
@@ -198,7 +211,7 @@ export default function ListViewScreen() {
     loadedIndices.current.add(index)
 
     const [videoResult, placeResult, events] = await Promise.all([
-      fetchPexelsPortraitVideo(getVideoQuery(r.cuisine)),
+      fetchPexelsPortraitVideo(getVideoQuery(r.cuisine, r.name)),
       fetchPlaceDetails(r.name, r.city),
       searchEventbriteEvents(r.name, r.city, r.state),
     ])

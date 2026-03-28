@@ -76,6 +76,7 @@ export default function MapViewScreen() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
+  const [mapSearch, setMapSearch] = useState('')
   // Track top bar height so map can offset correctly
   const [topBarHeight, setTopBarHeight] = useState(120)
   const topBarRef = useRef<HTMLDivElement>(null)
@@ -133,8 +134,12 @@ export default function MapViewScreen() {
 
   const filtered = restaurants.filter((r) => {
     if (activeFilter === 'Favorites') return favorites.has(r.id)
-    if (activeFilter === 'All') return true
-    return r.cuisine.toLowerCase() === activeFilter.toLowerCase()
+    if (activeFilter !== 'All' && r.cuisine.toLowerCase() !== activeFilter.toLowerCase()) return false
+    if (mapSearch.trim()) {
+      const q = mapSearch.toLowerCase()
+      return r.name.toLowerCase().includes(q) || r.cuisine.toLowerCase().includes(q) || r.city.toLowerCase().includes(q)
+    }
+    return true
   })
 
   return (
@@ -230,6 +235,35 @@ export default function MapViewScreen() {
               )}
             </AnimatePresence>
           </div>
+        </div>
+
+        {/* Search bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: 'rgba(0,0,0,0.06)', borderRadius: 12,
+          padding: '8px 12px', marginBottom: 8,
+          border: '1px solid rgba(0,0,0,0.08)',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8" stroke="#071126" strokeWidth="2" />
+            <path d="M21 21l-4.35-4.35" stroke="#071126" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input
+            value={mapSearch}
+            onChange={e => setMapSearch(e.target.value)}
+            placeholder="Search restaurants..."
+            style={{
+              flex: 1, background: 'transparent', border: 'none', outline: 'none',
+              fontFamily: 'Manrope, sans-serif', fontSize: 13, color: '#071126',
+            }}
+          />
+          {mapSearch && (
+            <button onClick={() => setMapSearch('')} style={{ opacity: 0.4, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Filter chips */}

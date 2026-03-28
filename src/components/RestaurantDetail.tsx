@@ -67,6 +67,7 @@ async function shareRestaurant(name: string, city: string) {
 }
 
 export default function RestaurantDetail({ restaurant: r, onClose, initialSection, isFavorite = false, onToggleFavorite }: Props) {
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null)
   const navigate = useNavigate()
   const [events, setEvents] = useState<DisplayEvent[]>([])
   const [placeInfo, setPlaceInfo] = useState<PlaceInfo>({})
@@ -383,6 +384,33 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
           </div>
         )}
       </motion.div>
+
+      {/* ── Iframe Modal for Events ── */}
+      {iframeUrl && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
+          <div
+            className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
+            style={{ background: '#0e1f42', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            <button
+              onClick={() => setIframeUrl(null)}
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.1)' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </button>
+            <span style={{ color: '#fff', fontFamily: 'Manrope', fontSize: 14, fontWeight: 600 }}>Event Details</span>
+            <a href={iframeUrl} target="_blank" rel="noreferrer"
+              className="ml-auto text-xs px-3 py-1.5 rounded-full"
+              style={{ background: '#4576EF', color: '#fff', textDecoration: 'none', fontFamily: 'Manrope' }}>
+              Open ↗
+            </a>
+          </div>
+          <iframe src={iframeUrl} className="flex-1 w-full border-0" title="Event Details" />
+        </div>
+      )}
     </>
   )
 }

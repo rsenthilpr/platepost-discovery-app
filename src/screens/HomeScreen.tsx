@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchPexelsVideo } from '../lib/pexels'
@@ -16,13 +16,7 @@ const LA_NEIGHBORHOODS = [
   'Highland Park', 'Fairfax', 'Mid-City', 'Brentwood', 'Larchmont',
 ]
 
-const VIBE_PLACEHOLDERS = [
-  'romantic dinner with live jazz...',
-  'best coffee spot to work from...',
-  'late night music and cocktails...',
-  'casual brunch with friends...',
-  'date night with great ambiance...',
-]
+
 
 // Recently viewed — stored in localStorage
 function getRecentlyViewed(): number[] {
@@ -48,10 +42,6 @@ export default function HomeScreen() {
   const [currentOpacity, setCurrentOpacity] = useState(1)
 
   // Vibe Match
-  const [vibeQuery, setVibeQuery] = useState('')
-  const [vibeFocused, setVibeFocused] = useState(false)
-  const [placeholderIndex, setPlaceholderIndex] = useState(0)
-  const vibeInputRef = useRef<HTMLInputElement>(null)
 
   // Feature panels
   const [showNeighborhoods, setShowNeighborhoods] = useState(false)
@@ -66,13 +56,7 @@ export default function HomeScreen() {
     loadVideos()
   }, [])
 
-  // Rotate placeholder text
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPlaceholderIndex(i => (i + 1) % VIBE_PLACEHOLDERS.length)
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [])
+
 
   // Crossfade videos
   useEffect(() => {
@@ -96,10 +80,7 @@ export default function HomeScreen() {
     return () => clearInterval(interval)
   }, [heroVideos.length, transitioning])
 
-  function handleVibeSubmit() {
-    if (!vibeQuery.trim()) return
-    navigate('/vibe', { state: { query: vibeQuery } })
-  }
+
 
   function handleNeighborhoodTap(neighborhood: string) {
     setShowNeighborhoods(false)
@@ -176,81 +157,7 @@ export default function HomeScreen() {
           </h1>
         </motion.div>
 
-        {/* ── Conversational Vibe Match ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="mb-4"
-        >
-          <div
-            className="rounded-2xl overflow-hidden"
-            style={{
-              background: vibeFocused ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.1)',
-              backdropFilter: 'blur(20px)',
-              border: vibeFocused ? '1.5px solid rgba(139,92,246,0.7)' : '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s',
-            }}
-          >
-            <div className="flex items-center gap-3 px-4 py-3.5">
-              <span style={{ fontSize: 18, flexShrink: 0 }}>✨</span>
-              <input
-                ref={vibeInputRef}
-                value={vibeQuery}
-                onChange={e => setVibeQuery(e.target.value)}
-                onFocus={() => setVibeFocused(true)}
-                onBlur={() => setVibeFocused(false)}
-                onKeyDown={e => e.key === 'Enter' && handleVibeSubmit()}
-                className="flex-1 bg-transparent outline-none"
-                style={{ color: '#fff', fontFamily: 'Manrope, sans-serif', fontSize: 14 }}
-              />
-              {!vibeQuery && !vibeFocused && (
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={placeholderIndex}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.3 }}
-                    className="absolute"
-                    style={{
-                      color: 'rgba(255,255,255,0.4)',
-                      fontFamily: 'Manrope, sans-serif',
-                      fontSize: 14,
-                      pointerEvents: 'none',
-                      left: 72,
-                    }}
-                  >
-                    {VIBE_PLACEHOLDERS[placeholderIndex]}
-                  </motion.span>
-                </AnimatePresence>
-              )}
-              {vibeQuery ? (
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  onClick={handleVibeSubmit}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold"
-                  style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)', color: '#fff', fontFamily: 'Manrope' }}
-                >
-                  Match →
-                </motion.button>
-              ) : (
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => navigate('/voice')}
-                  className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full"
-                  style={{ background: 'rgba(69,118,239,0.25)', border: '1px solid rgba(69,118,239,0.4)' }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <rect x="9" y="2" width="6" height="11" rx="3" fill="white" />
-                    <path d="M5 10a7 7 0 0014 0" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                    <line x1="12" y1="17" x2="12" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </motion.button>
-              )}
-            </div>
-          </div>
-        </motion.div>
+
 
         {/* ── Quick action chips ── */}
         <motion.div
@@ -354,8 +261,9 @@ export default function HomeScreen() {
           className="w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5"
           style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)', border: '2px solid rgba(255,255,255,0.2)' }}
         >
-          <span style={{ fontSize: 20 }}>✨</span>
-          <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, fontFamily: 'Manrope', letterSpacing: '0.05em' }}>AI</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <polygon points="5,3 19,12 5,21" fill="white" />
+          </svg>
         </motion.div>
       </motion.button>
 
