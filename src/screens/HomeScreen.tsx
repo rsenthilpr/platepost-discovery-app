@@ -263,7 +263,9 @@ export default function HomeScreen() {
           style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)', border: '2.5px solid rgba(255,255,255,0.35)' }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <polygon points="5,3 19,12 5,21" fill="white" />
+            <path d="M5 3.5L20 12L5 20.5V3.5Z" fill="white" />
+            <ellipse cx="11" cy="9.5" rx="2.2" ry="2.8" fill="#4576EF" />
+            <rect x="10.1" y="12" width="1.8" height="3.5" rx="0.9" fill="#4576EF" />
           </svg>
         </motion.div>
         <span style={{

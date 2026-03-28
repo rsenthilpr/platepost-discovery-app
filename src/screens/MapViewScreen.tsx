@@ -163,12 +163,15 @@ export default function MapViewScreen() {
           {/* PlatePost logo */}
           <button
             onClick={() => navigate('/')}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'none', border: 'none', cursor: 'pointer' }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <polygon points="5,3 19,12 5,21" fill="#071126" />
+            {/* PlatePost logo mark with spoon cutout */}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M5 3.5L20 12L5 20.5V3.5Z" fill="#071126" />
+              <ellipse cx="11" cy="9.5" rx="2.2" ry="2.8" fill="white" />
+              <rect x="10.1" y="12" width="1.8" height="3.5" rx="0.9" fill="white" />
             </svg>
-            <span style={{ fontFamily: 'Bungee, cursive', color: '#071126', fontSize: 15, letterSpacing: '0.05em' }}>
+            <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, color: '#071126', fontSize: 15, letterSpacing: '-0.01em' }}>
               PlatePost
             </span>
           </button>

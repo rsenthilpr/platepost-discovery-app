@@ -130,6 +130,14 @@ export default function ListViewScreen() {
   const [activeFilter, setActiveFilter] = useState(state.filter ?? 'All')
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+
+  function restoreScroll() {
+    requestAnimationFrame(() => {
+      const el = scrollContainerRef.current
+      if (el) el.scrollTo({ top: currentIndex * window.innerHeight, behavior: 'instant' })
+    })
+  }
   const loadedIndices = useRef<Set<number>>(new Set())
 
   function toggleFavorite(id: number) {
@@ -365,7 +373,7 @@ export default function ListViewScreen() {
           {selectedRestaurant && (
             <RestaurantDetail
               restaurant={selectedRestaurant}
-              onClose={() => setSelectedRestaurant(null)}
+              onClose={() => { setSelectedRestaurant(null); restoreScroll() }}
             />
           )}
         </AnimatePresence>
@@ -391,12 +399,18 @@ export default function ListViewScreen() {
 
       {/* Scrollable reel container */}
       <div
+        ref={scrollContainerRef}
         className="w-full h-full overflow-y-scroll"
         style={{
           scrollSnapType: 'y mandatory',
           scrollbarWidth: 'none',
           WebkitOverflowScrolling: 'touch',
         } as React.CSSProperties}
+        onScroll={(e) => {
+          const el = e.currentTarget
+          const idx = Math.round(el.scrollTop / window.innerHeight)
+          if (idx !== currentIndex) setCurrentIndex(idx)
+        }}
       >
         {slides.map((slide, index) => (
           <ReelSlide
@@ -458,7 +472,7 @@ export default function ListViewScreen() {
         {selectedRestaurant && (
           <RestaurantDetail
             restaurant={selectedRestaurant}
-            onClose={() => setSelectedRestaurant(null)}
+            onClose={() => { setSelectedRestaurant(null); restoreScroll() }}
             isFavorite={favorites.has(selectedRestaurant.id)}
             onToggleFavorite={() => toggleFavorite(selectedRestaurant.id)}
           />
@@ -656,7 +670,11 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
                 textDecoration: 'none',
               }}
             >
-              <span style={{ fontSize: 16 }}>🔷</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M5 3.5L20 12L5 20.5V3.5Z" fill="white" />
+                <ellipse cx="11" cy="9.5" rx="2.2" ry="2.8" fill="#4576EF" />
+                <rect x="10.1" y="12" width="1.8" height="3.5" rx="0.9" fill="#4576EF" />
+              </svg>
               <span style={{ fontFamily: 'Manrope', color: '#fff', fontSize: 11, fontWeight: 700 }}>
                 Video Menu
               </span>
