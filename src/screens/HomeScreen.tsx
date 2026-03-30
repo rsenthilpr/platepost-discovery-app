@@ -36,6 +36,26 @@ export function addToRecentlyViewed(id: number) {
 
 export default function HomeScreen() {
   const navigate = useNavigate()
+
+  // Shake to Surprise Me
+  useEffect(() => {
+    let lastShake = 0
+    let lastX = 0, lastY = 0, lastZ = 0
+    function handleMotion(e: DeviceMotionEvent) {
+      const acc = e.accelerationIncludingGravity
+      if (!acc) return
+      const dx = Math.abs((acc.x ?? 0) - lastX)
+      const dy = Math.abs((acc.y ?? 0) - lastY)
+      const dz = Math.abs((acc.z ?? 0) - lastZ)
+      if (dx + dy + dz > 25 && Date.now() - lastShake > 2000) {
+        lastShake = Date.now()
+        navigate('/surprise')
+      }
+      lastX = acc.x ?? 0; lastY = acc.y ?? 0; lastZ = acc.z ?? 0
+    }
+    window.addEventListener('devicemotion', handleMotion)
+    return () => window.removeEventListener('devicemotion', handleMotion)
+  }, [navigate])
   const [heroVideos, setHeroVideos] = useState<string[]>([])
   const [videoIndex, setVideoIndex] = useState(0)
   const [nextVideoIndex, setNextVideoIndex] = useState(1)
@@ -236,6 +256,24 @@ export default function HomeScreen() {
             </svg>
             Watch Feed
           </button>
+        </motion.div>
+
+        {/* Surprise Me button */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => navigate('/surprise')}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
+            style={{ fontFamily: 'Manrope, sans-serif',
+              background: 'linear-gradient(135deg, rgba(245,158,11,0.25), rgba(239,68,68,0.2))',
+              border: '1px solid rgba(245,158,11,0.4)', color: '#fff',
+              backdropFilter: 'blur(16px)' }}
+            animate={{ boxShadow: ['0 0 0px rgba(245,158,11,0)', '0 0 20px rgba(245,158,11,0.3)', '0 0 0px rgba(245,158,11,0)'] }}
+            transition={{ duration: 3, repeat: Infinity }}
+          >
+            🎲 Surprise Me — Pick a Restaurant
+          </motion.button>
         </motion.div>
       </div>
 

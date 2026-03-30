@@ -22,20 +22,20 @@ interface Message {
 }
 
 const SUGGESTED_PROMPTS = [
-  "First date tonight, budget $80, somewhere romantic",
-  "Best coffee shop to work from in Silver Lake",
-  "Live jazz with dinner, not too loud",
-  "Late night food after a show in DTLA",
-  "Vegetarian-friendly with great ambiance",
+  { text: "Plan my night 🌙", icon: "🌙", featured: true, prompt: "Plan my night — dinner and a venue for tonight in LA, budget $100 for 2 people" },
+  { text: "First date, budget $80, romantic", icon: "🕯️", featured: false, prompt: "First date tonight, budget $80, somewhere romantic" },
+  { text: "Best coffee to work from, Silver Lake", icon: "☕", featured: false, prompt: "Best coffee shop to work from in Silver Lake" },
+  { text: "Live jazz with dinner, not too loud", icon: "🎷", featured: false, prompt: "Live jazz with dinner, not too loud" },
+  { text: "Late night food after a show, DTLA", icon: "🌃", featured: false, prompt: "Late night food after a show in DTLA" },
 ]
 
-export default function ConciergeScreen() {
+export default function CraveScreen() {
   const navigate = useNavigate()
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '0',
       role: 'assistant',
-      text: "Hi! I'm your PlatePost Concierge 🍽️\n\nTell me what you're looking for tonight — the more detail the better. I'll find the perfect spot for you.",
+      text: "Hi! I'm your PlatePost Crave 🍽️\n\nTell me what you're looking for tonight — the more detail the better. I'll find the perfect spot for you.",
     }
   ])
   const [input, setInput] = useState('')
@@ -83,7 +83,7 @@ export default function ConciergeScreen() {
         `ID:${r.id} | ${r.name} | ${r.cuisine} | ${r.city}, ${r.state} | ${r.description ?? ''}`
       ).join('\n')
 
-      const systemPrompt = `You are PlatePost Concierge, an expert restaurant advisor for Los Angeles. You know every great spot in the city and give warm, specific, personalized recommendations like a knowledgeable local friend.
+      const systemPrompt = `You are PlatePost Crave, an expert restaurant advisor for Los Angeles. You know every great spot in the city and give warm, specific, personalized recommendations like a knowledgeable local friend.
 
 Available restaurants:
 ${restaurantList}
@@ -94,7 +94,11 @@ CRITICAL RULES:
 3. Be conversational, warm and specific — mention exact details about why each place fits
 4. If they give more context (budget, occasion, location), refine your recommendations
 5. Keep responses concise — 2-4 sentences per recommendation max
-6. Never make up restaurants not in the list`
+6. Never make up restaurants not in the list
+7. For "Plan my night" requests: build a FULL EVENING ITINERARY — start with dinner restaurant, then add a music/jazz/nightlife venue. Format it as:
+   🍽️ DINNER (7:00 PM): [Restaurant name] — [why it fits]
+   🎵 AFTER DINNER (9:00 PM): [Venue name] — [why it fits]
+   Then include [RESTAURANTS:id,id] with both venue IDs`
 
       const response = await fetch('/api/claude', {
         method: 'POST',
@@ -176,7 +180,7 @@ CRITICAL RULES:
             AI Powered
           </p>
           <h1 style={{ fontFamily: 'Bungee, cursive', color: '#fff', fontSize: 16, letterSpacing: '0.04em', lineHeight: 1.1 }}>
-            PlatePost Concierge
+            PlatePost Crave
           </h1>
         </div>
 
@@ -187,7 +191,7 @@ CRITICAL RULES:
               conversationHistory.current = []
               setMessages([{
                 id: '0', role: 'assistant',
-                text: "Hi! I'm your PlatePost Concierge 🍽️\n\nTell me what you're looking for tonight — the more detail the better.",
+                text: "Hi! I'm your PlatePost Crave 🍽️\n\nTell me what you're looking for tonight — the more detail the better.",
               }])
             }}
             className="ml-auto text-xs opacity-30 hover:opacity-60 transition-opacity"
@@ -302,19 +306,21 @@ CRITICAL RULES:
               Try asking...
             </p>
             <div className="flex flex-col gap-2">
-              {SUGGESTED_PROMPTS.map(prompt => (
+              {SUGGESTED_PROMPTS.map(p => (
                 <motion.button
-                  key={prompt}
+                  key={p.text}
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => sendMessage(prompt)}
-                  className="text-left px-4 py-3 rounded-2xl text-sm"
+                  onClick={() => sendMessage(p.prompt)}
+                  className="text-left px-4 py-3 rounded-2xl text-sm flex items-center gap-3"
                   style={{
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    color: 'rgba(255,255,255,0.6)',
+                    background: p.featured ? 'linear-gradient(135deg, rgba(69,118,239,0.2), rgba(139,92,246,0.2))' : 'rgba(255,255,255,0.04)',
+                    border: p.featured ? '1px solid rgba(69,118,239,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                    color: p.featured ? '#fff' : 'rgba(255,255,255,0.6)',
                   }}
                 >
-                  "{prompt}"
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>{p.icon}</span>
+                  <span>{p.featured ? <strong>{p.text}</strong> : `"${p.text}"`}</span>
+                  {p.featured && <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(69,118,239,0.3)', color: '#6B9EFF' }}>New</span>}
                 </motion.button>
               ))}
             </div>
