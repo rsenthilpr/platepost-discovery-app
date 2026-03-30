@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { PlatePostLogo, PlatePostOrbMark } from '../components/PlatePostLogo'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -34,67 +34,7 @@ export function addToRecentlyViewed(id: number) {
   } catch {}
 }
 
-// Draggable orb — user can drag to any position, position saved to localStorage
-function DraggableOrb({ id, defaultPos, onClick, children }: {
-  id: string
-  defaultPos: { x: number; y: number }
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  const getSavedPos = () => {
-    try {
-      const saved = localStorage.getItem(`orb_pos_${id}`)
-      return saved ? JSON.parse(saved) : defaultPos
-    } catch { return defaultPos }
-  }
 
-  const [pos, setPos] = useState(getSavedPos)
-  const [dragging, setDragging] = useState(false)
-  const dragStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
-  const moved = useRef(false)
-
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    e.currentTarget.setPointerCapture(e.pointerId)
-    dragStart.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y }
-    moved.current = false
-    setDragging(true)
-  }, [pos])
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragStart.current) return
-    const dx = e.clientX - dragStart.current.x
-    const dy = e.clientY - dragStart.current.y
-    if (Math.abs(dx) + Math.abs(dy) > 6) moved.current = true
-    const newX = Math.max(0, Math.min(window.innerWidth - 64, dragStart.current.px + dx))
-    const newY = Math.max(60, Math.min(window.innerHeight - 100, dragStart.current.py + dy))
-    setPos({ x: newX, y: newY })
-  }, [])
-
-  const onPointerUp = useCallback(() => {
-    setDragging(false)
-    dragStart.current = null
-    localStorage.setItem(`orb_pos_${id}`, JSON.stringify(pos))
-    if (!moved.current) onClick()
-  }, [id, pos, onClick])
-
-  return (
-    <div
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      className="absolute z-30 flex flex-col items-center gap-1 select-none"
-      style={{
-        left: pos.x, top: pos.y,
-        cursor: dragging ? 'grabbing' : 'grab',
-        touchAction: 'none',
-        opacity: dragging ? 0.85 : 1,
-        transition: dragging ? 'none' : 'opacity 0.2s',
-      }}
-    >
-      {children}
-    </div>
-  )
-}
 
 export default function HomeScreen() {
   const navigate = useNavigate()
@@ -129,6 +69,14 @@ export default function HomeScreen() {
   // Feature panels
   const [showNeighborhoods, setShowNeighborhoods] = useState(false)
   const [recentlyViewed] = useState<number[]>(getRecentlyViewed)
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try { return !localStorage.getItem('pp_welcomed') } catch { return true }
+  })
+
+  function dismissWelcome() {
+    try { localStorage.setItem('pp_welcomed', '1') } catch {}
+    setShowWelcome(false)
+  }
 
   useEffect(() => {
     async function loadVideos() {
@@ -276,6 +224,22 @@ export default function HomeScreen() {
             Neighborhoods
           </motion.button>
 
+          {/* Surprise Me chip */}
+          <motion.button
+            whileTap={{ scale: 0.93 }}
+            onClick={() => navigate('/surprise')}
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
+            style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.25), rgba(239,68,68,0.2))',
+              border: '1px solid rgba(245,158,11,0.5)', color: '#fff', fontFamily: 'Manrope', backdropFilter: 'blur(12px)' }}
+          >
+            <motion.span
+              animate={{ rotate: [0, 15, -15, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ fontSize: 12, display: 'inline-block' }}
+            >🎲</motion.span>
+            Surprise Me
+          </motion.button>
+
           {/* Recently Viewed */}
           {recentlyViewed.length > 0 && (
             <motion.button
@@ -322,36 +286,15 @@ export default function HomeScreen() {
 
       </div>
 
-      {/* ── Draggable Floating Orbs ── */}
-      <DraggableOrb
-        id="surprise-orb"
-        defaultPos={{ x: 16, y: window.innerHeight - 220 }}
-        onClick={() => navigate('/surprise')}
-      >
-        <motion.div className="absolute rounded-full"
-          style={{ width: 68, height: 68, background: 'rgba(245,158,11,0.2)', top: -6, left: -6 }}
-          animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          animate={{ boxShadow: ['0 0 20px rgba(245,158,11,0.4)', '0 0 36px rgba(239,68,68,0.5)', '0 0 20px rgba(245,158,11,0.4)'] }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-          className="w-14 h-14 rounded-full flex items-center justify-center"
-          style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: '2.5px solid rgba(255,255,255,0.35)' }}
-        >
-          <motion.span animate={{ rotate: [0, 15, -15, 0] }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ fontSize: 26, lineHeight: 1 }}>🎲</motion.span>
-        </motion.div>
-        <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Manrope',
-          letterSpacing: '0.1em', textTransform: 'uppercase' as const, opacity: 0.8,
-          textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Surprise</span>
-      </DraggableOrb>
-
-      <DraggableOrb
-        id="crave-orb"
-        defaultPos={{ x: window.innerWidth - 72, y: window.innerHeight - 220 }}
+      {/* ── Floating Crave Orb (right only) ── */}
+      <motion.button
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.8, type: 'spring', stiffness: 200 }}
+        whileTap={{ scale: 0.9 }}
         onClick={() => navigate('/concierge')}
+        className="absolute z-30 flex flex-col items-center gap-1"
+        style={{ bottom: 130, right: 16 }}
       >
         <motion.div className="absolute rounded-full"
           style={{ width: 68, height: 68, background: 'rgba(69,118,239,0.25)', top: -6, left: -6 }}
@@ -373,8 +316,75 @@ export default function HomeScreen() {
         </motion.div>
         <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Manrope',
           letterSpacing: '0.1em', textTransform: 'uppercase' as const, opacity: 0.8,
-          textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Crave</span>
-      </DraggableOrb>
+          textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Ask AI</span>
+      </motion.button>
+
+      {/* ── First-Time Welcome Overlay ── */}
+      <AnimatePresence>
+        {showWelcome && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50"
+              style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 40, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 24 }}
+              className="absolute z-50 left-4 right-4"
+              style={{ top: '50%', transform: 'translateY(-50%)' }}
+            >
+              {/* Logo */}
+              <div className="flex justify-center mb-6">
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                  style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)' }}>
+                  <PlatePostOrbMark size={32} />
+                </div>
+              </div>
+
+              <h2 style={{ fontFamily: 'Bungee, cursive', color: '#fff', fontSize: 26,
+                textAlign: 'center', letterSpacing: '0.04em', marginBottom: 8 }}>
+                Welcome to PlatePost
+              </h2>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center',
+                fontFamily: 'Manrope', marginBottom: 32, lineHeight: 1.6 }}>
+                Discover LA's best restaurants —<br/>however you like to explore
+              </p>
+
+              {/* 3 feature cards */}
+              <div className="flex flex-col gap-3 mb-8">
+                {[
+                  { icon: '🗺️', title: 'Explore the Map', desc: 'Browse restaurants near you visually' },
+                  { icon: '▶️', title: 'Watch the Feed', desc: 'Scroll through video previews of each spot' },
+                  { icon: '🎲', title: 'Surprise Me', desc: "Can't decide? Let us pick tonight's restaurant" },
+                  { icon: '✨', title: 'Ask AI (Crave)', desc: "Tell us your vibe — we'll find the perfect match" },
+                ].map(f => (
+                  <div key={f.title} className="flex items-center gap-4 px-4 py-3 rounded-2xl"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <span style={{ fontSize: 24, flexShrink: 0 }}>{f.icon}</span>
+                    <div>
+                      <p style={{ color: '#fff', fontFamily: 'Manrope', fontWeight: 700, fontSize: 14 }}>{f.title}</p>
+                      <p style={{ color: 'rgba(255,255,255,0.45)', fontFamily: 'Manrope', fontSize: 12 }}>{f.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={dismissWelcome}
+                className="w-full py-4 rounded-2xl font-bold text-base"
+                style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)',
+                  color: '#fff', fontFamily: 'Manrope', fontSize: 16 }}
+              >
+                Let's Explore 🍽️
+              </motion.button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── Neighborhoods Sheet ── */}
       <AnimatePresence>
