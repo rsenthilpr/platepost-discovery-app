@@ -258,26 +258,45 @@ export default function HomeScreen() {
           </button>
         </motion.div>
 
-        {/* Surprise Me button */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => navigate('/surprise')}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-            style={{ fontFamily: 'Manrope, sans-serif',
-              background: 'linear-gradient(135deg, rgba(245,158,11,0.25), rgba(239,68,68,0.2))',
-              border: '1px solid rgba(245,158,11,0.4)', color: '#fff',
-              backdropFilter: 'blur(16px)' }}
-            animate={{ boxShadow: ['0 0 0px rgba(245,158,11,0)', '0 0 20px rgba(245,158,11,0.3)', '0 0 0px rgba(245,158,11,0)'] }}
-            transition={{ duration: 3, repeat: Infinity }}
-          >
-            🎲 Surprise Me — Pick a Restaurant
-          </motion.button>
-        </motion.div>
       </div>
 
-      {/* ── Floating Concierge Orb ── */}
+      {/* ── Floating Surprise Me Orb (LEFT) ── */}
+      <motion.button
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.9, type: 'spring', stiffness: 200 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => navigate('/surprise')}
+        className="absolute z-30 flex flex-col items-center gap-1"
+        style={{ bottom: 130, left: 16 }}
+      >
+        <motion.div
+          className="absolute rounded-full"
+          style={{ width: 68, height: 68, background: 'rgba(245,158,11,0.2)', top: -6, left: -6 }}
+          animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.div
+          animate={{ boxShadow: ['0 0 20px rgba(245,158,11,0.4)', '0 0 36px rgba(239,68,68,0.5)', '0 0 20px rgba(245,158,11,0.4)'] }}
+          transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+          className="w-14 h-14 rounded-full flex items-center justify-center"
+          style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: '2.5px solid rgba(255,255,255,0.35)' }}
+        >
+          <motion.span
+            animate={{ rotate: [0, 15, -15, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ fontSize: 26, lineHeight: 1 }}
+          >🎲</motion.span>
+        </motion.div>
+        <span style={{
+          color: '#fff', fontSize: 9, fontWeight: 700,
+          fontFamily: 'Manrope', letterSpacing: '0.1em',
+          textTransform: 'uppercase', opacity: 0.8,
+          textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+        }}>Surprise</span>
+      </motion.button>
+
+      {/* ── Floating Crave Orb (RIGHT) ── */}
       <motion.button
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -287,7 +306,6 @@ export default function HomeScreen() {
         className="absolute z-30 flex flex-col items-center gap-1"
         style={{ bottom: 130, right: 16 }}
       >
-        {/* Pulse rings — double ring for more attention */}
         <motion.div
           className="absolute rounded-full"
           style={{ width: 68, height: 68, background: 'rgba(69,118,239,0.25)', top: -6, left: -6 }}

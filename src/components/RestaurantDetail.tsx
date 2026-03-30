@@ -325,7 +325,7 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
 
           {r.website_url && (
             <ActionButton icon="🌐" label="View Website"
-              onClick={() => window.open(r.website_url, '_blank')} />
+              onClick={() => setIframeUrl(r.website_url)} />
           )}
 
           <ActionButton icon="nav" label="Get Directions"

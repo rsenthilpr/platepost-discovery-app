@@ -310,7 +310,7 @@ CRITICAL RULES:
                 <motion.button
                   key={p.text}
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => sendMessage(p.prompt)}
+                  onClick={() => { setInput(p.prompt); inputRef.current?.focus() }}
                   className="text-left px-4 py-3 rounded-2xl text-sm flex items-center gap-3"
                   style={{
                     background: p.featured ? 'linear-gradient(135deg, rgba(69,118,239,0.2), rgba(139,92,246,0.2))' : 'rgba(255,255,255,0.04)',
