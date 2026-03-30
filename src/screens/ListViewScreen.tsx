@@ -129,6 +129,7 @@ export default function ListViewScreen() {
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState(state.filter ?? 'All')
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
+  const [menuIframeUrl, setMenuIframeUrl] = useState<string | null>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
@@ -427,6 +428,7 @@ export default function ListViewScreen() {
               window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, '_blank')
             }}
             onMenu={() => navigate(`/menu/${slide.restaurant.id}`)}
+            onVideoMenu={(url) => setMenuIframeUrl(url)}
             onEvents={() => setSelectedRestaurant(slide.restaurant)}
           />
         ))}
@@ -468,6 +470,33 @@ export default function ListViewScreen() {
         </div>
       </div>
 
+      {/* PlatePost Video Menu iframe */}
+      {menuIframeUrl && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
+          <div
+            className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
+            style={{ background: '#0e1f42', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            <button
+              onClick={() => setMenuIframeUrl(null)}
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.1)' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </button>
+            <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
+              <path d="M15 8 L90 50 L15 92 Z" fill="white" />
+              <ellipse cx="52" cy="36" rx="10" ry="12" fill="#4576EF" />
+              <rect x="44" y="46" width="7" height="22" rx="3.5" fill="#4576EF" transform="rotate(15 47 57)" />
+            </svg>
+            <span style={{ color: '#fff', fontFamily: 'Manrope', fontSize: 14, fontWeight: 600 }}>Video Menu</span>
+          </div>
+          <iframe src={menuIframeUrl} className="flex-1 w-full border-0" title="Video Menu" />
+        </div>
+      )}
+
       <AnimatePresence>
         {selectedRestaurant && (
           <RestaurantDetail
@@ -493,10 +522,11 @@ interface ReelSlideProps {
   onMoreInfo: () => void
   onDirections: () => void
   onMenu: () => void
+  onVideoMenu: (url: string) => void
   onEvents: () => void
 }
 
-function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slideRef, onMoreInfo, onDirections, onMenu, onEvents }: ReelSlideProps) {
+function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slideRef, onMoreInfo, onDirections, onMenu, onVideoMenu, onEvents }: ReelSlideProps) {
   const r = slide.restaurant
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -663,27 +693,24 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
           </motion.button>
 
           {PLATEPOST_MENU_URLS[r.id] ? (
-            <a
-              href={PLATEPOST_MENU_URLS[r.id]}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              onClick={() => onVideoMenu(PLATEPOST_MENU_URLS[r.id])}
               className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
               style={{
                 background: 'rgba(69,118,239,0.25)',
                 backdropFilter: 'blur(20px)',
                 border: '1px solid rgba(69,118,239,0.5)',
-                textDecoration: 'none',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M5 3.5L20 12L5 20.5V3.5Z" fill="white" />
-                <ellipse cx="11" cy="9.5" rx="2.2" ry="2.8" fill="#4576EF" />
-                <rect x="10.1" y="12" width="1.8" height="3.5" rx="0.9" fill="#4576EF" />
+              <svg width="14" height="14" viewBox="0 0 100 100" fill="none">
+                <path d="M15 8 L90 50 L15 92 Z" fill="white" />
+                <ellipse cx="52" cy="36" rx="10" ry="12" fill="#4576EF" />
+                <rect x="44" y="46" width="7" height="22" rx="3.5" fill="#4576EF" transform="rotate(15 47 57)" />
               </svg>
               <span style={{ fontFamily: 'Manrope', color: '#fff', fontSize: 11, fontWeight: 700 }}>
                 Video Menu
               </span>
-            </a>
+            </button>
           ) : (
             <motion.button
               whileTap={{ scale: 0.92 }}

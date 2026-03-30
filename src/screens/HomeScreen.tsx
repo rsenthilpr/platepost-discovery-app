@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { PlatePostLogo } from '../components/PlatePostLogo'
+import { PlatePostLogo, PlatePostOrbMark } from '../components/PlatePostLogo'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchPexelsVideo } from '../lib/pexels'
@@ -249,12 +249,18 @@ export default function HomeScreen() {
         className="absolute z-30 flex flex-col items-center gap-1"
         style={{ bottom: 130, right: 16 }}
       >
-        {/* Pulse ring */}
+        {/* Pulse rings — double ring for more attention */}
         <motion.div
           className="absolute rounded-full"
-          style={{ width: 64, height: 64, background: 'rgba(69,118,239,0.3)', top: -4, left: -4 }}
-          animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ width: 68, height: 68, background: 'rgba(69,118,239,0.25)', top: -6, left: -6 }}
+          animate={{ scale: [1, 1.5, 1], opacity: [0.7, 0, 0.7] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.div
+          className="absolute rounded-full"
+          style={{ width: 80, height: 80, background: 'rgba(139,92,246,0.15)', top: -12, left: -12 }}
+          animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
         />
         <motion.div
           animate={{ boxShadow: ['0 0 20px rgba(69,118,239,0.5)', '0 0 40px rgba(139,92,246,0.7)', '0 0 20px rgba(69,118,239,0.5)'] }}
@@ -262,18 +268,14 @@ export default function HomeScreen() {
           className="w-14 h-14 rounded-full flex items-center justify-center"
           style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)', border: '2.5px solid rgba(255,255,255,0.35)' }}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path d="M5 3.5L20 12L5 20.5V3.5Z" fill="white" />
-            <ellipse cx="11" cy="9.5" rx="2.2" ry="2.8" fill="#4576EF" />
-            <rect x="10.1" y="12" width="1.8" height="3.5" rx="0.9" fill="#4576EF" />
-          </svg>
+          <PlatePostOrbMark size={24} />
         </motion.div>
         <span style={{
           color: '#fff', fontSize: 9, fontWeight: 700,
           fontFamily: 'Manrope', letterSpacing: '0.1em',
           textTransform: 'uppercase', opacity: 0.8,
           textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-        }}>Concierge</span>
+        }}>Crave</span>
       </motion.button>
 
       {/* ── Neighborhoods Sheet ── */}
