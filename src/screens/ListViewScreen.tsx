@@ -133,13 +133,22 @@ export default function ListViewScreen() {
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
+  const scrollPositionRef = useRef<number>(0)
+  const loadedIndices = useRef<Set<number>>(new Set())
+
+  function _saveScroll() {
+    if (scrollContainerRef.current) {
+      scrollPositionRef.current = scrollContainerRef.current.scrollTop
+    }
+  }
+  void _saveScroll // suppress unused warning
+
   function restoreScroll() {
     requestAnimationFrame(() => {
       const el = scrollContainerRef.current
-      if (el) el.scrollTo({ top: currentIndex * window.innerHeight, behavior: 'instant' })
+      if (el) el.scrollTo({ top: scrollPositionRef.current, behavior: 'instant' })
     })
   }
-  const loadedIndices = useRef<Set<number>>(new Set())
 
   function toggleFavorite(id: number) {
     setFavorites((prev) => {
@@ -233,15 +242,32 @@ export default function ListViewScreen() {
       searchEventbriteEvents(r.name, r.city, r.state),
     ])
 
+    // Fetch Yelp photos in parallel for better image quality
+    let yelpPhotos: string[] = []
+    try {
+      const yelpRes = await fetch(`/api/yelp?name=${encodeURIComponent(r.name)}&city=${encodeURIComponent(r.city)}`)
+      if (yelpRes.ok) {
+        const yelpData = await yelpRes.json()
+        yelpPhotos = yelpData.photos || []
+      }
+    } catch {
+      // Yelp failure is non-fatal
+    }
+
+    // Pick best image: prefer Google HD photo (scored for venue shots),
+    // fall back to Yelp photos, then original image_url
+    const googlePhoto = placeResult?.photoUrl
+    const bestImage = googlePhoto || yelpPhotos[0] || r.image_url
+
     setSlides((prev) => {
       const next = [...prev]
       if (next[index]) {
         next[index] = {
           ...next[index],
           videoUrl: videoResult?.url ?? null,
-          rating: placeResult?.rating ?? null,
-          reviewCount: placeResult?.userRatingsTotal ?? null,
-          heroImage: placeResult?.photoUrl ?? r.image_url,
+          rating: (r.rating ?? placeResult?.rating) ?? null,
+          reviewCount: (r.review_count ?? placeResult?.userRatingsTotal) ?? null,
+          heroImage: bestImage,
           hasEvents: events.length > 0,
           loaded: true,
         }
@@ -411,6 +437,7 @@ export default function ListViewScreen() {
           const el = e.currentTarget
           const idx = Math.round(el.scrollTop / window.innerHeight)
           if (idx !== currentIndex) setCurrentIndex(idx)
+          scrollPositionRef.current = el.scrollTop
         }}
       >
         {slides.map((slide, index) => (

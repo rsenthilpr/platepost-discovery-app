@@ -6,6 +6,7 @@ export interface PlacesResult {
   rating?: number
   userRatingsTotal?: number
   photoUrl?: string
+  allPhotoUrls?: string[]
 }
 
 let initialized = false
@@ -18,13 +19,24 @@ async function ensureMapsLoaded() {
   await importLibrary('places')
 }
 
+function scoredPhotos(photos: google.maps.places.PlacePhoto[]): string[] {
+  return photos
+    .map(photo => {
+      const width = photo.width || 1
+      const height = photo.height || 1
+      const ratio = width / height
+      const score = ratio > 1.1 ? 2 : ratio > 0.9 ? 1 : 0
+      return { photo, score }
+    })
+    .sort((a, b) => b.score - a.score)
+    .map(({ photo }) => photo.getUrl({ maxWidth: 1600, maxHeight: 1200 }))
+}
+
 export async function fetchPlaceDetails(name: string, city: string): Promise<PlacesResult> {
   try {
     await ensureMapsLoaded()
-
     return new Promise((resolve) => {
       const service = new google.maps.places.PlacesService(document.createElement('div'))
-
       service.findPlaceFromQuery(
         { query: `${name} ${city}`, fields: ['place_id'] },
         (results, status) => {
@@ -37,10 +49,13 @@ export async function fetchPlaceDetails(name: string, city: string): Promise<Pla
               if (detailStatus !== google.maps.places.PlacesServiceStatus.OK || !place) {
                 return resolve({})
               }
+              const photos = place.photos || []
+              const scored = photos.length > 0 ? scoredPhotos(photos) : []
               resolve({
                 rating: place.rating,
                 userRatingsTotal: place.user_ratings_total,
-                photoUrl: place.photos?.[0]?.getUrl({ maxWidth: 800 }),
+                photoUrl: scored[0] || undefined,
+                allPhotoUrls: scored.slice(0, 5),
               })
             }
           )
