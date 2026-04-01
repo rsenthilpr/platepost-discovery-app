@@ -1,103 +1,42 @@
 // PlatePost Logo Component
-// Uses real logo image: public/platepost-logo.png (logomark only)
-// Full logo (mark + wordmark): public/platepost-logo-full.png
-// Fallback to SVG if image missing
+// pp-logo.png    = icon + "PlatePost" wordmark → place in /public/
+// pp-mark.png    = icon only (no text)         → place in /public/
 
-interface LogoProps {
-  size?: 'sm' | 'md' | 'lg'
-  color?: 'white' | 'dark'
-  showText?: boolean
-}
-
-export function PlatePostLogo({ size = 'md', color = 'white', showText = true }: LogoProps) {
-  const sizes = { sm: 16, md: 20, lg: 28 }
-  const fontSizes = { sm: 13, md: 16, lg: 22 }
-  const iconSize = sizes[size]
-  const fontSize = fontSizes[size]
-  const textColor = color === 'white' ? '#FFFFFF' : '#071126'
-
-  if (showText) {
-    // Full logo with wordmark — use full logo image if available
-    return (
-      <img
-        src="/platepost-logo-full.png"
-        alt="PlatePost"
-        height={iconSize * 1.4}
-        style={{ objectFit: 'contain', filter: color === 'dark' ? 'invert(1)' : 'none' }}
-        onError={(e) => {
-          // Fallback: mark + text
-          const parent = e.currentTarget.parentElement
-          if (parent) {
-            e.currentTarget.style.display = 'none'
-          }
-        }}
-      />
-    )
-  }
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(iconSize * 0.4) }}>
-      <PlatePostMark size={iconSize} color={color} />
-      <span style={{
-        fontFamily: 'Manrope, sans-serif',
-        fontWeight: 700,
-        fontSize,
-        color: textColor,
-        letterSpacing: '-0.01em',
-        lineHeight: 1,
-      }}>
-        PlatePost
-      </span>
-    </div>
-  )
-}
-
-// Logomark only — used in nav bars, small contexts
-export function PlatePostMark({
-  size = 20,
-  color = 'white',
-}: {
-  size?: number
-  color?: 'white' | 'dark'
-  // legacy props ignored:
-  triangleColor?: string
-  cutoutColor?: string
-}) {
+// Full logo — icon + wordmark (used in top nav)
+export function PlatePostLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
+  const heights = { sm: 20, md: 26, lg: 36 }
   return (
     <img
-      src="/platepost-logo.png"
+      src="/pp-logo.png"
       alt="PlatePost"
-      width={size}
-      height={size}
-      style={{
-        objectFit: 'contain',
-        filter: color === 'dark' ? 'invert(1)' : 'brightness(0) invert(1)',
-        display: 'block',
-      }}
-      onError={(e) => {
-        // SVG fallback if PNG missing
-        e.currentTarget.style.display = 'none'
-      }}
+      height={heights[size]}
+      style={{ objectFit: 'contain', display: 'block' }}
     />
   )
 }
 
-// Orb version — logomark inside the blue Crave orb (always white)
-export function PlatePostOrbMark({ size = 22 }: { size?: number }) {
+// Mark only — icon with no text (used in small/tight contexts)
+export function PlatePostMark({ size = 20 }: { size?: number }) {
   return (
     <img
-      src="/platepost-logo.png"
+      src="/pp-mark.png"
       alt="PlatePost"
       width={size}
       height={size}
-      style={{
-        objectFit: 'contain',
-        filter: 'brightness(0) invert(1)',
-        display: 'block',
-      }}
-      onError={(e) => {
-        e.currentTarget.style.display = 'none'
-      }}
+      style={{ objectFit: 'contain', display: 'block' }}
+    />
+  )
+}
+
+// Orb mark — icon inside the Crave orb (forced white)
+export function PlatePostOrbMark({ size = 22 }: { size?: number }) {
+  return (
+    <img
+      src="/pp-mark.png"
+      alt="PlatePost"
+      width={size}
+      height={size}
+      style={{ objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }}
     />
   )
 }

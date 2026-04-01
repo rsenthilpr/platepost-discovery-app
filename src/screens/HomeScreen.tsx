@@ -34,38 +34,47 @@ export function addToRecentlyViewed(id: number) {
   } catch {}
 }
 
-// Draggable orb — user can drag to any position, position saved to localStorage
-function DraggableOrb({ id, defaultPos, onClick, children }: {
+// Fixed-position orb — anchored to bottom-right by default, draggable anywhere
+function DraggableOrb({ id, defaultBottom, defaultRight, onClick, children }: {
   id: string
-  defaultPos: { x: number; y: number }
+  defaultBottom: number
+  defaultRight: number
   onClick: () => void
   children: React.ReactNode
 }) {
   const getSavedPos = () => {
     try {
       const saved = localStorage.getItem(`orb_pos_${id}`)
-      return saved ? JSON.parse(saved) : defaultPos
-    } catch { return defaultPos }
+      return saved ? JSON.parse(saved) : null
+    } catch { return null }
   }
 
-  const [pos, setPos] = useState(getSavedPos)
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(getSavedPos)
   const [dragging, setDragging] = useState(false)
   const dragStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
   const moved = useRef(false)
 
+  // Compute initial fixed position from bottom-right defaults
+  const getDefaultXY = () => ({
+    x: window.innerWidth - defaultRight - 56,
+    y: window.innerHeight - defaultBottom - 56,
+  })
+
+  const currentPos = pos ?? getDefaultXY()
+
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId)
-    dragStart.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y }
+    dragStart.current = { x: e.clientX, y: e.clientY, px: currentPos.x, py: currentPos.y }
     moved.current = false
     setDragging(true)
-  }, [pos])
+  }, [currentPos])
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragStart.current) return
     const dx = e.clientX - dragStart.current.x
     const dy = e.clientY - dragStart.current.y
     if (Math.abs(dx) + Math.abs(dy) > 6) moved.current = true
-    const newX = Math.max(0, Math.min(window.innerWidth - 64, dragStart.current.px + dx))
+    const newX = Math.max(8, Math.min(window.innerWidth - 64, dragStart.current.px + dx))
     const newY = Math.max(60, Math.min(window.innerHeight - 100, dragStart.current.py + dy))
     setPos({ x: newX, y: newY })
   }, [])
@@ -73,7 +82,7 @@ function DraggableOrb({ id, defaultPos, onClick, children }: {
   const onPointerUp = useCallback(() => {
     setDragging(false)
     dragStart.current = null
-    localStorage.setItem(`orb_pos_${id}`, JSON.stringify(pos))
+    if (pos) localStorage.setItem(`orb_pos_${id}`, JSON.stringify(pos))
     if (!moved.current) onClick()
   }, [id, pos, onClick])
 
@@ -82,9 +91,10 @@ function DraggableOrb({ id, defaultPos, onClick, children }: {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      className="absolute z-30 flex flex-col items-center gap-1 select-none"
+      className="fixed z-30 flex flex-col items-center gap-1 select-none"
       style={{
-        left: pos.x, top: pos.y,
+        left: currentPos.x,
+        top: currentPos.y,
         cursor: dragging ? 'grabbing' : 'grab',
         touchAction: 'none',
         opacity: dragging ? 0.85 : 1,
@@ -102,10 +112,10 @@ export default function HomeScreen() {
   // Reset orb positions to new bottom-left default (v2)
   useEffect(() => {
     const orbVersion = localStorage.getItem('orb_layout_version')
-    if (orbVersion !== 'v2') {
+    if (orbVersion !== 'v3') {
       localStorage.removeItem('orb_pos_surprise-orb')
       localStorage.removeItem('orb_pos_crave-orb')
-      localStorage.setItem('orb_layout_version', 'v2')
+      localStorage.setItem('orb_layout_version', 'v3')
     }
   }, [])
   useEffect(() => {
@@ -215,7 +225,7 @@ export default function HomeScreen() {
 
       {/* ── Top bar ── */}
       <div className="absolute top-0 left-0 right-0 z-20 pt-14 px-6 flex items-center justify-between">
-        <PlatePostLogo size="md" color="white" />
+        <PlatePostLogo size="md" />
         <button
           onClick={() => navigate('/map')}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
@@ -333,7 +343,8 @@ export default function HomeScreen() {
       {/* ── Draggable Floating Orbs ── */}
       <DraggableOrb
         id="surprise-orb"
-        defaultPos={{ x: 16, y: window.innerHeight - 240 }}
+        defaultBottom={160}
+        defaultRight={20}
         onClick={() => navigate('/surprise')}
       >
         <motion.div className="absolute rounded-full"
@@ -358,11 +369,12 @@ export default function HomeScreen() {
 
       <DraggableOrb
         id="crave-orb"
-        defaultPos={{ x: 16, y: window.innerHeight - 140 }}
+        defaultBottom={60}
+        defaultRight={20}
         onClick={() => navigate('/concierge')}
       >
         <motion.div className="absolute rounded-full"
-          style={{ background: 'rgba(0,72,249,0.25)', top: -6, left: -6 }}
+          style={{ width: 68, height: 68, background: 'rgba(0,72,249,0.25)', top: -6, left: -6 }}
           animate={{ scale: [1, 1.5, 1], opacity: [0.7, 0, 0.7] }}
           transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
         />
