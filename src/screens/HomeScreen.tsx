@@ -278,18 +278,21 @@ export default function HomeScreen() {
       />
 
       {/* ── Top bar ── */}
-      <div className="absolute top-0 left-0 right-0 z-20 pt-14 px-5 flex items-center justify-between">
-        <PlatePostLogo size="md" />
+      <div className="absolute top-0 left-0 right-0 z-40 pt-14 px-5 flex items-center justify-between pointer-events-none">
+        <div className="pointer-events-auto">
+          <PlatePostLogo size="md" />
+        </div>
         <button
           onClick={() => navigate('/map')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full pointer-events-auto"
           style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.25)' }}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
           </svg>
           <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 11, fontWeight: 600 }}>Los Angeles</span>
-        </button>      </div>
+        </button>
+      </div>
 
       {/* ── Scrollable main content ── */}
       <div className="absolute inset-0 z-20 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
@@ -392,12 +395,17 @@ export default function HomeScreen() {
                   Popular in LA
                 </h2>
               </div>
-              <div className="flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'Open Sans' }}>
-                <span>Scroll</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round" />
+              <motion.div
+                className="flex items-center gap-1"
+                animate={{ x: [0, 4, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'Open Sans', fontWeight: 600 }}
+              >
+                <span>swipe</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.6)" strokeWidth="2.5" strokeLinecap="round" />
                 </svg>
-              </div>
+              </motion.div>
             </div>
             <div
               className="flex gap-3 overflow-x-auto pl-5 pr-5 pb-2"
