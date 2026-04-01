@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
-import { searchEventbriteEvents } from '../lib/eventbrite'
-import { fetchPexelsPhoto } from '../lib/pexels'
+import { searchEventbriteByLocation, searchEventbriteEvents } from '../lib/eventbrite'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 
@@ -19,17 +18,22 @@ interface EventItem {
   name: string
   date: string
   time: string
+  rawDate: Date
   url: string
-  restaurant: Restaurant
+  restaurant: Restaurant | null
+  venueName: string
   heroImage: string | null
   source: 'eventbrite' | 'supabase'
 }
 
 function getTimeCategory(time: string): 'afternoon' | 'evening' | 'late' {
   const hour = parseInt(time.split(':')[0])
-  if (isNaN(hour)) return 'evening'
-  if (hour < 17) return 'afternoon'
-  if (hour < 21) return 'evening'
+  const isPM = time.toLowerCase().includes('pm')
+  let h = isNaN(hour) ? 12 : hour
+  if (isPM && h !== 12) h += 12
+  if (!isPM && h === 12) h = 0
+  if (h < 17) return 'afternoon'
+  if (h < 21) return 'evening'
   return 'late'
 }
 
@@ -39,13 +43,32 @@ const TIME_LABELS = {
   late: { label: 'Late Night', emoji: '🌙', color: '#3B82F6' },
 }
 
+// Generate 30-day calendar
+function generateDays(count = 30) {
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() + i)
+    d.setHours(0, 0, 0, 0)
+    return d
+  })
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+}
+
 export default function TonightScreen() {
   const navigate = useNavigate()
-  const [events, setEvents] = useState<EventItem[]>([])
+  const [allEvents, setAllEvents] = useState<EventItem[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
   const [activeCategory, setActiveCategory] = useState<'all' | 'afternoon' | 'evening' | 'late'>('all')
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0)
+  const days = generateDays(30)
+  const selectedDay = days[selectedDayIndex]
 
   function toggleFavorite(id: number) {
     setFavorites(prev => {
@@ -56,73 +79,93 @@ export default function TonightScreen() {
     })
   }
 
-  useEffect(() => {
-    loadEvents()
-  }, [])
+  useEffect(() => { loadAllEvents() }, [])
 
-  async function loadEvents() {
+  async function loadAllEvents() {
     setLoading(true)
-    const { data: restaurants } = await supabase.from('restaurants').select('*')
-    const allRestaurants = restaurants ?? []
+    const collected: EventItem[] = []
 
-    // Fetch events for all restaurants in parallel
-    const eventPromises = allRestaurants.map(async (r) => {
-      const liveEvents = await searchEventbriteEvents(r.name, r.city, r.state)
-      if (liveEvents.length > 0) {
-        const photo = await fetchPexelsPhoto(`${r.cuisine} music venue concert`)
-        return liveEvents.slice(0, 2).map(ev => ({
-          id: ev.id,
-          name: ev.name,
-          date: ev.date,
-          time: ev.time,
-          url: ev.url,
-          restaurant: r,
-          heroImage: photo?.url ?? r.image_url,
-          source: 'eventbrite' as const,
-        }))
-      }
+    // 1. Pull real Eventbrite events for all of LA (next 30 days)
+    const startDate = new Date()
+    const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    const liveEvents = await searchEventbriteByLocation(startDate, endDate)
 
-      // Fall back to Supabase seeded events
-      const { data: seededEvents } = await supabase
-        .from('events')
-        .select('*')
-        .eq('restaurant_id', r.id)
+    // Get restaurants for matching
+    const { data: restaurantData } = await supabase.from('restaurants').select('*')
+    const restaurants: Restaurant[] = restaurantData ?? []
 
-      if (seededEvents && seededEvents.length > 0) {
-        return seededEvents.slice(0, 1).map(ev => ({
-          id: String(ev.id),
-          name: ev.event_name,
-          date: ev.event_date,
-          time: ev.event_time,
-          url: ev.eventbrite_url,
-          restaurant: r,
-          heroImage: r.image_url,
-          source: 'supabase' as const,
-        }))
-      }
-      return []
+    for (const ev of liveEvents) {
+      // Try to match event venue to a restaurant in our DB
+      const matched = restaurants.find(r =>
+        ev.venueName?.toLowerCase().includes(r.name.toLowerCase()) ||
+        r.name.toLowerCase().includes((ev.venueName ?? '').toLowerCase())
+      )
+      collected.push({
+        id: ev.id,
+        name: ev.name,
+        date: ev.date,
+        time: ev.time,
+        rawDate: ev.rawDate,
+        url: ev.url,
+        restaurant: matched ?? null,
+        venueName: ev.venueName ?? 'Los Angeles',
+        heroImage: ev.imageUrl ?? matched?.image_url ?? null,
+        source: 'eventbrite',
+      })
+    }
+
+    // 2. Also search by venue name for known restaurants
+    const venueSearches = restaurants.slice(0, 15).map(async r => {
+      const evs = await searchEventbriteEvents(r.name, r.city, r.state)
+      return evs.map(ev => ({
+        id: ev.id,
+        name: ev.name,
+        date: ev.date,
+        time: ev.time,
+        rawDate: ev.rawDate,
+        url: ev.url,
+        restaurant: r,
+        venueName: r.name,
+        heroImage: ev.imageUrl ?? r.image_url,
+        source: 'eventbrite' as const,
+      }))
     })
+    const venueResults = await Promise.all(venueSearches)
+    const venueEvents = venueResults.flat()
 
-    const results = await Promise.all(eventPromises)
-    const allEvents = results.flat().sort((a, b) => a.time.localeCompare(b.time))
-    setEvents(allEvents)
+    // 3. Supabase seeded events as fallback
+    const { data: seededData } = await supabase.from('events').select('*, restaurants(*)')
+    const seededEvents: EventItem[] = (seededData ?? []).map((ev: any) => ({
+      id: String(ev.id),
+      name: ev.event_name,
+      date: ev.event_date,
+      time: ev.event_time,
+      rawDate: new Date(`${ev.event_date} ${ev.event_time}`),
+      url: ev.eventbrite_url,
+      restaurant: ev.restaurants ?? null,
+      venueName: ev.restaurants?.name ?? 'Los Angeles',
+      heroImage: ev.restaurants?.image_url ?? null,
+      source: 'supabase' as const,
+    }))
+
+    // Merge, deduplicate by id
+    const allMerged = [...collected, ...venueEvents, ...seededEvents]
+    const seen = new Set<string>()
+    const deduped = allMerged.filter(ev => {
+      if (seen.has(ev.id)) return false
+      seen.add(ev.id)
+      return true
+    }).sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime())
+
+    setAllEvents(deduped)
     setLoading(false)
   }
 
-  const now = new Date()
-  const todayStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-
-  // 14-day calendar
-  const days = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() + i)
-    return d
-  })
-  const [selectedDay, setSelectedDay] = useState(0)
-
+  // Filter events for selected day
+  const eventsForDay = allEvents.filter(ev => isSameDay(ev.rawDate, selectedDay))
   const filtered = activeCategory === 'all'
-    ? events
-    : events.filter(e => getTimeCategory(e.time) === activeCategory)
+    ? eventsForDay
+    : eventsForDay.filter(e => getTimeCategory(e.time) === activeCategory)
 
   const grouped = {
     afternoon: filtered.filter(e => getTimeCategory(e.time) === 'afternoon'),
@@ -130,20 +173,27 @@ export default function TonightScreen() {
     late: filtered.filter(e => getTimeCategory(e.time) === 'late'),
   }
 
+  const now = new Date()
+  const todayStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+
+  // Group days by month for display
+  const months = days.reduce((acc, day) => {
+    const key = day.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    if (!acc[key]) acc[key] = []
+    acc[key].push(day)
+    return acc
+  }, {} as Record<string, Date[]>)
+
   return (
     <div className="fixed inset-0 flex flex-col" style={{ background: '#070d1f', fontFamily: 'Open Sans, sans-serif' }}>
 
       {/* Header */}
-      <div
-        className="flex-shrink-0 pt-12 px-5 pb-3"
-        style={{ background: 'rgba(7,13,31,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
-      >
+      <div className="flex-shrink-0 pt-12 px-5 pb-3"
+        style={{ background: 'rgba(7,13,31,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex items-center gap-3 mb-3">
-          <button
-            onClick={() => navigate('/')}
+          <button onClick={() => navigate('/')}
             className="w-9 h-9 flex items-center justify-center rounded-full flex-shrink-0"
-            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
-          >
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -159,48 +209,63 @@ export default function TonightScreen() {
           {!loading && (
             <span className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full"
               style={{ background: 'rgba(0,72,249,0.2)', color: '#60a5fa', border: '1px solid rgba(0,72,249,0.3)' }}>
-              {events.length} events
+              {eventsForDay.length} events
             </span>
           )}
         </div>
 
-        {/* 14-day calendar scroll */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-3" style={{ scrollbarWidth: 'none' }}>
-          {days.map((day, i) => (
-            <button
-              key={i}
-              onClick={() => setSelectedDay(i)}
-              className="flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl transition-all"
-              style={{
-                background: selectedDay === i ? '#0048f9' : 'rgba(255,255,255,0.06)',
-                border: selectedDay === i ? '1px solid #0048f9' : '1px solid rgba(255,255,255,0.08)',
-                minWidth: 48,
-              }}
-            >
-              <span style={{ fontFamily: 'Open Sans', color: selectedDay === i ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 600 }}>
-                {day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
-              </span>
-              <span style={{ fontFamily: 'Open Sans', color: selectedDay === i ? '#fff' : 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: 700 }}>
-                {day.getDate()}
-              </span>
-            </button>
+        {/* Calendar — Apple-style horizontal scroll by month */}
+        <div className="overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          {Object.entries(months).map(([monthLabel, monthDays]) => (
+            <div key={monthLabel} className="mb-2">
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6, paddingLeft: 2 }}>
+                {monthLabel}
+              </p>
+              <div className="flex gap-2">
+                {monthDays.map((day) => {
+                  const globalIdx = days.findIndex(d => isSameDay(d, day))
+                  const isSelected = globalIdx === selectedDayIndex
+                  const isToday = isSameDay(day, new Date())
+                  const hasEvents = allEvents.some(ev => isSameDay(ev.rawDate, day))
+                  return (
+                    <button
+                      key={day.toISOString()}
+                      onClick={() => setSelectedDayIndex(globalIdx)}
+                      className="flex-shrink-0 flex flex-col items-center rounded-xl transition-all"
+                      style={{
+                        width: 44,
+                        padding: '8px 0',
+                        background: isSelected ? '#0048f9' : isToday ? 'rgba(0,72,249,0.15)' : 'rgba(255,255,255,0.05)',
+                        border: isSelected ? '1px solid #0048f9' : isToday ? '1px solid rgba(0,72,249,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                      }}
+                    >
+                      <span style={{ fontFamily: 'Open Sans', color: isSelected ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                      </span>
+                      <span style={{ fontFamily: 'Open Sans', color: isSelected ? '#fff' : isToday ? '#60a5fa' : 'rgba(255,255,255,0.8)', fontSize: 17, fontWeight: 700, lineHeight: 1.2 }}>
+                        {day.getDate()}
+                      </span>
+                      {/* Dot indicator for days with events */}
+                      <div style={{ width: 4, height: 4, borderRadius: '50%', marginTop: 2, background: hasEvents ? (isSelected ? '#fff' : '#0048f9') : 'transparent' }} />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           ))}
         </div>
 
         {/* Time filters */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-1">
           {(['all', 'afternoon', 'evening', 'late'] as const).map(cat => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
+            <button key={cat} onClick={() => setActiveCategory(cat)}
               className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
               style={{
                 background: activeCategory === cat ? '#0048f9' : 'rgba(255,255,255,0.07)',
                 color: activeCategory === cat ? '#fff' : 'rgba(255,255,255,0.5)',
                 border: activeCategory === cat ? '1px solid #0048f9' : '1px solid rgba(255,255,255,0.1)',
                 fontFamily: 'Open Sans',
-              }}
-            >
+              }}>
               {cat === 'all' ? 'All' : TIME_LABELS[cat].emoji + ' ' + TIME_LABELS[cat].label.split(' ').pop()}
             </button>
           ))}
@@ -213,13 +278,18 @@ export default function TonightScreen() {
           <div className="flex flex-col items-center justify-center h-64 gap-4">
             <div className="w-8 h-8 rounded-full border-2 animate-spin"
               style={{ borderColor: 'rgba(255,255,255,0.1)', borderTopColor: '#0048f9' }} />
-            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, fontFamily: 'Open Sans' }}>Finding events...</p>
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, fontFamily: 'Open Sans' }}>
+              Finding real events in LA...
+            </p>
           </div>
-        ) : events.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-3">
+        ) : eventsForDay.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 gap-3 px-6">
             <span style={{ fontSize: 48 }}>🎭</span>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, textAlign: 'center', fontFamily: 'Open Sans' }}>
-              No events found.{'\n'}Check back later!
+            <p style={{ color: '#fff', fontSize: 16, fontWeight: 700, textAlign: 'center', fontFamily: 'Open Sans' }}>
+              No events on {selectedDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', fontFamily: 'Open Sans' }}>
+              Try a different date — blue dots show days with events
             </p>
           </div>
         ) : (
@@ -231,93 +301,20 @@ export default function TonightScreen() {
               return (
                 <div key={cat} className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
-                    <span style={{ fontSize: 16 }}>{label.emoji}</span>
-                    <h2 style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-                      {label.label}
+                    <span style={{ fontSize: 14 }}>{label.emoji}</span>
+                    <h2 style={{ fontFamily: 'Open Sans', fontWeight: 700, color: 'rgba(255,255,255,0.5)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                      {cat === 'late' ? 'Late Night' : label.label.split(' ').slice(1).join(' ')}
                     </h2>
-                    <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
                   </div>
-
                   <div className="flex flex-col gap-3">
-                    {catEvents.map((ev, i) => (
-                      <motion.div
+                    {catEvents.map(ev => (
+                      <EventCard
                         key={ev.id}
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.06 }}
-                        className="rounded-2xl overflow-hidden cursor-pointer"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-                        onClick={() => setSelectedRestaurant(ev.restaurant)}
-                      >
-                        {/* Hero image */}
-                        <div className="relative" style={{ height: 140 }}>
-                          <img
-                            src={ev.heroImage ?? ev.restaurant.image_url}
-                            alt={ev.name}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0"
-                            style={{ background: 'linear-gradient(to top, rgba(7,13,31,0.9) 0%, transparent 60%)' }} />
-
-                          {/* Live badge */}
-                          {ev.source === 'eventbrite' && (
-                            <div
-                              className="absolute top-3 left-3 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1"
-                              style={{ background: '#F05537', color: '#fff', fontSize: 10 }}
-                            >
-                              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                              LIVE
-                            </div>
-                          )}
-
-                          {/* Time */}
-                          <div
-                            className="absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full"
-                            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
-                          >
-                            {ev.time}
-                          </div>
-
-                          {/* Venue name overlay */}
-                          <div className="absolute bottom-0 left-0 right-0 px-4 pb-3">
-                            <p className="text-xs font-semibold mb-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                              {ev.restaurant.name} · {ev.restaurant.city}
-                            </p>
-                            <p className="font-bold text-sm text-white leading-snug">{ev.name}</p>
-                          </div>
-                        </div>
-
-                        {/* Bottom action row */}
-                        <div className="flex items-center gap-3 px-4 py-3">
-                          <span
-                            className="text-xs px-2.5 py-1 rounded-full font-semibold"
-                            style={{ background: 'rgba(69,118,239,0.15)', color: '#6B9EFF' }}
-                          >
-                            {ev.restaurant.cuisine}
-                          </span>
-                          <div className="flex-1" />
-                          <button
-                            onClick={e => { e.stopPropagation(); toggleFavorite(ev.restaurant.id) }}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24"
-                              fill={favorites.has(ev.restaurant.id) ? '#E11D48' : 'none'}
-                              stroke={favorites.has(ev.restaurant.id) ? '#E11D48' : 'rgba(255,255,255,0.3)'}
-                              strokeWidth="2">
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                            </svg>
-                          </button>
-                          <a
-                            href={ev.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            className="text-xs font-bold px-3 py-1.5 rounded-xl"
-                            style={{ background: '#4576EF', color: '#fff', textDecoration: 'none' }}
-                          >
-                            Get Tickets
-                          </a>
-                        </div>
-                      </motion.div>
+                        event={ev}
+                        isFavorite={ev.restaurant ? favorites.has(ev.restaurant.id) : false}
+                        onToggleFavorite={() => ev.restaurant && toggleFavorite(ev.restaurant.id)}
+                        onRestaurantClick={() => ev.restaurant && setSelectedRestaurant(ev.restaurant)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -338,5 +335,106 @@ export default function TonightScreen() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+function EventCard({ event: ev, isFavorite, onToggleFavorite, onRestaurantClick }: {
+  event: EventItem
+  isFavorite: boolean
+  onToggleFavorite: () => void
+  onRestaurantClick: () => void
+}) {
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null)
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+        className="rounded-2xl overflow-hidden"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        {/* Hero image */}
+        {ev.heroImage && (
+          <div className="relative" style={{ height: 140 }}>
+            <img src={ev.heroImage} alt={ev.name} className="w-full h-full object-cover" />
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 60%)' }} />
+            <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-bold"
+              style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', fontFamily: 'Open Sans', backdropFilter: 'blur(8px)' }}>
+              {ev.time}
+            </div>
+            {ev.source === 'eventbrite' && (
+              <div className="absolute top-3 left-3 px-2 py-0.5 rounded-md text-xs font-bold"
+                style={{ background: '#F05537', color: '#fff', fontFamily: 'Open Sans', fontSize: 9 }}>
+                EVENTBRITE
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="p-3">
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontFamily: 'Open Sans', marginBottom: 2 }}>
+            {ev.venueName} · {ev.date}
+          </p>
+          <p style={{ color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Open Sans', marginBottom: 8, lineHeight: 1.3 }}>
+            {ev.name}
+          </p>
+
+          <div className="flex items-center gap-2">
+            {ev.restaurant?.cuisine && (
+              <span className="text-xs px-2.5 py-1 rounded-full"
+                style={{ background: 'rgba(0,72,249,0.2)', color: '#60a5fa', fontFamily: 'Open Sans', fontWeight: 600 }}>
+                {ev.restaurant.cuisine}
+              </span>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <button onClick={onToggleFavorite}
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(255,255,255,0.07)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24"
+                  fill={isFavorite ? '#E11D48' : 'none'}
+                  stroke={isFavorite ? '#E11D48' : 'rgba(255,255,255,0.5)'}
+                  strokeWidth="2">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              </button>
+              {ev.restaurant && (
+                <button onClick={onRestaurantClick}
+                  className="px-3 py-1.5 rounded-full text-xs font-bold"
+                  style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', fontFamily: 'Open Sans' }}>
+                  Info
+                </button>
+              )}
+              <button
+                onClick={() => { window.open(ev.url, '_blank') }}
+                className="px-3 py-1.5 rounded-full text-xs font-bold"
+                style={{ background: '#0048f9', color: '#fff', fontFamily: 'Open Sans' }}>
+                Get Tickets
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {iframeUrl && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
+          <div className="flex items-center gap-3 px-4 py-3" style={{ background: '#0e1f42' }}>
+            <button onClick={() => setIframeUrl(null)}
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </button>
+            <span style={{ color: '#fff', fontFamily: 'Open Sans', fontSize: 14, fontWeight: 600 }}>Get Tickets</span>
+            <a href={iframeUrl} target="_blank" rel="noreferrer"
+              className="ml-auto text-xs px-3 py-1.5 rounded-full"
+              style={{ background: '#0048f9', color: '#fff', textDecoration: 'none', fontFamily: 'Open Sans' }}>
+              Open ↗
+            </a>
+          </div>
+          <iframe src={iframeUrl} className="flex-1 w-full border-0" title="Tickets" />
+        </div>
+      )}
+    </>
   )
 }

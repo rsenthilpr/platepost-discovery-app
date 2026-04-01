@@ -158,10 +158,10 @@ export default function HomeScreen() {
   // Reset orb positions to bottom-right default (v5)
   useEffect(() => {
     const orbVersion = localStorage.getItem('orb_layout_version')
-    if (orbVersion !== 'v6') {
+    if (orbVersion !== 'v7') {
       localStorage.removeItem('orb_pos_surprise-orb')
       localStorage.removeItem('orb_pos_crave-orb')
-      localStorage.setItem('orb_layout_version', 'v6')
+      localStorage.setItem('orb_layout_version', 'v7')
     }
   }, [])
 
@@ -429,7 +429,7 @@ export default function HomeScreen() {
       </div>
 
       {/* ── Draggable Floating Orbs ── */}
-      <DraggableOrb id="surprise-orb" defaultBottom={320} defaultRight={20} onClick={() => navigate('/surprise')}>
+      <DraggableOrb id="surprise-orb" defaultBottom={420} defaultRight={20} onClick={() => navigate('/surprise')}>
         <motion.div className="absolute rounded-full"
           style={{ width: 68, height: 68, background: 'rgba(245,158,11,0.2)', top: -6, left: -6 }}
           animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
@@ -447,7 +447,7 @@ export default function HomeScreen() {
         <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase' as const, opacity: 0.8, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Surprise</span>
       </DraggableOrb>
 
-      <DraggableOrb id="crave-orb" defaultBottom={230} defaultRight={20} onClick={() => navigate('/concierge')}>
+      <DraggableOrb id="crave-orb" defaultBottom={320} defaultRight={20} onClick={() => navigate('/concierge')}>
         <motion.div className="absolute rounded-full"
           style={{ width: 68, height: 68, background: 'rgba(0,72,249,0.25)', top: -6, left: -6 }}
           animate={{ scale: [1, 1.5, 1], opacity: [0.7, 0, 0.7] }}

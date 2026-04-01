@@ -335,35 +335,42 @@ export default function MapViewScreen() {
               clickableIcons: false,
             }}
           >
-            {filtered.map(r => (
-              <OverlayView
-                key={r.id}
-                position={{ lat: r.latitude, lng: r.longitude }}
-                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-              >
-                <motion.div
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  onClick={() => setSelectedRestaurant(r)}
-                  style={{
-                    width: 44, height: 44,
-                    borderRadius: '50%',
-                    background: favorites.has(r.id) ? '#E11D48' : '#071126',
-                    border: '3px solid white',
-                    boxShadow: selectedRestaurant?.id === r.id
-                      ? '0 0 0 3px #4576EF, 0 4px 16px rgba(0,0,0,0.3)'
-                      : '0 4px 16px rgba(0,0,0,0.25)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', fontSize: 18,
-                    transform: 'translate(-50%, -50%)',
-                    transition: 'box-shadow 0.2s, background 0.2s',
-                  }}
+            {filtered.map(r => {
+              const emoji = CUISINE_EMOJI[r.cuisine] ?? '🍽️'
+              const isFav = favorites.has(r.id)
+              const isSelected = selectedRestaurant?.id === r.id
+              return (
+                <OverlayView
+                  key={r.id}
+                  position={{ lat: r.latitude, lng: r.longitude }}
+                  mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                 >
-                  {CUISINE_EMOJI[r.cuisine] ?? '🍽️'}
-                </motion.div>
-              </OverlayView>
-            ))}
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    onClick={() => setSelectedRestaurant(r)}
+                    style={{
+                      width: isSelected ? 52 : 44,
+                      height: isSelected ? 52 : 44,
+                      borderRadius: '50%',
+                      background: isFav ? '#E11D48' : isSelected ? '#0048f9' : '#fff',
+                      border: `3px solid ${isSelected ? '#0048f9' : isFav ? '#E11D48' : '#071126'}`,
+                      boxShadow: isSelected
+                        ? '0 0 0 3px rgba(0,72,249,0.3), 0 6px 20px rgba(0,0,0,0.35)'
+                        : '0 3px 12px rgba(0,0,0,0.2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', fontSize: isSelected ? 22 : 18,
+                      transform: 'translate(-50%, -50%)',
+                      transition: 'all 0.2s',
+                      zIndex: isSelected ? 10 : 1,
+                    }}
+                  >
+                    {emoji}
+                  </motion.div>
+                </OverlayView>
+              )
+            })}
           </GoogleMap>
         ) : (
           <div className="flex items-center justify-center h-full">

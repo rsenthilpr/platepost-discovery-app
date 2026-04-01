@@ -28,6 +28,7 @@ interface LocationState {
   tonight?: boolean
   neighborhood?: string
   recentIds?: number[]
+  searchQuery?: string
 }
 
 const VIDEO_QUERY_POOLS: Record<string, string[]> = {
@@ -184,7 +185,21 @@ export default function ListViewScreen() {
 
   function applyFilter(list: Restaurant[], filter: string): Restaurant[] {
     let result = list
-    // Cuisine filter
+
+    // Search query filter — from home screen search
+    if (state.searchQuery) {
+      const q = state.searchQuery.toLowerCase()
+      result = result.filter(r =>
+        r.name.toLowerCase().includes(q) ||
+        r.cuisine.toLowerCase().includes(q) ||
+        r.city.toLowerCase().includes(q) ||
+        (r.neighborhood ?? '').toLowerCase().includes(q) ||
+        (r.description ?? '').toLowerCase().includes(q)
+      )
+      return result.length > 0 ? result : list
+    }
+
+    // Cuisine/type filter
     if (filter && filter !== 'All') {
       result = result.filter((r) =>
         filter === 'DJs'
@@ -199,7 +214,6 @@ export default function ListViewScreen() {
         r.description?.toLowerCase().includes(state.neighborhood!.toLowerCase()) ||
         r.name?.toLowerCase().includes(state.neighborhood!.toLowerCase())
       )
-      // If neighborhood filter returns nothing, show all (neighborhood data may not match)
       if (result.length === 0) result = list
     }
     // Recently viewed filter
