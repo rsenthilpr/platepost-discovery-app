@@ -1,34 +1,49 @@
 // PlatePost Logo Component
-// pp-logo.png    = icon + "PlatePost" wordmark → place in /public/
-// pp-mark.png    = icon only (no text)         → place in /public/
+// pp-logo.png  = full logo (icon + "PlatePost" text) — dark colored, works on light bg
+// pp-mark.png  = icon only — dark colored, works on light bg
+//
+// For DARK backgrounds: add filter to force white
+// For LIGHT backgrounds: use as-is
 
-// Full logo — icon + wordmark (used in top nav)
-export function PlatePostLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
+export function PlatePostLogo({ size = 'md', white = false }: {
+  size?: 'sm' | 'md' | 'lg'
+  white?: boolean  // true = force white (for dark backgrounds)
+}) {
   const heights = { sm: 20, md: 26, lg: 36 }
   return (
     <img
       src="/pp-logo.png"
       alt="PlatePost"
       height={heights[size]}
-      style={{ objectFit: 'contain', display: 'block' }}
+      style={{
+        objectFit: 'contain',
+        display: 'block',
+        filter: white ? 'brightness(0) invert(1)' : 'none',
+      }}
     />
   )
 }
 
-// Mark only — icon with no text (used in small/tight contexts)
-export function PlatePostMark({ size = 20 }: { size?: number }) {
+export function PlatePostMark({ size = 20, white = false }: {
+  size?: number
+  white?: boolean
+}) {
   return (
     <img
       src="/pp-mark.png"
       alt="PlatePost"
       width={size}
       height={size}
-      style={{ objectFit: 'contain', display: 'block' }}
+      style={{
+        objectFit: 'contain',
+        display: 'block',
+        filter: white ? 'brightness(0) invert(1)' : 'none',
+      }}
     />
   )
 }
 
-// Orb mark — icon inside the Crave orb (forced white)
+// Orb mark — always white (inside blue orb)
 export function PlatePostOrbMark({ size = 22 }: { size?: number }) {
   return (
     <img

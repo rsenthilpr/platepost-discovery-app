@@ -426,32 +426,35 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
   )
 }
 
-// Smart iframe — tries to load in iframe, shows "Open in Browser" if blocked
+// Smart iframe — always tries iframe first, Open in Browser always available in header
 function SmartIframe({ url, onClose }: { url: string; onClose: () => void }) {
-  const [blocked, setBlocked] = useState(false)
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-
-  // Detect if iframe is blocked after a timeout
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const iframe = iframeRef.current
-        if (iframe) {
-          // If contentDocument is null or throws, it's likely blocked
-          const doc = iframe.contentDocument
-          if (!doc || doc.body?.innerHTML === '') {
-            setBlocked(true)
-          }
-        }
-      } catch {
-        setBlocked(true)
-      }
-    }, 3000)
-    return () => clearTimeout(timer)
-  }, [url])
+  const [loaded, setLoaded] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
 
   const isVideoMenu = url.includes('platepost.io')
   const isEventbrite = url.includes('eventbrite.com')
+  const isHollywoodBowl = url.includes('hollywoodbowl.com')
+  const isLighthouse = url.includes('thelighthousecafe')
+  const isTheEcho = url.includes('theecho.com')
+  const isTroubadour = url.includes('troubadour.com')
+
+  // These sites are known to block iframes — open directly in new tab
+  const alwaysOpenExternal = isHollywoodBowl || isLighthouse || isTheEcho || isTroubadour
+
+  useEffect(() => {
+    if (alwaysOpenExternal) {
+      window.open(url, '_blank')
+      onClose()
+      return
+    }
+    // 5 second timeout — if iframe hasn't loaded, show fallback
+    const timer = setTimeout(() => {
+      if (!loaded) setTimedOut(true)
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [url])
+
+  if (alwaysOpenExternal) return null
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
@@ -479,30 +482,26 @@ function SmartIframe({ url, onClose }: { url: string; onClose: () => void }) {
         </a>
       </div>
 
-      {/* Iframe or blocked state */}
-      {blocked ? (
+      {/* Iframe */}
+      {timedOut ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6"
           style={{ background: '#070d1f' }}>
-          <span style={{ fontSize: 48 }}>🔒</span>
+          <span style={{ fontSize: 48 }}>🌐</span>
           <p style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 16, fontWeight: 700, textAlign: 'center' }}>
-            This site can't be shown here
-          </p>
-          <p style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center' }}>
-            The website blocked embedding for security reasons.
+            Couldn't load this page
           </p>
           <a href={url} target="_blank" rel="noreferrer"
-            className="px-6 py-3 rounded-2xl text-sm font-bold flex items-center gap-2"
+            className="px-6 py-3 rounded-2xl text-sm font-bold"
             style={{ background: '#0048f9', color: '#fff', textDecoration: 'none', fontFamily: 'Open Sans' }}>
             Open in Browser ↗
           </a>
         </div>
       ) : (
         <iframe
-          ref={iframeRef}
           src={url}
           className="flex-1 w-full border-0"
           title="Content"
-          onError={() => setBlocked(true)}
+          onLoad={() => setLoaded(true)}
         />
       )}
     </div>

@@ -491,7 +491,7 @@ export default function ListViewScreen() {
         </div>
       </div>
 
-      {/* PlatePost Video Menu iframe */}
+      {/* PlatePost VideoMenu iframe */}
       {menuIframeUrl && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
           <div
@@ -507,14 +507,11 @@ export default function ListViewScreen() {
                 <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </button>
-            <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
-              <path d="M15 8 L90 50 L15 92 Z" fill="white" />
-              <ellipse cx="52" cy="36" rx="10" ry="12" fill="#4576EF" />
-              <rect x="44" y="46" width="7" height="22" rx="3.5" fill="#4576EF" transform="rotate(15 47 57)" />
-            </svg>
-            <span style={{ color: '#fff', fontFamily: 'Manrope', fontSize: 14, fontWeight: 600 }}>Video Menu</span>
+            <img src="/pp-mark.png" alt="" width={16} height={16}
+              style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+            <span style={{ color: '#fff', fontFamily: 'Open Sans', fontSize: 14, fontWeight: 600 }}>VideoMenu</span>
           </div>
-          <iframe src={menuIframeUrl} className="flex-1 w-full border-0" title="Video Menu" />
+          <iframe src={menuIframeUrl} className="flex-1 w-full border-0" title="VideoMenu" />
         </div>
       )}
 
