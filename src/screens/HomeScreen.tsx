@@ -112,10 +112,10 @@ export default function HomeScreen() {
   // Reset orb positions to new bottom-left default (v2)
   useEffect(() => {
     const orbVersion = localStorage.getItem('orb_layout_version')
-    if (orbVersion !== 'v4') {
+    if (orbVersion !== 'v5') {
       localStorage.removeItem('orb_pos_surprise-orb')
       localStorage.removeItem('orb_pos_crave-orb')
-      localStorage.setItem('orb_layout_version', 'v4')
+      localStorage.setItem('orb_layout_version', 'v5')
     }
   }, [])
   useEffect(() => {
@@ -343,7 +343,7 @@ export default function HomeScreen() {
       {/* ── Draggable Floating Orbs ── */}
       <DraggableOrb
         id="surprise-orb"
-        defaultBottom={220}
+        defaultBottom={150}
         defaultRight={20}
         onClick={() => navigate('/surprise')}
       >
@@ -369,7 +369,7 @@ export default function HomeScreen() {
 
       <DraggableOrb
         id="crave-orb"
-        defaultBottom={120}
+        defaultBottom={60}
         defaultRight={20}
         onClick={() => navigate('/concierge')}
       >
