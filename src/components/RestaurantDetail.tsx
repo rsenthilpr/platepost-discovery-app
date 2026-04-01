@@ -418,32 +418,93 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
         )}
       </motion.div>
 
-      {/* ── Iframe Modal for Events ── */}
+      {/* ── Smart Iframe Modal ── */}
       {iframeUrl && (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
-          <div
-            className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
-            style={{ background: '#0e1f42', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
-          >
-            <button
-              onClick={() => setIframeUrl(null)}
-              className="w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.1)' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-            </button>
-            <span style={{ color: '#fff', fontFamily: 'Manrope', fontSize: 14, fontWeight: 600 }}>Event Details</span>
-            <a href={iframeUrl} target="_blank" rel="noreferrer"
-              className="ml-auto text-xs px-3 py-1.5 rounded-full"
-              style={{ background: '#4576EF', color: '#fff', textDecoration: 'none', fontFamily: 'Manrope' }}>
-              Open ↗
-            </a>
-          </div>
-          <iframe src={iframeUrl} className="flex-1 w-full border-0" title="Event Details" />
-        </div>
+        <SmartIframe url={iframeUrl} onClose={() => setIframeUrl(null)} />
       )}
     </>
+  )
+}
+
+// Smart iframe — tries to load in iframe, shows "Open in Browser" if blocked
+function SmartIframe({ url, onClose }: { url: string; onClose: () => void }) {
+  const [blocked, setBlocked] = useState(false)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  // Detect if iframe is blocked after a timeout
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const iframe = iframeRef.current
+        if (iframe) {
+          // If contentDocument is null or throws, it's likely blocked
+          const doc = iframe.contentDocument
+          if (!doc || doc.body?.innerHTML === '') {
+            setBlocked(true)
+          }
+        }
+      } catch {
+        setBlocked(true)
+      }
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [url])
+
+  const isVideoMenu = url.includes('platepost.io')
+  const isEventbrite = url.includes('eventbrite.com')
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
+        style={{ background: '#0e1f42', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <button onClick={onClose}
+          className="w-8 h-8 rounded-full flex items-center justify-center"
+          style={{ background: 'rgba(255,255,255,0.1)' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+        </button>
+        {isVideoMenu && (
+          <img src="/pp-mark.png" alt="" width={16} height={16}
+            style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+        )}
+        <span style={{ color: '#fff', fontFamily: 'Open Sans', fontSize: 14, fontWeight: 600 }}>
+          {isVideoMenu ? 'VideoMenu' : isEventbrite ? 'Get Tickets' : 'Visit Website'}
+        </span>
+        <a href={url} target="_blank" rel="noreferrer"
+          className="ml-auto text-xs px-3 py-1.5 rounded-full flex items-center gap-1"
+          style={{ background: '#0048f9', color: '#fff', textDecoration: 'none', fontFamily: 'Open Sans', fontWeight: 600 }}>
+          Open ↗
+        </a>
+      </div>
+
+      {/* Iframe or blocked state */}
+      {blocked ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6"
+          style={{ background: '#070d1f' }}>
+          <span style={{ fontSize: 48 }}>🔒</span>
+          <p style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 16, fontWeight: 700, textAlign: 'center' }}>
+            This site can't be shown here
+          </p>
+          <p style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center' }}>
+            The website blocked embedding for security reasons.
+          </p>
+          <a href={url} target="_blank" rel="noreferrer"
+            className="px-6 py-3 rounded-2xl text-sm font-bold flex items-center gap-2"
+            style={{ background: '#0048f9', color: '#fff', textDecoration: 'none', fontFamily: 'Open Sans' }}>
+            Open in Browser ↗
+          </a>
+        </div>
+      ) : (
+        <iframe
+          ref={iframeRef}
+          src={url}
+          className="flex-1 w-full border-0"
+          title="Content"
+          onError={() => setBlocked(true)}
+        />
+      )}
+    </div>
   )
 }

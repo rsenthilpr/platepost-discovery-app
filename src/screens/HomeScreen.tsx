@@ -289,8 +289,7 @@ export default function HomeScreen() {
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
           </svg>
           <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 11, fontWeight: 600 }}>Los Angeles</span>
-        </button>
-      </div>
+        </button>      </div>
 
       {/* ── Scrollable main content ── */}
       <div className="absolute inset-0 z-20 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
@@ -390,8 +389,14 @@ export default function HomeScreen() {
                   Top Rated
                 </p>
                 <h2 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, color: '#fff', fontSize: 20 }}>
-                  LA's 10 Best Restaurants
+                  Popular in LA
                 </h2>
+              </div>
+              <div className="flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'Open Sans' }}>
+                <span>Scroll</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round" />
+                </svg>
               </div>
             </div>
             <div
@@ -508,7 +513,12 @@ export default function HomeScreen() {
                 <div className="flex flex-col gap-2 max-h-64 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
                   {searchResults.map(r => (
                     <button key={r.id}
-                      onClick={() => { submitSearch(r.name); setShowSearch(false); navigate('/list', { state: { listView: true, searchQuery: r.name } }) }}
+                      onClick={() => {
+                        addToSearchHistory(r.name)
+                        setSearchHistory(getSearchHistory())
+                        setShowSearch(false)
+                        setSelectedRestaurant(r)
+                      }}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-left"
                       style={{ background: 'rgba(255,255,255,0.05)' }}>
                       <img src={r.image_url} alt={r.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />

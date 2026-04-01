@@ -701,11 +701,7 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
               onClick={() => onVideoMenu(PLATEPOST_MENU_URLS[r.id])}
               className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
               style={{ background: 'rgba(0,72,249,0.25)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,72,249,0.5)' }}>
-              <svg width="16" height="16" viewBox="0 0 100 100" fill="none">
-                <path d="M15 8 L90 50 L15 92 Z" fill="white" />
-                <ellipse cx="52" cy="36" rx="10" ry="12" fill="#0048f9" />
-                <rect x="44" y="46" width="7" height="22" rx="3.5" fill="#0048f9" transform="rotate(15 47 57)" />
-              </svg>
+              <img src="/pp-mark.png" alt="" width={18} height={18} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
               <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 11, fontWeight: 700 }}>VideoMenu</span>
             </motion.button>
           ) : (
