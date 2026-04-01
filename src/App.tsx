@@ -8,6 +8,7 @@ import VibeMatchScreen from './screens/VibeMatchScreen'
 import ConciergeScreen from './screens/ConciergeScreen'
 import TonightScreen from './screens/TonightScreen'
 import SurpriseMeScreen from './screens/SurpriseMeScreen'
+import SeedPage from './screens/SeedPage'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/concierge" element={<ConciergeScreen />} />
         <Route path="/tonight" element={<TonightScreen />} />
         <Route path="/surprise" element={<SurpriseMeScreen />} />
+        <Route path="/seed" element={<SeedPage />} />
       </Routes>
     </BrowserRouter>
   )
