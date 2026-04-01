@@ -7,28 +7,66 @@ export const config = { runtime: 'nodejs' }
 
 const GOOGLE_API_KEY = process.env.VITE_GOOGLE_PLACES_KEY || process.env.VITE_GOOGLE_MAPS_KEY
 
-// LA/OC search queries — curated for quality restaurants
+// LA/OC search queries — comprehensive coverage
 const SEARCH_QUERIES = [
-  // Coffee shops (PlatePost's core vertical)
+  // Coffee — core vertical
   { query: 'best coffee shop Los Angeles', cuisine: 'Coffee', neighborhood: 'Los Angeles' },
   { query: 'best coffee shop Silver Lake Los Angeles', cuisine: 'Coffee', neighborhood: 'Silver Lake' },
   { query: 'best coffee shop West Hollywood', cuisine: 'Coffee', neighborhood: 'West Hollywood' },
   { query: 'best coffee shop Venice Beach Los Angeles', cuisine: 'Coffee', neighborhood: 'Venice' },
   { query: 'best coffee shop Arts District Los Angeles', cuisine: 'Coffee', neighborhood: 'Arts District' },
   { query: 'best coffee shop Orange County California', cuisine: 'Coffee', neighborhood: 'Orange County' },
-  // Restaurants
-  { query: 'best restaurant West Hollywood Los Angeles', cuisine: 'American', neighborhood: 'West Hollywood' },
-  { query: 'best Japanese restaurant Los Angeles', cuisine: 'Japanese', neighborhood: 'Los Angeles' },
-  { query: 'best Italian restaurant Los Angeles', cuisine: 'Italian', neighborhood: 'Los Angeles' },
-  { query: 'best Mexican restaurant Los Angeles', cuisine: 'Mexican', neighborhood: 'Los Angeles' },
-  { query: 'best sushi restaurant Los Angeles', cuisine: 'Japanese', neighborhood: 'Los Angeles' },
+  { query: 'best coffee shop Koreatown Los Angeles', cuisine: 'Coffee', neighborhood: 'Koreatown' },
+  { query: 'best coffee shop Echo Park Los Angeles', cuisine: 'Coffee', neighborhood: 'Echo Park' },
+  { query: 'best coffee shop Highland Park Los Angeles', cuisine: 'Coffee', neighborhood: 'Highland Park' },
+  { query: 'best coffee shop Culver City', cuisine: 'Coffee', neighborhood: 'Culver City' },
+  { query: 'best coffee shop Santa Monica', cuisine: 'Coffee', neighborhood: 'Santa Monica' },
+  { query: 'best coffee shop Pasadena California', cuisine: 'Coffee', neighborhood: 'Pasadena' },
+  { query: 'best coffee shop Anaheim California', cuisine: 'Coffee', neighborhood: 'Anaheim' },
+  { query: 'best coffee shop Irvine California', cuisine: 'Coffee', neighborhood: 'Irvine' },
+  { query: 'best coffee shop Fullerton California', cuisine: 'Coffee', neighborhood: 'Fullerton' },
+  { query: 'specialty coffee Los Angeles', cuisine: 'Coffee', neighborhood: 'Los Angeles' },
+  { query: 'third wave coffee shop Los Angeles', cuisine: 'Coffee', neighborhood: 'Los Angeles' },
+  // American / Brunch
   { query: 'best brunch restaurant Los Angeles', cuisine: 'American', neighborhood: 'Los Angeles' },
+  { query: 'best brunch West Hollywood', cuisine: 'American', neighborhood: 'West Hollywood' },
+  { query: 'best brunch Santa Monica', cuisine: 'American', neighborhood: 'Santa Monica' },
+  { query: 'best burger restaurant Los Angeles', cuisine: 'American', neighborhood: 'Los Angeles' },
   { query: 'best rooftop restaurant Los Angeles', cuisine: 'American', neighborhood: 'Los Angeles' },
+  { query: 'best American restaurant Beverly Hills', cuisine: 'American', neighborhood: 'Beverly Hills' },
+  { query: 'best restaurant West Hollywood Los Angeles', cuisine: 'American', neighborhood: 'West Hollywood' },
+  // Japanese / Sushi
+  { query: 'best Japanese restaurant Los Angeles', cuisine: 'Japanese', neighborhood: 'Los Angeles' },
+  { query: 'best sushi restaurant Los Angeles', cuisine: 'Japanese', neighborhood: 'Los Angeles' },
+  { query: 'best ramen Los Angeles', cuisine: 'Japanese', neighborhood: 'Los Angeles' },
+  { query: 'best omakase sushi Los Angeles', cuisine: 'Japanese', neighborhood: 'Los Angeles' },
+  // Italian
+  { query: 'best Italian restaurant Los Angeles', cuisine: 'Italian', neighborhood: 'Los Angeles' },
+  { query: 'best pizza Los Angeles', cuisine: 'Italian', neighborhood: 'Los Angeles' },
+  { query: 'best Italian restaurant Silver Lake', cuisine: 'Italian', neighborhood: 'Silver Lake' },
+  // Mexican
+  { query: 'best Mexican restaurant Los Angeles', cuisine: 'Mexican', neighborhood: 'Los Angeles' },
+  { query: 'best tacos Los Angeles', cuisine: 'Mexican', neighborhood: 'Los Angeles' },
+  { query: 'best Mexican restaurant East LA', cuisine: 'Mexican', neighborhood: 'East LA' },
+  // Korean
   { query: 'best Korean BBQ Los Angeles Koreatown', cuisine: 'Korean', neighborhood: 'Koreatown' },
+  { query: 'best Korean restaurant Los Angeles', cuisine: 'Korean', neighborhood: 'Los Angeles' },
+  // Thai / Asian
   { query: 'best Thai restaurant Los Angeles', cuisine: 'Thai', neighborhood: 'Los Angeles' },
-  // Music/Jazz venues (for Crave "Plan My Night")
+  { query: 'best Vietnamese restaurant Los Angeles', cuisine: 'Vietnamese', neighborhood: 'Los Angeles' },
+  { query: 'best Chinese restaurant Los Angeles', cuisine: 'Chinese', neighborhood: 'Los Angeles' },
+  { query: 'best dim sum Los Angeles', cuisine: 'Chinese', neighborhood: 'Los Angeles' },
+  // Mediterranean / Other
+  { query: 'best Mediterranean restaurant Los Angeles', cuisine: 'Mediterranean', neighborhood: 'Los Angeles' },
+  { query: 'best Indian restaurant Los Angeles', cuisine: 'Indian', neighborhood: 'Los Angeles' },
+  // Music / Jazz
   { query: 'jazz club Los Angeles', cuisine: 'Jazz', neighborhood: 'Los Angeles' },
   { query: 'live music venue Los Angeles', cuisine: 'Music', neighborhood: 'Los Angeles' },
+  { query: 'live music bar Silver Lake', cuisine: 'Music', neighborhood: 'Silver Lake' },
+  // Cafes / Bakeries
+  { query: 'best cafe bakery Los Angeles', cuisine: 'Cafe', neighborhood: 'Los Angeles' },
+  { query: 'best bakery West Hollywood', cuisine: 'Cafe', neighborhood: 'West Hollywood' },
+  { query: 'best breakfast cafe Los Angeles', cuisine: 'Cafe', neighborhood: 'Los Angeles' },
 ]
 
 async function searchPlaces(query: string): Promise<any[]> {
@@ -46,7 +84,7 @@ async function getPlaceDetails(placeId: string): Promise<any> {
   return data.result || null
 }
 
-function getPhotoUrl(photoReference: string, maxWidth = 800): string {
+function getPhotoUrl(photoReference: string, maxWidth = 1600): string {
   return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoReference}&key=${GOOGLE_API_KEY}`
 }
 

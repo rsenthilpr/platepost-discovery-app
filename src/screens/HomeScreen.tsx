@@ -2,39 +2,29 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { PlatePostLogo, PlatePostOrbMark } from '../components/PlatePostLogo'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { fetchPexelsVideo } from '../lib/pexels'
+import { supabase } from '../lib/supabase'
+import type { Restaurant } from '../types'
+import RestaurantDetail from '../components/RestaurantDetail'
 
-const VIDEO_QUERIES = [
-  'pasta cooking italian food',
-  'sushi japanese food preparation',
-  'coffee barista espresso',
-  'burger grill american food',
-]
-
-const LA_NEIGHBORHOODS = [
-  'DTLA', 'Silver Lake', 'Los Feliz', 'Echo Park', 'Koreatown',
-  'West Hollywood', 'Culver City', 'Venice', 'Santa Monica', 'Arts District',
-  'Highland Park', 'Fairfax', 'Mid-City', 'Brentwood', 'Larchmont',
-]
-
-
-
-// Recently viewed — stored in localStorage
-function getRecentlyViewed(): number[] {
-  try {
-    return JSON.parse(localStorage.getItem('pp_recently_viewed') ?? '[]')
-  } catch { return [] }
+// Search history helpers
+function getSearchHistory(): string[] {
+  try { return JSON.parse(localStorage.getItem('pp_search_history') ?? '[]') } catch { return [] }
 }
-
-export function addToRecentlyViewed(id: number) {
+function addToSearchHistory(term: string) {
   try {
-    const existing = getRecentlyViewed().filter(i => i !== id)
-    const updated = [id, ...existing].slice(0, 10)
-    localStorage.setItem('pp_recently_viewed', JSON.stringify(updated))
+    const existing = getSearchHistory().filter(s => s !== term)
+    const updated = [term, ...existing].slice(0, 10)
+    localStorage.setItem('pp_search_history', JSON.stringify(updated))
+  } catch {}
+}
+function removeFromSearchHistory(term: string) {
+  try {
+    const updated = getSearchHistory().filter(s => s !== term)
+    localStorage.setItem('pp_search_history', JSON.stringify(updated))
   } catch {}
 }
 
-// Fixed-position orb — anchored to bottom-right by default, draggable anywhere
+// Draggable orb — fixed position, draggable anywhere
 function DraggableOrb({ id, defaultBottom, defaultRight, onClick, children }: {
   id: string
   defaultBottom: number
@@ -54,7 +44,6 @@ function DraggableOrb({ id, defaultBottom, defaultRight, onClick, children }: {
   const dragStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
   const moved = useRef(false)
 
-  // Compute initial fixed position from bottom-right defaults
   const getDefaultXY = () => ({
     x: window.innerWidth - defaultRight - 56,
     y: window.innerHeight - defaultBottom - 56,
@@ -93,8 +82,7 @@ function DraggableOrb({ id, defaultBottom, defaultRight, onClick, children }: {
       onPointerUp={onPointerUp}
       className="fixed z-30 flex flex-col items-center gap-1 select-none"
       style={{
-        left: currentPos.x,
-        top: currentPos.y,
+        left: currentPos.x, top: currentPos.y,
         cursor: dragging ? 'grabbing' : 'grab',
         touchAction: 'none',
         opacity: dragging ? 0.85 : 1,
@@ -106,10 +94,68 @@ function DraggableOrb({ id, defaultBottom, defaultRight, onClick, children }: {
   )
 }
 
+// Top 10 carousel restaurant card
+function Top10Card({ restaurant, rank, onClick }: { restaurant: Restaurant; rank: number; onClick: () => void }) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.96 }}
+      onClick={onClick}
+      className="flex-shrink-0 relative rounded-2xl overflow-hidden"
+      style={{ width: 160, height: 220 }}
+    >
+      <img
+        src={restaurant.image_url}
+        alt={restaurant.name}
+        className="w-full h-full object-cover"
+      />
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.1) 60%)' }} />
+      {/* Rank number */}
+      <div className="absolute top-2 left-2">
+        <span style={{
+          fontFamily: 'Open Sans, sans-serif',
+          fontWeight: 800,
+          fontSize: 36,
+          color: 'rgba(255,255,255,0.25)',
+          lineHeight: 1,
+          WebkitTextStroke: '1px rgba(255,255,255,0.4)',
+        }}>
+          {rank}
+        </span>
+      </div>
+      <div className="absolute bottom-0 left-0 right-0 p-3">
+        <p style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 700, color: '#fff', fontSize: 13, lineHeight: 1.2, marginBottom: 2 }}>
+          {restaurant.name}
+        </p>
+        <p style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
+          {restaurant.city}
+        </p>
+        {restaurant.rating && (
+          <div className="flex items-center gap-1 mt-1">
+            <span style={{ color: '#FBBF24', fontSize: 10 }}>★</span>
+            <span style={{ fontFamily: 'Open Sans', color: '#FBBF24', fontSize: 11, fontWeight: 700 }}>
+              {restaurant.rating.toFixed(1)}
+            </span>
+          </div>
+        )}
+      </div>
+    </motion.button>
+  )
+}
+
 export default function HomeScreen() {
   const navigate = useNavigate()
+  const [heroImages, setHeroImages] = useState<string[]>([])
+  const [imageIndex, setImageIndex] = useState(0)
+  const [top10, setTop10] = useState<Restaurant[]>([])
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<Restaurant[]>([])
+  const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([])
+  const [searchHistory, setSearchHistory] = useState<string[]>(getSearchHistory)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
-  // Reset orb positions to new bottom-left default (v2)
+  // Reset orb positions to bottom-right default (v5)
   useEffect(() => {
     const orbVersion = localStorage.getItem('orb_layout_version')
     if (orbVersion !== 'v5') {
@@ -118,6 +164,8 @@ export default function HomeScreen() {
       localStorage.setItem('orb_layout_version', 'v5')
     }
   }, [])
+
+  // Shake to Surprise Me
   useEffect(() => {
     let lastShake = 0
     let lastX = 0, lastY = 0, lastZ = 0
@@ -136,95 +184,101 @@ export default function HomeScreen() {
     window.addEventListener('devicemotion', handleMotion)
     return () => window.removeEventListener('devicemotion', handleMotion)
   }, [navigate])
-  const [heroVideos, setHeroVideos] = useState<string[]>([])
-  const [videoIndex, setVideoIndex] = useState(0)
-  const [nextVideoIndex, setNextVideoIndex] = useState(1)
-  const [transitioning, setTransitioning] = useState(false)
-  const [currentOpacity, setCurrentOpacity] = useState(1)
 
-  // Vibe Match
-
-  // Feature panels
-  const [showNeighborhoods, setShowNeighborhoods] = useState(false)
-  const [recentlyViewed] = useState<number[]>(getRecentlyViewed)
-
+  // Load restaurants
   useEffect(() => {
-    async function loadVideos() {
-      const results = await Promise.all(VIDEO_QUERIES.map(q => fetchPexelsVideo(q)))
-      const urls = results.map(r => r?.url).filter((url): url is string => !!url)
-      if (urls.length > 0) setHeroVideos(urls)
+    async function load() {
+      const { data } = await supabase.from('restaurants').select('*')
+      const list = data ?? []
+      setAllRestaurants(list)
+
+      // Top 10 by rating + review count
+      const scored = [...list]
+        .filter(r => r.rating && r.review_count)
+        .sort((a, b) => {
+          const scoreA = (a.rating ?? 0) * Math.log10((a.review_count ?? 1) + 1)
+          const scoreB = (b.rating ?? 0) * Math.log10((b.review_count ?? 1) + 1)
+          return scoreB - scoreA
+        })
+        .slice(0, 10)
+      setTop10(scored)
+
+      // Hero images from top restaurants
+      const images = scored.slice(0, 6).map(r => r.image_url).filter(Boolean)
+      setHeroImages(images)
     }
-    loadVideos()
+    load()
   }, [])
 
-
-
-  // Crossfade videos
+  // Crossfade hero images
   useEffect(() => {
-    if (heroVideos.length < 2) return
+    if (heroImages.length < 2) return
     const interval = setInterval(() => {
-      if (transitioning) return
-      setTransitioning(true)
-      let opacity = 1
-      const fadeOut = setInterval(() => {
-        opacity -= 0.04
-        setCurrentOpacity(Math.max(0, opacity))
-        if (opacity <= 0) {
-          clearInterval(fadeOut)
-          setVideoIndex(v => (v + 1) % heroVideos.length)
-          setNextVideoIndex(v => (v + 1) % heroVideos.length)
-          setCurrentOpacity(1)
-          setTransitioning(false)
-        }
-      }, 50)
-    }, 6000)
+      setImageIndex(i => (i + 1) % heroImages.length)
+    }, 5000)
     return () => clearInterval(interval)
-  }, [heroVideos.length, transitioning])
+  }, [heroImages.length])
 
+  // Search
+  function handleSearch(query: string) {
+    setSearchQuery(query)
+    if (!query.trim()) {
+      setSearchResults([])
+      return
+    }
+    const q = query.toLowerCase()
+    const results = allRestaurants.filter(r =>
+      r.name.toLowerCase().includes(q) ||
+      r.cuisine.toLowerCase().includes(q) ||
+      r.city.toLowerCase().includes(q) ||
+      (r.neighborhood ?? '').toLowerCase().includes(q) ||
+      (r.description ?? '').toLowerCase().includes(q)
+    ).slice(0, 20)
+    setSearchResults(results)
+  }
 
+  function submitSearch(query: string) {
+    if (!query.trim()) return
+    addToSearchHistory(query.trim())
+    setSearchHistory(getSearchHistory())
+    navigate('/list', { state: { searchQuery: query, listView: true } })
+  }
 
-  function handleNeighborhoodTap(neighborhood: string) {
-    setShowNeighborhoods(false)
-    navigate('/list', { state: { filter: 'All', neighborhood, listView: true } })
+  function deleteHistory(term: string) {
+    removeFromSearchHistory(term)
+    setSearchHistory(getSearchHistory())
   }
 
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#000' }}>
 
-      {/* ── Video Layer ── */}
+      {/* ── Hero background — crossfading real photos ── */}
       <div className="absolute inset-0">
-        {heroVideos.length > 0 ? (
-          <>
-            <video
-              key={`cur-${videoIndex}`}
-              src={heroVideos[videoIndex]}
-              autoPlay muted loop playsInline
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ opacity: currentOpacity, transition: 'opacity 1.2s ease' }}
-            />
-            {heroVideos[nextVideoIndex] && (
-              <video
-                key={`next-${nextVideoIndex}`}
-                src={heroVideos[nextVideoIndex]}
-                autoPlay muted loop playsInline
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{ opacity: transitioning ? 1 - currentOpacity : 0, transition: 'opacity 1.2s ease' }}
-              />
-            )}
-          </>
-        ) : (
-          <div className="absolute inset-0"
-            style={{ background: 'linear-gradient(135deg, #0a1628 0%, #1a2f5e 50%, #071126 100%)' }} />
+        {heroImages.map((img, i) => (
+          <img
+            key={img}
+            src={img}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{
+              opacity: i === imageIndex ? 1 : 0,
+              transition: 'opacity 1.5s ease',
+              zIndex: i === imageIndex ? 1 : 0,
+            }}
+          />
+        ))}
+        {heroImages.length === 0 && (
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #0a1628, #1a2f5e)' }} />
         )}
       </div>
 
       {/* Gradient overlay */}
-      <div className="absolute inset-0 pointer-events-none"
-        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.55) 65%, rgba(0,0,0,0.95) 100%)' }}
+      <div className="absolute inset-0 z-10 pointer-events-none"
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0.97) 100%)' }}
       />
 
       {/* ── Top bar ── */}
-      <div className="absolute top-0 left-0 right-0 z-20 pt-14 px-6 flex items-center justify-between">
+      <div className="absolute top-0 left-0 right-0 z-20 pt-14 px-5 flex items-center justify-between">
         <PlatePostLogo size="md" />
         <button
           onClick={() => navigate('/map')}
@@ -234,119 +288,135 @@ export default function HomeScreen() {
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
           </svg>
-          <span style={{ fontFamily: 'Manrope, sans-serif', color: '#fff', fontSize: 11, fontWeight: 600 }}>Los Angeles</span>
+          <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 11, fontWeight: 600 }}>Los Angeles</span>
         </button>
       </div>
 
-      {/* ── Main content ── */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 px-5 pb-10">
+      {/* ── Scrollable main content ── */}
+      <div className="absolute inset-0 z-20 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
 
-        {/* Headline */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="mb-5">
-          <p style={{ fontFamily: 'Manrope, sans-serif', color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>
-            Discover
-          </p>
-          <h1 style={{ fontFamily: 'Bungee, cursive', color: '#fff', fontSize: 'clamp(2rem, 9vw, 3.2rem)', lineHeight: 1.05, letterSpacing: '0.02em', textShadow: '0 2px 20px rgba(0,0,0,0.4)' }}>
-            LA's best<br />restaurants
-          </h1>
-        </motion.div>
+        {/* Spacer for hero area */}
+        <div style={{ height: '45vh' }} />
 
+        {/* ── Hero text + chips ── */}
+        <div className="px-5 pb-4">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="mb-4">
+            <p style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
+              Discover
+            </p>
+            <h1 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, color: '#fff', fontSize: 'clamp(2rem, 9vw, 3.2rem)', lineHeight: 1.05, textShadow: '0 2px 20px rgba(0,0,0,0.4)' }}>
+              LA's Best<br />Restaurants
+            </h1>
+          </motion.div>
 
-
-        {/* ── Quick action chips ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="flex gap-2 mb-4 overflow-x-auto"
-          style={{ scrollbarWidth: 'none' }}
-        >
-          {/* Open Now */}
-          <motion.button
-            whileTap={{ scale: 0.93 }}
-            onClick={() => navigate('/list', { state: { filter: 'All', openNow: true, listView: true } })}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
-            style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', color: '#fff', fontFamily: 'Manrope', backdropFilter: 'blur(12px)' }}
+          {/* ── Chip nav: Open Now / Events / Search ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.15 }}
+            className="flex gap-2 mb-4"
           >
-            <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#10b981' }} />
-            Open Now
-          </motion.button>
-
-          {/* Tonight */}
-          <motion.button
-            whileTap={{ scale: 0.93 }}
-            onClick={() => navigate('/tonight')}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
-            style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.4)', color: '#fff', fontFamily: 'Manrope', backdropFilter: 'blur(12px)' }}
-          >
-            <span style={{ fontSize: 12 }}>🎟️</span>
-            Tonight
-          </motion.button>
-
-          {/* Neighborhoods */}
-          <motion.button
-            whileTap={{ scale: 0.93 }}
-            onClick={() => setShowNeighborhoods(true)}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
-            style={{ background: 'rgba(69,118,239,0.2)', border: '1px solid rgba(69,118,239,0.4)', color: '#fff', fontFamily: 'Manrope', backdropFilter: 'blur(12px)' }}
-          >
-            <span style={{ fontSize: 12 }}>📍</span>
-            Neighborhoods
-          </motion.button>
-
-          {/* Recently Viewed */}
-          {recentlyViewed.length > 0 && (
             <motion.button
               whileTap={{ scale: 0.93 }}
-              onClick={() => navigate('/list', { state: { recentIds: recentlyViewed, listView: true } })}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
-              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontFamily: 'Manrope', backdropFilter: 'blur(12px)' }}
+              onClick={() => navigate('/list', { state: { filter: 'All', openNow: true, listView: true } })}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold flex-shrink-0"
+              style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', color: '#fff', fontFamily: 'Open Sans', backdropFilter: 'blur(12px)' }}
             >
-              <span style={{ fontSize: 12 }}>🕐</span>
-              Recent
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#10b981' }} />
+              Open Now
             </motion.button>
-          )}
-        </motion.div>
 
-        {/* ── Bottom buttons ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="flex gap-3"
-        >
-          <button
-            onClick={() => navigate('/map')}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-            style={{ fontFamily: 'Manrope, sans-serif', background: '#0048f9', color: '#fff' }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#fff" />
-              <circle cx="12" cy="9" r="2.5" fill="#0048f9" />
-            </svg>
-            Explore Map
-          </button>
-          <button
-            onClick={() => navigate('/list')}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-            style={{ fontFamily: 'Manrope, sans-serif', background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.22)', color: '#fff' }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <polygon points="5,3 19,12 5,21" fill="white" />
-            </svg>
-            Watch Feed
-          </button>
-        </motion.div>
+            <motion.button
+              whileTap={{ scale: 0.93 }}
+              onClick={() => navigate('/tonight')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold flex-shrink-0"
+              style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.4)', color: '#fff', fontFamily: 'Open Sans', backdropFilter: 'blur(12px)' }}
+            >
+              <span style={{ fontSize: 12 }}>🎟️</span>
+              Events
+            </motion.button>
 
+            <motion.button
+              whileTap={{ scale: 0.93 }}
+              onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold flex-shrink-0"
+              style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontFamily: 'Open Sans', backdropFilter: 'blur(12px)' }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="7" stroke="white" strokeWidth="2.2" />
+                <path d="M16.5 16.5L21 21" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+              Search
+            </motion.button>
+          </motion.div>
+
+          {/* ── Bottom buttons ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.25 }}
+            className="flex gap-3 mb-8"
+          >
+            <button
+              onClick={() => navigate('/map')}
+              className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
+              style={{ fontFamily: 'Open Sans, sans-serif', background: '#0048f9', color: '#fff' }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#fff" />
+                <circle cx="12" cy="9" r="2.5" fill="#0048f9" />
+              </svg>
+              View Map
+            </button>
+            <button
+              onClick={() => navigate('/list')}
+              className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
+              style={{ fontFamily: 'Open Sans, sans-serif', background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.22)', color: '#fff' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <polygon points="5,3 19,12 5,21" fill="white" />
+              </svg>
+              Explore Feed
+            </button>
+          </motion.div>
+        </div>
+
+        {/* ── Top 10 Carousel ── */}
+        {top10.length > 0 && (
+          <div className="pb-8">
+            <div className="px-5 mb-3 flex items-center justify-between">
+              <div>
+                <p style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                  Top Rated
+                </p>
+                <h2 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, color: '#fff', fontSize: 20 }}>
+                  LA's 10 Best Restaurants
+                </h2>
+              </div>
+            </div>
+            <div
+              className="flex gap-3 overflow-x-auto pl-5 pr-5 pb-2"
+              style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}
+            >
+              {top10.map((r, i) => (
+                <div key={r.id} style={{ scrollSnapAlign: 'start' }}>
+                  <Top10Card
+                    restaurant={r}
+                    rank={i + 1}
+                    onClick={() => setSelectedRestaurant(r)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Bottom spacer */}
+        <div style={{ height: 120 }} />
       </div>
 
       {/* ── Draggable Floating Orbs ── */}
-      <DraggableOrb
-        id="surprise-orb"
-        defaultBottom={150}
-        defaultRight={20}
-        onClick={() => navigate('/surprise')}
-      >
+      <DraggableOrb id="surprise-orb" defaultBottom={150} defaultRight={20} onClick={() => navigate('/surprise')}>
         <motion.div className="absolute rounded-full"
           style={{ width: 68, height: 68, background: 'rgba(245,158,11,0.2)', top: -6, left: -6 }}
           animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
@@ -358,21 +428,13 @@ export default function HomeScreen() {
           className="w-14 h-14 rounded-full flex items-center justify-center"
           style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: '2.5px solid rgba(255,255,255,0.35)' }}
         >
-          <motion.span animate={{ rotate: [0, 15, -15, 0] }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          <motion.span animate={{ rotate: [0, 15, -15, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             style={{ fontSize: 26, lineHeight: 1 }}>🎲</motion.span>
         </motion.div>
-        <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Manrope',
-          letterSpacing: '0.1em', textTransform: 'uppercase' as const, opacity: 0.8,
-          textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Surprise</span>
+        <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase' as const, opacity: 0.8, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Surprise</span>
       </DraggableOrb>
 
-      <DraggableOrb
-        id="crave-orb"
-        defaultBottom={60}
-        defaultRight={20}
-        onClick={() => navigate('/concierge')}
-      >
+      <DraggableOrb id="crave-orb" defaultBottom={60} defaultRight={20} onClick={() => navigate('/concierge')}>
         <motion.div className="absolute rounded-full"
           style={{ width: 68, height: 68, background: 'rgba(0,72,249,0.25)', top: -6, left: -6 }}
           animate={{ scale: [1, 1.5, 1], opacity: [0.7, 0, 0.7] }}
@@ -391,48 +453,114 @@ export default function HomeScreen() {
         >
           <PlatePostOrbMark size={24} />
         </motion.div>
-        <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Manrope',
-          letterSpacing: '0.1em', textTransform: 'uppercase' as const, opacity: 0.8,
-          textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Crave</span>
+        <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase' as const, opacity: 0.8, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Crave</span>
       </DraggableOrb>
 
-      {/* ── Neighborhoods Sheet ── */}
+      {/* ── Search overlay ── */}
       <AnimatePresence>
-        {showNeighborhoods && (
+        {showSearch && (
           <>
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 z-30"
-              style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-              onClick={() => setShowNeighborhoods(false)}
+              className="fixed inset-0 z-40"
+              style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}
+              onClick={() => setShowSearch(false)}
             />
             <motion.div
-              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="absolute bottom-0 left-0 right-0 z-40 rounded-t-3xl px-5 pt-4 pb-14"
-              style={{ background: '#0d1b35', maxHeight: '70vh', overflowY: 'auto', scrollbarWidth: 'none' }}
+              className="fixed top-0 left-0 right-0 z-50 px-4 pt-14 pb-4"
+              style={{ background: '#0d1b35' }}
             >
-              <div className="flex justify-center mb-4">
-                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }} />
+              {/* Search input */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 flex items-center gap-2 px-4 py-3 rounded-2xl"
+                  style={{ background: 'rgba(255,255,255,0.08)', border: '1.5px solid rgba(0,72,249,0.4)' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="11" cy="11" r="7" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+                    <path d="M16.5 16.5L21 21" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  <input
+                    ref={searchInputRef}
+                    value={searchQuery}
+                    onChange={e => handleSearch(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && submitSearch(searchQuery)}
+                    placeholder="Restaurants, cuisines, neighborhoods..."
+                    className="flex-1 bg-transparent outline-none text-sm"
+                    style={{ color: '#fff', fontFamily: 'Open Sans, sans-serif' }}
+                  />
+                  {searchQuery && (
+                    <button onClick={() => handleSearch('')}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <button onClick={() => setShowSearch(false)}
+                  style={{ color: 'rgba(255,255,255,0.6)', fontFamily: 'Open Sans', fontSize: 14 }}>
+                  Cancel
+                </button>
               </div>
-              <p style={{ fontFamily: 'Bungee, cursive', color: '#fff', fontSize: 18, letterSpacing: '0.04em', marginBottom: 16 }}>
-                Browse by Neighborhood
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {LA_NEIGHBORHOODS.map(n => (
-                  <motion.button
-                    key={n}
-                    whileTap={{ scale: 0.93 }}
-                    onClick={() => handleNeighborhoodTap(n)}
-                    className="px-4 py-2 rounded-full text-xs font-semibold"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontFamily: 'Manrope' }}
-                  >
-                    📍 {n}
-                  </motion.button>
-                ))}
-              </div>
+
+              {/* Search results */}
+              {searchQuery && searchResults.length > 0 && (
+                <div className="flex flex-col gap-2 max-h-64 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+                  {searchResults.map(r => (
+                    <button key={r.id}
+                      onClick={() => { submitSearch(r.name); setShowSearch(false); navigate('/list', { state: { listView: true, searchQuery: r.name } }) }}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-left"
+                      style={{ background: 'rgba(255,255,255,0.05)' }}>
+                      <img src={r.image_url} alt={r.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                      <div>
+                        <p style={{ fontFamily: 'Open Sans', fontWeight: 600, color: '#fff', fontSize: 13 }}>{r.name}</p>
+                        <p style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>{r.cuisine} · {r.city}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Search history */}
+              {!searchQuery && searchHistory.length > 0 && (
+                <div>
+                  <p style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+                    Recent
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {searchHistory.map(term => (
+                      <div key={term} className="flex items-center justify-between px-3 py-2.5 rounded-xl"
+                        style={{ background: 'rgba(255,255,255,0.04)' }}>
+                        <button onClick={() => { handleSearch(term); submitSearch(term); setShowSearch(false) }}
+                          className="flex items-center gap-2 flex-1 text-left">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
+                            <path d="M12 7v5l3 3" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                          <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>{term}</span>
+                        </button>
+                        <button onClick={() => deleteHistory(term)} className="p-1">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                            <path d="M18 6L6 18M6 6l12 12" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Restaurant detail sheet */}
+      <AnimatePresence>
+        {selectedRestaurant && (
+          <RestaurantDetail
+            restaurant={selectedRestaurant}
+            onClose={() => setSelectedRestaurant(null)}
+          />
         )}
       </AnimatePresence>
     </div>

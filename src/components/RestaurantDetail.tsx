@@ -318,24 +318,55 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
           </div>
         )}
 
-        {/* Action buttons — 2 column grid */}
-        <div className="px-4 mb-4 grid grid-cols-2 gap-3">
-          <ActionButton icon="🍽️" label="View Menu" primary
-            onClick={() => { onClose(); navigate(`/menu/${r.id}`) }} />
-
-          {r.website_url && (
-            <ActionButton icon="🌐" label="View Website"
-              onClick={() => setIframeUrl(r.website_url)} />
+        {/* Action buttons — VideoMenu full width on top for PlatePost customers */}
+        <div className="px-4 mb-4">
+          {r.platepost_menu_url && (
+            <button
+              onClick={() => setIframeUrl(r.platepost_menu_url)}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl mb-3 text-sm font-bold"
+              style={{ background: '#0048f9', color: '#fff', fontFamily: 'Open Sans, sans-serif' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 100 100" fill="none">
+                <path d="M15 8 L90 50 L15 92 Z" fill="white" />
+                <ellipse cx="52" cy="36" rx="10" ry="12" fill="#0048f9" />
+                <rect x="44" y="46" width="7" height="22" rx="3.5" fill="#0048f9" transform="rotate(15 47 57)" />
+              </svg>
+              VideoMenu
+            </button>
           )}
+          <button
+            onClick={() => { onClose(); navigate(`/menu/${r.id}`) }}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
+            style={{ background: 'rgba(255,255,255,0.07)', color: '#FAFBFF', border: '1px solid rgba(255,255,255,0.12)', fontFamily: 'Open Sans, sans-serif' }}
+          >
+            🍽️ More Info
+          </button>
+        </div>
 
-          <ActionButton icon="nav" label="Get Directions"
-            onClick={() => window.open(getDirectionsUrl(), '_blank')} />
-
-          {!loadingEvents && events.length > 0 && (
-            <ActionButton icon="🎟️" label={`Events (${events.length})`}
-              onClick={() => {
-                eventsSectionRef.current?.scrollIntoView({ behavior: 'smooth' })
-              }} />
+        {/* Address + hours */}
+        <div className="px-4 mb-4">
+          {r.address && (
+            <div className="flex items-start gap-2 mb-2">
+              <span style={{ fontSize: 14, flexShrink: 0, marginTop: 2 }}>📍</span>
+              <p style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>{r.address}</p>
+            </div>
+          )}
+          {r.phone && (
+            <div className="flex items-center gap-2 mb-2">
+              <span style={{ fontSize: 14 }}>📞</span>
+              <p style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>{r.phone}</p>
+            </div>
+          )}
+          {r.website_url && (
+            <button
+              onClick={() => setIframeUrl(r.website_url)}
+              className="flex items-center gap-2"
+            >
+              <span style={{ fontSize: 14 }}>🔗</span>
+              <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#60a5fa', fontSize: 13, textDecoration: 'underline' }}>
+                Visit Website
+              </span>
+            </button>
           )}
         </div>
 
@@ -414,38 +445,5 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
         </div>
       )}
     </>
-  )
-}
-
-function NavIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="3 11 22 2 13 21 11 13 3 11"/>
-    </svg>
-  )
-}
-
-function ActionButton({
-  icon, label, onClick, primary = false,
-}: {
-  icon: string
-  label: string
-  onClick: () => void
-  primary?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition-all active:scale-95"
-      style={{
-        fontFamily: 'Manrope, sans-serif',
-        background: primary ? '#071126' : 'rgba(255,255,255,0.07)',
-        color: '#FAFBFF',
-        border: primary ? '1px solid rgba(69,118,239,0.4)' : '1px solid rgba(255,255,255,0.1)',
-      }}
-    >
-      {icon === 'nav' ? <NavIcon /> : <span>{icon}</span>}
-      <span className="truncate">{label}</span>
-    </button>
   )
 }

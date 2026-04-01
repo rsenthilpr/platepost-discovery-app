@@ -112,6 +112,14 @@ export default function TonightScreen() {
   const now = new Date()
   const todayStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
+  // 14-day calendar
+  const days = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() + i)
+    return d
+  })
+  const [selectedDay, setSelectedDay] = useState(0)
+
   const filtered = activeCategory === 'all'
     ? events
     : events.filter(e => getTimeCategory(e.time) === activeCategory)
@@ -123,14 +131,14 @@ export default function TonightScreen() {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col" style={{ background: '#070d1f', fontFamily: 'Manrope, sans-serif' }}>
+    <div className="fixed inset-0 flex flex-col" style={{ background: '#070d1f', fontFamily: 'Open Sans, sans-serif' }}>
 
       {/* Header */}
       <div
-        className="flex-shrink-0 pt-12 px-5 pb-4"
+        className="flex-shrink-0 pt-12 px-5 pb-3"
         style={{ background: 'rgba(7,13,31,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
       >
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-3">
           <button
             onClick={() => navigate('/')}
             className="w-9 h-9 flex items-center justify-center rounded-full flex-shrink-0"
@@ -144,18 +152,39 @@ export default function TonightScreen() {
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
               {todayStr}
             </p>
-            <h1 style={{ fontFamily: 'Bungee, cursive', color: '#fff', fontSize: 22, letterSpacing: '0.04em' }}>
-              Tonight 🎟️
+            <h1 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, color: '#fff', fontSize: 22 }}>
+              Events 🎟️
             </h1>
           </div>
           {!loading && (
-            <span
-              className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full"
-              style={{ background: 'rgba(69,118,239,0.2)', color: '#6B9EFF', border: '1px solid rgba(69,118,239,0.3)' }}
-            >
+            <span className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full"
+              style={{ background: 'rgba(0,72,249,0.2)', color: '#60a5fa', border: '1px solid rgba(0,72,249,0.3)' }}>
               {events.length} events
             </span>
           )}
+        </div>
+
+        {/* 14-day calendar scroll */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-3" style={{ scrollbarWidth: 'none' }}>
+          {days.map((day, i) => (
+            <button
+              key={i}
+              onClick={() => setSelectedDay(i)}
+              className="flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl transition-all"
+              style={{
+                background: selectedDay === i ? '#0048f9' : 'rgba(255,255,255,0.06)',
+                border: selectedDay === i ? '1px solid #0048f9' : '1px solid rgba(255,255,255,0.08)',
+                minWidth: 48,
+              }}
+            >
+              <span style={{ fontFamily: 'Open Sans', color: selectedDay === i ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 600 }}>
+                {day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
+              </span>
+              <span style={{ fontFamily: 'Open Sans', color: selectedDay === i ? '#fff' : 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: 700 }}>
+                {day.getDate()}
+              </span>
+            </button>
+          ))}
         </div>
 
         {/* Time filters */}
@@ -166,9 +195,10 @@ export default function TonightScreen() {
               onClick={() => setActiveCategory(cat)}
               className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
               style={{
-                background: activeCategory === cat ? '#4576EF' : 'rgba(255,255,255,0.07)',
+                background: activeCategory === cat ? '#0048f9' : 'rgba(255,255,255,0.07)',
                 color: activeCategory === cat ? '#fff' : 'rgba(255,255,255,0.5)',
-                border: activeCategory === cat ? '1px solid #4576EF' : '1px solid rgba(255,255,255,0.1)',
+                border: activeCategory === cat ? '1px solid #0048f9' : '1px solid rgba(255,255,255,0.1)',
+                fontFamily: 'Open Sans',
               }}
             >
               {cat === 'all' ? 'All' : TIME_LABELS[cat].emoji + ' ' + TIME_LABELS[cat].label.split(' ').pop()}
@@ -182,14 +212,14 @@ export default function TonightScreen() {
         {loading ? (
           <div className="flex flex-col items-center justify-center h-64 gap-4">
             <div className="w-8 h-8 rounded-full border-2 animate-spin"
-              style={{ borderColor: 'rgba(255,255,255,0.1)', borderTopColor: '#4576EF' }} />
-            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Finding tonight's events...</p>
+              style={{ borderColor: 'rgba(255,255,255,0.1)', borderTopColor: '#0048f9' }} />
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, fontFamily: 'Open Sans' }}>Finding events...</p>
           </div>
         ) : events.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 gap-3">
             <span style={{ fontSize: 48 }}>🎭</span>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, textAlign: 'center' }}>
-              No events found tonight.{'\n'}Check back later!
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, textAlign: 'center', fontFamily: 'Open Sans' }}>
+              No events found.{'\n'}Check back later!
             </p>
           </div>
         ) : (

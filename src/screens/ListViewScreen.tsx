@@ -136,12 +136,6 @@ export default function ListViewScreen() {
   const scrollPositionRef = useRef<number>(0)
   const loadedIndices = useRef<Set<number>>(new Set())
 
-  function _saveScroll() {
-    if (scrollContainerRef.current) {
-      scrollPositionRef.current = scrollContainerRef.current.scrollTop
-    }
-  }
-  void _saveScroll // suppress unused warning
 
   function restoreScroll() {
     requestAnimationFrame(() => {
@@ -555,96 +549,100 @@ interface ReelSlideProps {
 
 function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slideRef, onMoreInfo, onDirections, onMenu, onVideoMenu, onEvents }: ReelSlideProps) {
   const r = slide.restaurant
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const [showFavPopup, setShowFavPopup] = useState(false)
+  const [kenBurnsKey, setKenBurnsKey] = useState(0)
 
-  // Play whenever isActive or videoUrl changes
+  // Reset Ken Burns animation when slide becomes active
   useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    if (isActive) {
-      const t = setTimeout(() => {
-        video.play().catch(() => {})
-      }, 100)
-      return () => clearTimeout(t)
-    } else {
-      video.pause()
-      video.currentTime = 0
+    if (isActive) setKenBurnsKey(k => k + 1)
+  }, [isActive])
+
+  function handleFavorite() {
+    onToggleFavorite()
+    if (!isFavorite) {
+      setShowFavPopup(true)
+      setTimeout(() => setShowFavPopup(false), 2000)
     }
-  }, [isActive, slide.videoUrl])
+  }
+
+  const bgImage = slide.heroImage ?? r.image_url
 
   return (
     <div
       ref={slideRef}
       data-index={index}
-      className="relative w-full flex-shrink-0"
+      className="relative w-full flex-shrink-0 overflow-hidden"
       style={{ height: '100dvh', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
     >
-      {/* Background */}
-      {slide.videoUrl ? (
-        <video
-          ref={videoRef}
-          src={slide.videoUrl}
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-      ) : (
-        <img
-          src={slide.heroImage ?? r.image_url}
-          alt={r.name}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-      )}
+      {/* Background — real HD photo with Ken Burns animation */}
+      <img
+        key={kenBurnsKey}
+        src={bgImage}
+        alt={r.name}
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{
+          animation: isActive ? 'kenBurns 8s ease-in-out infinite alternate' : 'none',
+          transformOrigin: 'center center',
+        }}
+      />
 
       {/* Gradients */}
       <div className="absolute top-0 left-0 right-0 pointer-events-none"
         style={{ height: 140, background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)' }} />
       <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-        style={{ height: '60%', background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.55) 55%, transparent 100%)' }} />
+        style={{ height: '65%', background: 'linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.6) 50%, transparent 100%)' }} />
 
-      {/* Top bar — heart only (back button is rendered at container level) */}
+      {/* Favorites popup */}
+      <AnimatePresence>
+        {showFavPopup && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.9 }}
+            className="absolute top-1/2 left-1/2 z-20 flex items-center gap-2 px-4 py-2.5 rounded-full"
+            style={{ transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(16px)', border: '1px solid rgba(225,29,72,0.4)' }}
+          >
+            <span style={{ fontSize: 18 }}>❤️</span>
+            <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 13, fontWeight: 600 }}>
+              Added to Favorites
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Top bar — heart */}
       <div className="absolute top-0 left-0 right-0 z-10 pt-12 px-5 flex items-center justify-end">
-        {/* Heart / favorite button */}
         <motion.button
           whileTap={{ scale: 0.8 }}
-          onClick={onToggleFavorite}
+          onClick={handleFavorite}
           className="w-9 h-9 flex items-center justify-center rounded-full"
-          style={{
-            background: 'rgba(0,0,0,0.35)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.2)',
-          }}
+          style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)' }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill={isFavorite ? '#E11D48' : 'none'} stroke={isFavorite ? '#E11D48' : 'white'} strokeWidth="2">
+          <motion.svg
+            width="18" height="18" viewBox="0 0 24 24"
+            fill={isFavorite ? '#E11D48' : 'none'}
+            stroke={isFavorite ? '#E11D48' : 'white'}
+            strokeWidth="2"
+            animate={isFavorite ? { scale: [1, 1.3, 1] } : { scale: 1 }}
+            transition={{ duration: 0.3 }}
+          >
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-          </svg>
+          </motion.svg>
         </motion.button>
       </div>
 
       {/* Bottom content */}
       <div className="absolute bottom-0 left-0 right-0 z-10 px-5 pb-28">
-        {/* Cuisine tag + PlatePost badge */}
+        {/* Tags row */}
         <div className="mb-2.5 flex items-center gap-2">
           <span className="text-xs font-bold px-3 py-1 rounded-full"
-            style={{
-              background: 'rgba(69,118,239,0.3)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(69,118,239,0.45)',
-              color: '#fff',
-              fontFamily: 'Manrope, sans-serif',
-            }}>
+            style={{ background: 'rgba(0,72,249,0.3)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,72,249,0.45)', color: '#fff', fontFamily: 'Open Sans, sans-serif' }}>
             {r.cuisine}
           </span>
           {PLATEPOST_MENU_URLS[r.id] && (
-            <span className="font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
-              style={{ background: 'rgba(69,118,239,0.85)', color: '#fff', fontFamily: 'Manrope', fontSize: 9, fontWeight: 700 }}>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
-                <path d="M5 3.5L20 12L5 20.5V3.5Z" fill="white"/>
-                <ellipse cx="11" cy="9.2" rx="2.5" ry="3.2" fill="#4576EF"/>
-                <rect x="9.9" y="12" width="2.2" height="4" rx="1.1" fill="#4576EF"/>
-              </svg>
+            <span className="font-bold px-2.5 py-1 rounded-full flex items-center gap-1"
+              style={{ background: 'rgba(0,72,249,0.85)', color: '#fff', fontFamily: 'Open Sans', fontSize: 10, fontWeight: 700 }}>
+              <img src="/pp-mark.png" alt="" width={10} height={10} style={{ filter: 'brightness(0) invert(1)', objectFit: 'contain' }} />
               PlatePost
             </span>
           )}
@@ -652,30 +650,25 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
 
         {/* Name */}
         <h1 className="mb-1.5 leading-tight"
-          style={{
-            fontFamily: 'Bungee, cursive',
-            color: '#fff',
-            fontSize: 'clamp(1.7rem, 7vw, 2.5rem)',
-            textShadow: '0 2px 16px rgba(0,0,0,0.6)',
-          }}>
+          style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, color: '#fff', fontSize: 'clamp(1.7rem, 7vw, 2.5rem)', textShadow: '0 2px 16px rgba(0,0,0,0.6)' }}>
           {r.name}
         </h1>
 
         {/* Location + rating */}
         <div className="flex items-center gap-3 mb-5 flex-wrap">
-          <span style={{ fontFamily: 'Manrope, sans-serif', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
-            {r.city}, {r.state}
+          <span style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
+            📍 {r.city}, {r.state}
           </span>
           {slide.rating && (
             <div className="flex items-center gap-1.5">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="#FBBF24">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
-              <span style={{ fontFamily: 'Manrope', color: '#FBBF24', fontSize: 13, fontWeight: 700 }}>
+              <span style={{ fontFamily: 'Open Sans', color: '#FBBF24', fontSize: 13, fontWeight: 700 }}>
                 {slide.rating.toFixed(1)}
               </span>
               {slide.reviewCount && (
-                <span style={{ fontFamily: 'Manrope', color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
+                <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
                   ({slide.reviewCount.toLocaleString()})
                 </span>
               )}
@@ -683,87 +676,52 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
           )}
         </div>
 
-        {/* 3 action buttons — Events only shown if hasEvents */}
+        {/* Action buttons */}
         <div className="flex gap-2.5 mb-3" style={{ alignItems: 'stretch' }}>
           {slide.hasEvents && (
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              onClick={onEvents}
+            <motion.button whileTap={{ scale: 0.92 }} onClick={onEvents}
               className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.18)',
-              }}
-            >
+              style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)' }}>
               <span style={{ fontSize: 20 }}>🎟️</span>
-              <span style={{ fontFamily: 'Manrope', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>
-                Events
-              </span>
+              <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>Events</span>
             </motion.button>
           )}
 
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            onClick={onDirections}
+          <motion.button whileTap={{ scale: 0.92 }} onClick={onDirections}
             className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
-            style={{
-              background: 'rgba(255,255,255,0.1)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.18)',
-            }}
-          >
-            <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></span>
-            <span style={{ fontFamily: 'Manrope', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>
-              Directions
-            </span>
+            style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+            </svg>
+            <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>Directions</span>
           </motion.button>
 
           {PLATEPOST_MENU_URLS[r.id] ? (
-            <button
+            <motion.button whileTap={{ scale: 0.92 }}
               onClick={() => onVideoMenu(PLATEPOST_MENU_URLS[r.id])}
               className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
-              style={{
-                background: 'rgba(69,118,239,0.25)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(69,118,239,0.5)',
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 100 100" fill="none">
+              style={{ background: 'rgba(0,72,249,0.25)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,72,249,0.5)' }}>
+              <svg width="16" height="16" viewBox="0 0 100 100" fill="none">
                 <path d="M15 8 L90 50 L15 92 Z" fill="white" />
-                <ellipse cx="52" cy="36" rx="10" ry="12" fill="#4576EF" />
-                <rect x="44" y="46" width="7" height="22" rx="3.5" fill="#4576EF" transform="rotate(15 47 57)" />
+                <ellipse cx="52" cy="36" rx="10" ry="12" fill="#0048f9" />
+                <rect x="44" y="46" width="7" height="22" rx="3.5" fill="#0048f9" transform="rotate(15 47 57)" />
               </svg>
-              <span style={{ fontFamily: 'Manrope', color: '#fff', fontSize: 11, fontWeight: 700 }}>
-                Video Menu
-              </span>
-            </button>
+              <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 11, fontWeight: 700 }}>VideoMenu</span>
+            </motion.button>
           ) : (
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              onClick={onMenu}
+            <motion.button whileTap={{ scale: 0.92 }} onClick={onMenu}
               className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.18)',
-              }}
-            >
+              style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)' }}>
               <span style={{ fontSize: 20 }}>🍽️</span>
-              <span style={{ fontFamily: 'Manrope', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>
-                Menu
-              </span>
+              <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>Menu</span>
             </motion.button>
           )}
         </div>
 
         {/* More Info */}
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={onMoreInfo}
+        <motion.button whileTap={{ scale: 0.98 }} onClick={onMoreInfo}
           className="w-full py-3.5 rounded-2xl text-sm font-bold"
-          style={{ fontFamily: 'Manrope', background: 'rgba(255,255,255,0.95)', color: '#071126' }}
-        >
+          style={{ fontFamily: 'Open Sans', background: 'rgba(255,255,255,0.95)', color: '#071126' }}>
           More Info
         </motion.button>
       </div>
