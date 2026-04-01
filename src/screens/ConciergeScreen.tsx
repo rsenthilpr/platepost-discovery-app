@@ -163,15 +163,15 @@ CRITICAL RULES:
           </svg>
         </button>
 
-        {/* Animated orb */}
+        {/* Piggy mascot */}
         <div className="relative flex-shrink-0">
           <motion.div
-            animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
+            animate={{ scale: [1, 1.15, 1] }}
             transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
             className="w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)' }}
+            style={{ background: 'linear-gradient(135deg, #0048f9, #3b82f6)' }}
           >
-            <span style={{ fontSize: 16 }}>✨</span>
+            <span style={{ fontSize: 18 }}>🐷</span>
           </motion.div>
         </div>
 
@@ -215,8 +215,8 @@ CRITICAL RULES:
           >
             {msg.role === 'assistant' && (
               <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center mr-2 mt-0.5"
-                style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)', fontSize: 12 }}>
-                ✨
+                style={{ background: 'linear-gradient(135deg, #0048f9, #3b82f6)', fontSize: 14 }}>
+                🐷
               </div>
             )}
 
@@ -226,7 +226,7 @@ CRITICAL RULES:
                 className="rounded-2xl px-4 py-3 text-sm leading-relaxed"
                 style={{
                   background: msg.role === 'user'
-                    ? 'linear-gradient(135deg, #4576EF, #6B9EFF)'
+                    ? 'linear-gradient(135deg, #0048f9, #3b82f6)'
                     : 'rgba(255,255,255,0.06)',
                   color: '#fff',
                   borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
@@ -313,14 +313,14 @@ CRITICAL RULES:
                   onClick={() => { setInput(p.prompt); inputRef.current?.focus() }}
                   className="text-left px-4 py-3 rounded-2xl text-sm flex items-center gap-3"
                   style={{
-                    background: p.featured ? 'linear-gradient(135deg, rgba(69,118,239,0.2), rgba(139,92,246,0.2))' : 'rgba(255,255,255,0.04)',
-                    border: p.featured ? '1px solid rgba(69,118,239,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                    background: p.featured ? 'linear-gradient(135deg, rgba(0,72,249,0.2), rgba(0,72,249,0.1))' : 'rgba(255,255,255,0.04)',
+                    border: p.featured ? '1px solid rgba(0,72,249,0.4)' : '1px solid rgba(255,255,255,0.08)',
                     color: p.featured ? '#fff' : 'rgba(255,255,255,0.6)',
                   }}
                 >
                   <span style={{ fontSize: 18, flexShrink: 0 }}>{p.icon}</span>
                   <span>{p.featured ? <strong>{p.text}</strong> : `"${p.text}"`}</span>
-                  {p.featured && <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(69,118,239,0.3)', color: '#6B9EFF' }}>New</span>}
+                  {p.featured && <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,72,249,0.3)', color: '#60a5fa' }}>New</span>}
                 </motion.button>
               ))}
             </div>
@@ -337,7 +337,7 @@ CRITICAL RULES:
       >
         <div
           className="flex items-center gap-3 rounded-2xl px-4 py-3"
-          style={{ background: 'rgba(255,255,255,0.07)', border: '1.5px solid rgba(69,118,239,0.3)' }}
+          style={{ background: 'rgba(255,255,255,0.07)', border: '1.5px solid rgba(0,72,249,0.3)' }}
         >
           <input
             ref={inputRef}
@@ -354,7 +354,7 @@ CRITICAL RULES:
             disabled={!input.trim() || loading}
             className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{
-              background: input.trim() ? 'linear-gradient(135deg, #4576EF, #8b5cf6)' : 'rgba(255,255,255,0.08)',
+              background: input.trim() ? 'linear-gradient(135deg, #0048f9, #3b82f6)' : 'rgba(255,255,255,0.08)',
               transition: 'all 0.2s',
             }}
           >

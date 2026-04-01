@@ -99,7 +99,15 @@ function DraggableOrb({ id, defaultPos, onClick, children }: {
 export default function HomeScreen() {
   const navigate = useNavigate()
 
-  // Shake to Surprise Me
+  // Reset orb positions to new bottom-left default (v2)
+  useEffect(() => {
+    const orbVersion = localStorage.getItem('orb_layout_version')
+    if (orbVersion !== 'v2') {
+      localStorage.removeItem('orb_pos_surprise-orb')
+      localStorage.removeItem('orb_pos_crave-orb')
+      localStorage.setItem('orb_layout_version', 'v2')
+    }
+  }, [])
   useEffect(() => {
     let lastShake = 0
     let lastX = 0, lastY = 0, lastZ = 0
@@ -300,11 +308,11 @@ export default function HomeScreen() {
           <button
             onClick={() => navigate('/map')}
             className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-            style={{ fontFamily: 'Manrope, sans-serif', background: '#fff', color: '#071126' }}
+            style={{ fontFamily: 'Manrope, sans-serif', background: '#0048f9', color: '#fff' }}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#071126" />
-              <circle cx="12" cy="9" r="2.5" fill="white" />
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#fff" />
+              <circle cx="12" cy="9" r="2.5" fill="#0048f9" />
             </svg>
             Explore Map
           </button>
@@ -325,7 +333,7 @@ export default function HomeScreen() {
       {/* ── Draggable Floating Orbs ── */}
       <DraggableOrb
         id="surprise-orb"
-        defaultPos={{ x: 16, y: window.innerHeight - 220 }}
+        defaultPos={{ x: 16, y: window.innerHeight - 240 }}
         onClick={() => navigate('/surprise')}
       >
         <motion.div className="absolute rounded-full"
@@ -350,24 +358,24 @@ export default function HomeScreen() {
 
       <DraggableOrb
         id="crave-orb"
-        defaultPos={{ x: window.innerWidth - 72, y: window.innerHeight - 220 }}
+        defaultPos={{ x: 16, y: window.innerHeight - 140 }}
         onClick={() => navigate('/concierge')}
       >
         <motion.div className="absolute rounded-full"
-          style={{ width: 68, height: 68, background: 'rgba(69,118,239,0.25)', top: -6, left: -6 }}
+          style={{ background: 'rgba(0,72,249,0.25)', top: -6, left: -6 }}
           animate={{ scale: [1, 1.5, 1], opacity: [0.7, 0, 0.7] }}
           transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.div className="absolute rounded-full"
-          style={{ width: 80, height: 80, background: 'rgba(139,92,246,0.15)', top: -12, left: -12 }}
+          style={{ width: 80, height: 80, background: 'rgba(0,72,249,0.15)', top: -12, left: -12 }}
           animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
           transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
         />
         <motion.div
-          animate={{ boxShadow: ['0 0 20px rgba(69,118,239,0.5)', '0 0 40px rgba(139,92,246,0.7)', '0 0 20px rgba(69,118,239,0.5)'] }}
+          animate={{ boxShadow: ['0 0 20px rgba(0,72,249,0.5)', '0 0 40px rgba(0,72,249,0.7)', '0 0 20px rgba(0,72,249,0.5)'] }}
           transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
           className="w-14 h-14 rounded-full flex items-center justify-center"
-          style={{ background: 'linear-gradient(135deg, #4576EF, #8b5cf6)', border: '2.5px solid rgba(255,255,255,0.35)' }}
+          style={{ background: 'linear-gradient(135deg, #0048f9, #3b82f6)', border: '2.5px solid rgba(255,255,255,0.35)' }}
         >
           <PlatePostOrbMark size={24} />
         </motion.div>

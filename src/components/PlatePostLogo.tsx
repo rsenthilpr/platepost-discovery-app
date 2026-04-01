@@ -1,6 +1,7 @@
 // PlatePost Logo Component
-// The mark: play triangle pointing right, with spoon shape cut out
-// Spoon: round bowl near top-center, thin handle angling down toward bottom-left
+// Uses real logo image: public/platepost-logo.png (logomark only)
+// Full logo (mark + wordmark): public/platepost-logo-full.png
+// Fallback to SVG if image missing
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg'
@@ -15,64 +16,88 @@ export function PlatePostLogo({ size = 'md', color = 'white', showText = true }:
   const fontSize = fontSizes[size]
   const textColor = color === 'white' ? '#FFFFFF' : '#071126'
 
+  if (showText) {
+    // Full logo with wordmark — use full logo image if available
+    return (
+      <img
+        src="/platepost-logo-full.png"
+        alt="PlatePost"
+        height={iconSize * 1.4}
+        style={{ objectFit: 'contain', filter: color === 'dark' ? 'invert(1)' : 'none' }}
+        onError={(e) => {
+          // Fallback: mark + text
+          const parent = e.currentTarget.parentElement
+          if (parent) {
+            e.currentTarget.style.display = 'none'
+          }
+        }}
+      />
+    )
+  }
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(iconSize * 0.4) }}>
-      <PlatePostMark size={iconSize} triangleColor={textColor} cutoutColor={color === 'white' ? '#071126' : '#ffffff'} />
-      {showText && (
-        <span style={{
-          fontFamily: 'Manrope, sans-serif',
-          fontWeight: 700,
-          fontSize,
-          color: textColor,
-          letterSpacing: '-0.01em',
-          lineHeight: 1,
-        }}>
-          PlatePost
-        </span>
-      )}
+      <PlatePostMark size={iconSize} color={color} />
+      <span style={{
+        fontFamily: 'Manrope, sans-serif',
+        fontWeight: 700,
+        fontSize,
+        color: textColor,
+        letterSpacing: '-0.01em',
+        lineHeight: 1,
+      }}>
+        PlatePost
+      </span>
     </div>
   )
 }
 
-// The spoon-cut play triangle mark
-// triangleColor: the fill of the triangle (white on dark bg, dark on light bg)
-// cutoutColor: the spoon cutout color (opposite of triangle, to create negative space)
+// Logomark only — used in nav bars, small contexts
 export function PlatePostMark({
   size = 20,
-  triangleColor = '#fff',
-  cutoutColor = '#071126',
+  color = 'white',
 }: {
   size?: number
+  color?: 'white' | 'dark'
+  // legacy props ignored:
   triangleColor?: string
   cutoutColor?: string
 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
-      {/* Play triangle — slightly rounded feel, pointing right */}
-      <path d="M15 8 L90 50 L15 92 Z" fill={triangleColor} />
-      {/* Spoon cutout — bowl (ellipse) near top center of triangle, handle angling down-left */}
-      {/* Bowl of spoon */}
-      <ellipse cx="52" cy="36" rx="10" ry="12" fill={cutoutColor} />
-      {/* Handle — thin rect angled down toward bottom-left */}
-      <rect
-        x="44" y="46"
-        width="7" height="22"
-        rx="3.5"
-        fill={cutoutColor}
-        transform="rotate(15 47 57)"
-      />
-    </svg>
+    <img
+      src="/platepost-logo.png"
+      alt="PlatePost"
+      width={size}
+      height={size}
+      style={{
+        objectFit: 'contain',
+        filter: color === 'dark' ? 'invert(1)' : 'brightness(0) invert(1)',
+        display: 'block',
+      }}
+      onError={(e) => {
+        // SVG fallback if PNG missing
+        e.currentTarget.style.display = 'none'
+      }}
+    />
   )
 }
 
-// Orb version — for the floating Crave button (triangle on colored background)
+// Orb version — logomark inside the blue Crave orb (always white)
 export function PlatePostOrbMark({ size = 22 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
-      <path d="M15 8 L90 50 L15 92 Z" fill="white" />
-      <ellipse cx="52" cy="36" rx="10" ry="12" fill="#4576EF" />
-      <rect x="44" y="46" width="7" height="22" rx="3.5" fill="#4576EF"
-        transform="rotate(15 47 57)" />
-    </svg>
+    <img
+      src="/platepost-logo.png"
+      alt="PlatePost"
+      width={size}
+      height={size}
+      style={{
+        objectFit: 'contain',
+        filter: 'brightness(0) invert(1)',
+        display: 'block',
+      }}
+      onError={(e) => {
+        e.currentTarget.style.display = 'none'
+      }}
+    />
   )
 }
