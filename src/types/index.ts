@@ -12,6 +12,15 @@ export interface Restaurant {
   image_url: string
   description: string
   created_at: string
+  // Real data fields
+  rating?: number
+  review_count?: number
+  phone?: string
+  hours?: string
+  place_id?: string
+  neighborhood?: string
+  price_level?: number
+  address?: string
 }
 
 export interface Event {
