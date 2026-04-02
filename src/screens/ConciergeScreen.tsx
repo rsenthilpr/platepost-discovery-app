@@ -85,21 +85,43 @@ function KawaiiPiggy({
       <AnimatePresence>
         {quip && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.7, y: 6 }}
+            initial={{ opacity: 0, scale: 0.8, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.7 }}
-            className="absolute whitespace-nowrap px-3 py-1.5 rounded-2xl text-xs font-bold"
+            exit={{ opacity: 0, scale: 0.8, y: 8 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
             style={{
-              bottom: '105%', left: '50%', transform: 'translateX(-50%)',
-              background: '#0048f9', color: '#fff', fontFamily: 'Open Sans', zIndex: 10,
-              boxShadow: '0 4px 12px rgba(0,72,249,0.4)',
+              position: 'absolute',
+              bottom: '108%',
+              left: '60%',
+              // White Duolingo-style bubble
+              background: '#fff',
+              color: '#333',
+              fontFamily: 'Open Sans',
+              fontWeight: 700,
+              fontSize: 12,
+              borderRadius: 14,
+              padding: '10px 14px',
+              whiteSpace: 'nowrap',
+              zIndex: 10,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.1)',
+              border: '1px solid rgba(0,0,0,0.06)',
+              minWidth: 120,
+              maxWidth: 200,
+              lineHeight: 1.3,
             }}
           >
             {quip}
+            {/* Triangle pointer — bottom-left, points to piggy mouth */}
             <div style={{
-              position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
-              width: 0, height: 0, borderLeft: '5px solid transparent',
-              borderRight: '5px solid transparent', borderTop: '5px solid #0048f9',
+              position: 'absolute',
+              top: '100%',
+              left: 18,
+              width: 0,
+              height: 0,
+              borderLeft: '8px solid transparent',
+              borderRight: '8px solid transparent',
+              borderTop: '8px solid #fff',
+              filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.08))',
             }} />
           </motion.div>
         )}
@@ -114,15 +136,15 @@ function KawaiiPiggy({
         style={{ cursor: 'pointer', display: 'block', filter: 'drop-shadow(0 4px 8px rgba(255,100,150,0.25))' }}
         animate={
           isSquished ? { scaleX: 1.25, scaleY: 0.75 } :
-          isHappy ? { y: [0, -8, 0, -5, 0], rotate: [0, -3, 3, -2, 0] } :
-          isThinking ? { rotate: [-3, 3, -3] } :
-          { y: [0, -4, 0] }
+          isHappy ? { y: [0, -10, 0], rotate: [0, -4, 4, 0] } :
+          isThinking ? { rotate: [-2, 2, -2] } :
+          { y: [0, -5, 0] }
         }
         transition={
           isSquished ? { duration: 0.1, type: 'spring', stiffness: 500 } :
-          isHappy ? { duration: 0.6, times: [0, 0.2, 0.5, 0.75, 1] } :
-          isThinking ? { duration: 0.5, repeat: Infinity, ease: 'easeInOut' } :
-          { duration: 2.5, repeat: Infinity, ease: 'easeInOut' }
+          isHappy ? { duration: 0.5, ease: 'easeOut' } :
+          isThinking ? { duration: 0.6, repeat: Infinity, ease: 'easeInOut' } :
+          { duration: 3, repeat: Infinity, ease: [0.45, 0, 0.55, 1], repeatType: 'mirror' }
         }
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.9 }}
@@ -212,7 +234,7 @@ export default function CraveScreen() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
   const [piggyState, setPiggyState] = useState<'idle' | 'thinking' | 'happy' | 'squished'>('idle')
-  const [piggyQuip, setPiggyQuip] = useState<string | null>(null)
+  const [piggyQuip, setPiggyQuip] = useState<string | null>("Oink! I know all the best spots 🐷")
   const [eyeTarget, setEyeTarget] = useState<{ x: number; y: number } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -221,6 +243,9 @@ export default function CraveScreen() {
 
   useEffect(() => {
     supabase.from('restaurants').select('*').then(({ data }) => setRestaurants(data ?? []))
+    // Clear welcome quip after 4 seconds
+    const t = setTimeout(() => setPiggyQuip(null), 4000)
+    return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {

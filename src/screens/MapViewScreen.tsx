@@ -8,7 +8,6 @@ import RestaurantDetail from '../components/RestaurantDetail'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? import.meta.env.VITE_GOOGLE_PLACES_KEY
 const PLATEPOST_IDS = new Set([4, 5, 17, 18])
-// Must be defined outside component to prevent re-render reloads
 const GOOGLE_MAPS_LIBRARIES: ('places')[] = ['places']
 
 function loadFavorites(): Set<number> {
@@ -25,7 +24,6 @@ const MAP_STYLES = [
   { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
   { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f8f8f8' }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9e9f6' }] },
-  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#e0e0e0' }] },
 ]
 
 const CUISINE_EMOJI: Record<string, string> = {
@@ -67,29 +65,45 @@ export default function MapViewScreen() {
   const [searchSuggestions, setSearchSuggestions] = useState<Restaurant[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [map, setMap] = useState<google.maps.Map | null>(null)
-  const [currentZoom, setCurrentZoom] = useState(11)
+  const [currentZoom, setCurrentZoom] = useState(13)
   const [mapCenter, setMapCenter] = useState({ lat: 34.0522, lng: -118.2437 })
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [locationLoading, setLocationLoading] = useState(false)
   const topBarRef = useRef<HTMLDivElement>(null)
-  const [topBarHeight, setTopBarHeight] = useState(140)
+  const [topBarHeight, setTopBarHeight] = useState(160)
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_KEY,
     libraries: GOOGLE_MAPS_LIBRARIES,
   })
 
-  // Load restaurants
   useEffect(() => {
-    supabase.from('restaurants').select('*').then(({ data }) => {
-      setRestaurants(data ?? [])
-    })
+    supabase.from('restaurants').select('*').then(({ data }) => setRestaurants(data ?? []))
+    // Ask for location on mount
+    requestUserLocation()
   }, [])
 
-  // Track top bar height
   useEffect(() => {
     if (topBarRef.current) setTopBarHeight(topBarRef.current.offsetHeight)
   }, [])
 
-  // Filter restaurants
+  function requestUserLocation() {
+    if (!navigator.geolocation) return
+    setLocationLoading(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setUserLocation(loc)
+        setMapCenter(loc)
+        if (map) { map.setCenter(loc); map.setZoom(14) }
+        setLocationLoading(false)
+      },
+      () => setLocationLoading(false),
+      { timeout: 8000 }
+    )
+  }
+
+  // Filtered restaurants
   const filtered = restaurants.filter(r => {
     if (activeFilter === 'Saved') return favorites.has(r.id)
     if (activeFilter !== 'All' && r.cuisine.toLowerCase() !== activeFilter.toLowerCase()) return false
@@ -100,7 +114,7 @@ export default function MapViewScreen() {
     return true
   })
 
-  // Nearby restaurants sorted by distance from map center
+  // Nearby tray — sorted by distance from map center, pro first
   const nearbyRestaurants = (() => {
     const sorted = [...filtered].sort((a, b) => {
       const da = Math.pow(a.latitude - mapCenter.lat, 2) + Math.pow(a.longitude - mapCenter.lng, 2)
@@ -128,65 +142,63 @@ export default function MapViewScreen() {
   // Auto-fit when filter changes
   useEffect(() => {
     if (!map || !isLoaded || filtered.length === 0) return
+    if (userLocation) {
+      map.setCenter(userLocation); map.setZoom(13); return
+    }
     const ca = filtered.filter(r => r.latitude >= 32 && r.latitude <= 35.5 && r.longitude >= -119.5 && r.longitude <= -116)
     const toFit = ca.length > 0 ? ca : filtered
     if (toFit.length === 1) {
-      map.setCenter({ lat: toFit[0].latitude, lng: toFit[0].longitude })
-      map.setZoom(14)
+      map.setCenter({ lat: toFit[0].latitude, lng: toFit[0].longitude }); map.setZoom(14)
     } else if (toFit.length > 1) {
       const bounds = new window.google.maps.LatLngBounds()
       toFit.forEach(r => bounds.extend({ lat: r.latitude, lng: r.longitude }))
-      map.fitBounds(bounds, { top: 60, bottom: 180, left: 20, right: 20 })
+      map.fitBounds(bounds, { top: 60, bottom: 200, left: 20, right: 20 })
     }
   }, [activeFilter, restaurants.length, isLoaded])
 
   function toggleFavorite(id: number) {
     setFavorites(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      saveFavorites(next)
-      return next
+      const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id)
+      saveFavorites(next); return next
     })
   }
 
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
     setMap(mapInstance)
-    mapInstance.addListener('zoom_changed', () => {
-      setCurrentZoom(mapInstance.getZoom() ?? 11)
-    })
-    // Throttle center updates to avoid flooding React state
+    mapInstance.addListener('zoom_changed', () => setCurrentZoom(mapInstance.getZoom() ?? 13))
     let centerTimer: ReturnType<typeof setTimeout> | null = null
     mapInstance.addListener('center_changed', () => {
       if (centerTimer) clearTimeout(centerTimer)
       centerTimer = setTimeout(() => {
         const c = mapInstance.getCenter()
         if (c) setMapCenter({ lat: c.lat(), lng: c.lng() })
-      }, 300)
+      }, 400)
     })
   }, [])
 
   if (loadError) return (
-    <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#f5f5f5' }}>
-      <p style={{ fontFamily: 'Open Sans', color: '#666' }}>Failed to load map. Check API key.</p>
+    <div className="fixed inset-0 flex flex-col items-center justify-center gap-4" style={{ background: '#f5f5f5' }}>
+      <p style={{ fontFamily: 'Open Sans', color: '#666', fontSize: 14 }}>Map failed to load.</p>
+      <p style={{ fontFamily: 'Open Sans', color: '#999', fontSize: 12 }}>Check that VITE_GOOGLE_MAPS_KEY is set in Vercel.</p>
     </div>
   )
 
   return (
-    <div className="fixed inset-0" style={{ background: '#f0f0f0' }}>
+    <div className="fixed inset-0" style={{ background: '#f0f0f0', fontFamily: 'Open Sans, sans-serif' }}>
 
       {/* Top bar */}
       <div ref={topBarRef} style={{
         position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
         background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(12px)',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+        boxShadow: '0 1px 8px rgba(0,0,0,0.08)',
         paddingTop: 48, paddingBottom: 10, paddingLeft: 16, paddingRight: 16,
       }}>
-        {/* Header row */}
+        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
           <button onClick={() => navigate('/')} style={{
             width: 36, height: 36, borderRadius: '50%', border: '1.5px solid #e5e7eb',
             background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+            cursor: 'pointer', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
           }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="#071126" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -194,12 +206,12 @@ export default function MapViewScreen() {
           </button>
           <img src="/pp-logo.png" alt="PlatePost" height={22} style={{ objectFit: 'contain' }} />
           <div style={{ flex: 1 }} />
-          <span style={{ fontFamily: 'Open Sans', fontSize: 12, fontWeight: 600, color: '#444' }}>
+          <span style={{ fontFamily: 'Open Sans', fontSize: 12, fontWeight: 600, color: '#888' }}>
             {filtered.length} places
           </span>
         </div>
 
-        {/* Search bar */}
+        {/* Search */}
         <div style={{ position: 'relative' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
@@ -211,7 +223,7 @@ export default function MapViewScreen() {
               <path d="M21 21l-4.35-4.35" stroke="#071126" strokeWidth="2" strokeLinecap="round" />
             </svg>
             <input value={mapSearch} onChange={e => setMapSearch(e.target.value)}
-              placeholder="Search restaurants, cuisines..."
+              placeholder="Search restaurants, cuisines, neighborhoods..."
               style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'Open Sans', fontSize: 13, color: '#071126' }} />
             {mapSearch && (
               <button onClick={() => { setMapSearch(''); setShowSuggestions(false) }}
@@ -222,8 +234,6 @@ export default function MapViewScreen() {
               </button>
             )}
           </div>
-
-          {/* Suggestions dropdown */}
           {showSuggestions && (
             <div style={{
               position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff',
@@ -244,7 +254,7 @@ export default function MapViewScreen() {
                 }}>
                   <img src={r.image_url} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                   <div>
-                    <p style={{ fontWeight: 600, color: '#071126', margin: 0 }}>{r.name}</p>
+                    <p style={{ fontWeight: 600, color: '#071126', margin: 0, fontSize: 13 }}>{r.name}</p>
                     <p style={{ color: '#9ca3af', fontSize: 11, margin: 0 }}>{r.cuisine} · {r.city}</p>
                   </div>
                 </button>
@@ -257,9 +267,8 @@ export default function MapViewScreen() {
         <div style={{ display: 'flex', gap: 7, overflowX: 'auto', scrollbarWidth: 'none' as const }}>
           {FILTERS.map(f => (
             <button key={f} onClick={() => setActiveFilter(f)} style={{
-              flexShrink: 0, padding: '5px 12px', borderRadius: 999,
-              fontSize: 11, fontWeight: 600, cursor: 'pointer',
-              fontFamily: 'Open Sans', transition: 'all 0.15s',
+              flexShrink: 0, padding: '5px 12px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'Open Sans', transition: 'all 0.15s',
               background: activeFilter === f ? '#0048f9' : '#fff',
               color: activeFilter === f ? '#fff' : '#444',
               border: activeFilter === f ? '1px solid #0048f9' : '1px solid #ddd',
@@ -271,18 +280,19 @@ export default function MapViewScreen() {
       </div>
 
       {/* Map */}
-      <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: 180 }}>
+      <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: 188 }}>
         {isLoaded ? (
           <GoogleMap
             mapContainerStyle={{ width: '100%', height: '100%' }}
-            center={{ lat: 34.0522, lng: -118.2437 }}
-            zoom={11}
+            center={userLocation ?? { lat: 34.0522, lng: -118.2437 }}
+            zoom={currentZoom}
             onLoad={onMapLoad}
             options={{
-              styles: MAP_STYLES, disableDefaultUI: false, zoomControl: true,
-              streetViewControl: false, mapTypeControl: false, fullscreenControl: false, clickableIcons: false,
+              styles: MAP_STYLES, disableDefaultUI: true,
+              zoomControl: true, clickableIcons: false,
             }}
           >
+            {/* Restaurant markers */}
             {clusterRestaurants(filtered, currentZoom).map((cluster) => {
               const r = cluster.restaurant
               const isPro = PLATEPOST_IDS.has(r.id)
@@ -301,11 +311,11 @@ export default function MapViewScreen() {
                       if (isCluster && map) {
                         map.setZoom((map.getZoom() ?? 11) + 2)
                         map.panTo({ lat: cluster.lat, lng: cluster.lng })
-                      } else { setSelectedRestaurant(r) }
+                      } else setSelectedRestaurant(r)
                     }}
                     style={{
-                      width: isCluster ? 48 : isPro ? 48 : isSelected ? 50 : 40,
-                      height: isCluster ? 48 : isPro ? 48 : isSelected ? 50 : 40,
+                      width: isCluster ? 46 : isPro ? 46 : isSelected ? 48 : 38,
+                      height: isCluster ? 46 : isPro ? 46 : isSelected ? 48 : 38,
                       borderRadius: '50%',
                       background: isCluster ? '#0048f9' : isPro ? '#0048f9' : isFav ? '#E11D48' : isSelected ? '#0048f9' : '#fff',
                       border: `3px solid ${isPro || isCluster ? '#fff' : isSelected ? '#0048f9' : isFav ? '#fff' : '#e5e7eb'}`,
@@ -315,9 +325,9 @@ export default function MapViewScreen() {
                       zIndex: isPro ? 10 : isSelected ? 9 : isCluster ? 5 : 1, transition: 'all 0.2s',
                     }}>
                     {isCluster ? (
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'Open Sans' }}>{cluster.count}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', fontFamily: 'Open Sans' }}>{cluster.count}</span>
                     ) : isPro ? (
-                      <img src="/pp-mark.png" alt="" width={20} height={20} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+                      <img src="/pp-mark.png" alt="" width={18} height={18} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
                     ) : (
                       <span style={{ fontSize: isSelected ? 20 : 16 }}>{CUISINE_EMOJI[r.cuisine] ?? '🍽️'}</span>
                     )}
@@ -325,13 +335,46 @@ export default function MapViewScreen() {
                 </OverlayView>
               )
             })}
+
+            {/* User location dot */}
+            {userLocation && (
+              <OverlayView position={userLocation} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                <div style={{
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: '#0048f9', border: '3px solid #fff',
+                  boxShadow: '0 0 0 4px rgba(0,72,249,0.25)',
+                  transform: 'translate(-50%, -50%)',
+                }} />
+              </OverlayView>
+            )}
           </GoogleMap>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="w-8 h-8 rounded-full border-2 animate-spin"
-              style={{ borderColor: 'rgba(0,0,0,0.1)', borderTopColor: '#0048f9' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid rgba(0,0,0,0.1)', borderTopColor: '#0048f9', animation: 'spin 1s linear infinite' }} />
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
           </div>
         )}
+      </div>
+
+      {/* Near me button */}
+      <div style={{ position: 'absolute', bottom: 200, right: 16, zIndex: 50 }}>
+        <button onClick={requestUserLocation} style={{
+          width: 44, height: 44, borderRadius: '50%',
+          background: userLocation ? '#0048f9' : '#fff',
+          border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+        }}>
+          {locationLoading ? (
+            <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(0,0,0,0.1)', borderTopColor: '#0048f9', animation: 'spin 1s linear infinite' }} />
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="3" fill={userLocation ? '#fff' : '#0048f9'} />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke={userLocation ? '#fff' : '#0048f9'} strokeWidth="2" strokeLinecap="round" />
+              <circle cx="12" cy="12" r="8" stroke={userLocation ? '#fff' : '#0048f9'} strokeWidth="1.5" opacity="0.4" />
+            </svg>
+          )}
+        </button>
       </div>
 
       {/* Restaurant Tray */}
@@ -353,6 +396,7 @@ export default function MapViewScreen() {
             Feed
           </button>
         </div>
+
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingLeft: 16, paddingRight: 16, scrollbarWidth: 'none' as const }}>
           {nearbyRestaurants.map(r => {
             const isPro = PLATEPOST_IDS.has(r.id)
@@ -361,19 +405,16 @@ export default function MapViewScreen() {
               <motion.button key={r.id} whileTap={{ scale: 0.96 }}
                 onClick={() => { setSelectedRestaurant(r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
                 style={{
-                  flexShrink: 0, width: 130, borderRadius: 14, overflow: 'hidden',
-                  background: '#fff', border: `2px solid ${isSelected ? '#0048f9' : isPro ? '#0048f9' : '#f3f4f6'}`,
-                  cursor: 'pointer', textAlign: 'left',
+                  flexShrink: 0, width: 130, borderRadius: 14, overflow: 'hidden', background: '#fff',
+                  border: `2px solid ${isSelected ? '#0048f9' : isPro ? '#0048f9' : '#f3f4f6'}`,
+                  cursor: 'pointer', textAlign: 'left', padding: 0,
                   boxShadow: isSelected ? '0 4px 16px rgba(0,72,249,0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
-                  transition: 'all 0.2s', padding: 0,
+                  transition: 'all 0.2s',
                 }}>
                 <div style={{ position: 'relative', height: 80 }}>
                   <img src={r.image_url} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   {isPro && (
-                    <div style={{
-                      position: 'absolute', top: 5, left: 5, background: '#0048f9',
-                      borderRadius: 6, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 3,
-                    }}>
+                    <div style={{ position: 'absolute', top: 5, left: 5, background: '#0048f9', borderRadius: 6, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 3 }}>
                       <img src="/pp-mark.png" alt="" width={8} height={8} style={{ filter: 'brightness(0) invert(1)', objectFit: 'contain' }} />
                       <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 8, fontWeight: 700 }}>PRO</span>
                     </div>
