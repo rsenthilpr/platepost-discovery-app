@@ -220,15 +220,35 @@ function KawaiiPiggy({
         )}
       </motion.svg>
 
-      {/* Tap me hint */}
+      {/* Tap me — speech bubble style */}
       {showTapHint && (
-        <motion.p
-          animate={{ opacity: [0.4, 0.9, 0.4] }}
+        <motion.div
+          animate={{ opacity: [0.7, 1, 0.7], y: [0, -2, 0] }}
           transition={{ duration: 2, repeat: Infinity }}
-          style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 3 }}
+          style={{
+            position: 'absolute',
+            bottom: '108%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: 12,
+            padding: '5px 10px',
+            whiteSpace: 'nowrap',
+            zIndex: 5,
+          }}
         >
-          tap me!
-        </motion.p>
+          <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 10, fontWeight: 700 }}>
+            👆 Tap me!
+          </span>
+          <div style={{
+            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+            width: 0, height: 0,
+            borderLeft: '5px solid transparent', borderRight: '5px solid transparent',
+            borderTop: '5px solid rgba(255,255,255,0.15)',
+          }} />
+        </motion.div>
       )}
     </div>
   )
