@@ -8,6 +8,51 @@ import RestaurantDetail from '../components/RestaurantDetail'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY
 
+// Simple cluster — group restaurants that are too close together at current zoom
+function clusterRestaurants(restaurants: Restaurant[], zoom: number): Array<{
+  restaurant: Restaurant
+  count: number
+  lat: number
+  lng: number
+}> {
+  // At high zoom levels (13+), show all individual markers
+  if (zoom >= 13) {
+    return restaurants.map(r => ({ restaurant: r, count: 1, lat: r.latitude, lng: r.longitude }))
+  }
+  // At lower zoom, cluster nearby restaurants
+  const threshold = zoom >= 11 ? 0.03 : zoom >= 9 ? 0.08 : 0.2
+  const used = new Set<number>()
+  const clusters: Array<{ restaurant: Restaurant; count: number; lat: number; lng: number }> = []
+
+  restaurants.forEach((r, i) => {
+    if (used.has(i)) return
+    used.add(i)
+    let count = 1
+    let latSum = r.latitude
+    let lngSum = r.longitude
+
+    restaurants.forEach((r2, j) => {
+      if (i === j || used.has(j)) return
+      const dlat = Math.abs(r.latitude - r2.latitude)
+      const dlng = Math.abs(r.longitude - r2.longitude)
+      if (dlat < threshold && dlng < threshold) {
+        used.add(j)
+        count++
+        latSum += r2.latitude
+        lngSum += r2.longitude
+      }
+    })
+
+    clusters.push({
+      restaurant: r,
+      count,
+      lat: latSum / count,
+      lng: lngSum / count,
+    })
+  })
+  return clusters
+}
+
 // Load favorites from localStorage
 function loadFavorites(): Set<number> {
   try { return new Set(JSON.parse(localStorage.getItem('pp_favorites') ?? '[]')) } catch { return new Set() }
@@ -52,6 +97,7 @@ export default function MapViewScreen() {
   const [searchSuggestions, setSearchSuggestions] = useState<Restaurant[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [map, setMap] = useState<google.maps.Map | null>(null)
+  const [currentZoom, setCurrentZoom] = useState(11)
   const [topBarHeight, setTopBarHeight] = useState(140)
   const topBarRef = useRef<HTMLDivElement>(null)
 
@@ -102,6 +148,9 @@ export default function MapViewScreen() {
 
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
     setMap(mapInstance)
+    mapInstance.addListener('zoom_changed', () => {
+      setCurrentZoom(mapInstance.getZoom() ?? 11)
+    })
   }, [])
 
   // Auto-fit to CA restaurants when filter changes
@@ -335,38 +384,51 @@ export default function MapViewScreen() {
               clickableIcons: false,
             }}
           >
-            {filtered.map(r => {
+            {clusterRestaurants(filtered, currentZoom).map((cluster) => {
+              const r = cluster.restaurant
               const emoji = CUISINE_EMOJI[r.cuisine] ?? '🍽️'
               const isFav = favorites.has(r.id)
               const isSelected = selectedRestaurant?.id === r.id
+              const isCluster = cluster.count > 1
               return (
                 <OverlayView
-                  key={r.id}
-                  position={{ lat: r.latitude, lng: r.longitude }}
+                  key={`${r.id}-${cluster.lat}-${cluster.lng}`}
+                  position={{ lat: cluster.lat, lng: cluster.lng }}
                   mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                 >
                   <motion.div
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    onClick={() => setSelectedRestaurant(r)}
+                    onClick={() => {
+                      if (isCluster && map) {
+                        map.setZoom((map.getZoom() ?? 11) + 2)
+                        map.panTo({ lat: cluster.lat, lng: cluster.lng })
+                      } else {
+                        setSelectedRestaurant(r)
+                      }
+                    }}
                     style={{
-                      width: isSelected ? 52 : 44,
-                      height: isSelected ? 52 : 44,
+                      width: isCluster ? 52 : isSelected ? 52 : 44,
+                      height: isCluster ? 52 : isSelected ? 52 : 44,
                       borderRadius: '50%',
-                      background: isFav ? '#E11D48' : isSelected ? '#0048f9' : '#fff',
-                      border: `3px solid ${isSelected ? '#0048f9' : isFav ? '#E11D48' : '#071126'}`,
-                      boxShadow: isSelected
+                      background: isCluster ? '#0048f9' : isFav ? '#E11D48' : isSelected ? '#0048f9' : '#fff',
+                      border: `3px solid ${isCluster ? '#fff' : isSelected ? '#0048f9' : isFav ? '#E11D48' : '#071126'}`,
+                      boxShadow: isSelected || isCluster
                         ? '0 0 0 3px rgba(0,72,249,0.3), 0 6px 20px rgba(0,0,0,0.35)'
                         : '0 3px 12px rgba(0,0,0,0.2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', fontSize: isSelected ? 22 : 18,
+                      cursor: 'pointer',
+                      fontSize: isCluster ? 13 : isSelected ? 22 : 18,
+                      fontWeight: isCluster ? 700 : 400,
+                      color: isCluster ? '#fff' : 'inherit',
+                      fontFamily: isCluster ? 'Open Sans, sans-serif' : 'inherit',
                       transform: 'translate(-50%, -50%)',
                       transition: 'all 0.2s',
-                      zIndex: isSelected ? 10 : 1,
+                      zIndex: isSelected ? 10 : isCluster ? 5 : 1,
                     }}
                   >
-                    {emoji}
+                    {isCluster ? cluster.count : emoji}
                   </motion.div>
                 </OverlayView>
               )

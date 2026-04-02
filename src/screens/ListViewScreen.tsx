@@ -155,10 +155,18 @@ export default function ListViewScreen() {
     })
   }
 
-  const FILTERS = ['All', 'Coffee', 'Jazz', 'Music', 'DJs', 'Japanese', 'Italian', 'American', 'Cafe']
+  const FILTERS = ['All', 'Coffee', 'Jazz', 'Music', 'DJs', 'Japanese', 'Italian', 'American', 'Cafe', 'Korean', 'Mexican', 'Thai', 'Vietnamese', 'Chinese', 'Indian', 'Mediterranean']
 
   useEffect(() => {
     fetchRestaurants()
+    // If arriving with a searchQuery that matches a cuisine, auto-select that filter
+    if (state.searchQuery) {
+      const q = state.searchQuery.toLowerCase()
+      const matchingFilter = FILTERS.find(f => f.toLowerCase() === q)
+      if (matchingFilter && matchingFilter !== 'All') {
+        setActiveFilter(matchingFilter)
+      }
+    }
   }, [])
 
   async function fetchRestaurants() {

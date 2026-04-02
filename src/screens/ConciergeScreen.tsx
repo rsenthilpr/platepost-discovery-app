@@ -39,66 +39,78 @@ const PIGGY_QUIPS = [
   "I've eaten there. 10/10. 🐷",
 ]
 
-// Kawaii Piggy SVG Component
+// Kawaii Piggy SVG Component — bigger, with working eye tracking
 function KawaiiPiggy({
   eyeTarget,
   state: pigState,
   onTap,
   quip,
+  size = 52,
+  showTapHint = false,
 }: {
   eyeTarget: { x: number; y: number } | null
   state: 'idle' | 'thinking' | 'happy' | 'squished'
   onTap: () => void
   quip: string | null
+  size?: number
+  showTapHint?: boolean
 }) {
-  const pigRef = useRef<HTMLDivElement>(null)
+  const pigRef = useRef<SVGSVGElement>(null)
+  const [eyeOffset, setEyeOffset] = useState({ lx: 0, ly: 0, rx: 0, ry: 0 })
 
-  // Calculate eye direction
-  const getEyeOffset = (side: 'left' | 'right') => {
-    if (!eyeTarget || !pigRef.current) return { x: 0, y: 0 }
-    const rect = pigRef.current.getBoundingClientRect()
-    const cx = rect.left + rect.width * (side === 'left' ? 0.38 : 0.62)
-    const cy = rect.top + rect.height * 0.42
-    const dx = eyeTarget.x - cx
-    const dy = eyeTarget.y - cy
-    const dist = Math.sqrt(dx * dx + dy * dy)
-    if (dist === 0) return { x: 0, y: 0 }
-    const maxOffset = 2.5
-    return {
-      x: (dx / dist) * Math.min(maxOffset, dist * 0.15),
-      y: (dy / dist) * Math.min(maxOffset, dist * 0.15),
+  // Recalculate eye direction whenever cursor moves
+  useEffect(() => {
+    if (!eyeTarget || !pigRef.current) {
+      setEyeOffset({ lx: 0, ly: 0, rx: 0, ry: 0 })
+      return
     }
-  }
+    const rect = pigRef.current.getBoundingClientRect()
+    // Eye centers in screen coords (matching SVG viewBox positions scaled)
+    const scale = rect.width / 100
+    const leftEyeScreen = { x: rect.left + 36 * scale, y: rect.top + 48 * scale }
+    const rightEyeScreen = { x: rect.left + 64 * scale, y: rect.top + 48 * scale }
 
-  const leftEye = getEyeOffset('left')
-  const rightEye = getEyeOffset('right')
+    const calcOffset = (eyeScreen: { x: number; y: number }) => {
+      const dx = eyeTarget.x - eyeScreen.x
+      const dy = eyeTarget.y - eyeScreen.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist === 0) return { x: 0, y: 0 }
+      const maxPx = 2.8
+      return {
+        x: (dx / dist) * Math.min(maxPx, dist * 0.12),
+        y: (dy / dist) * Math.min(maxPx, dist * 0.12),
+      }
+    }
+
+    const l = calcOffset(leftEyeScreen)
+    const r = calcOffset(rightEyeScreen)
+    setEyeOffset({ lx: l.x, ly: l.y, rx: r.x, ry: r.y })
+  }, [eyeTarget])
 
   const isThinking = pigState === 'thinking'
   const isHappy = pigState === 'happy'
   const isSquished = pigState === 'squished'
 
   return (
-    <div className="relative flex-shrink-0" ref={pigRef}>
+    <div className="relative flex-shrink-0 flex flex-col items-center">
       {/* Speech bubble */}
       <AnimatePresence>
         {quip && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.7, y: 4 }}
+            initial={{ opacity: 0, scale: 0.7, y: 6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.7 }}
-            className="absolute bottom-full mb-2 left-1/2 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold"
+            className="absolute whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold"
             style={{
-              transform: 'translateX(-50%)',
-              background: '#0048f9',
-              color: '#fff',
-              fontFamily: 'Open Sans',
-              zIndex: 10,
+              bottom: '105%', left: '50%', transform: 'translateX(-50%)',
+              background: '#0048f9', color: '#fff',
+              fontFamily: 'Open Sans', zIndex: 10,
               boxShadow: '0 4px 12px rgba(0,72,249,0.4)',
             }}
           >
             {quip}
             <div style={{
-              position: 'absolute', bottom: -4, left: '50%',
+              position: 'absolute', top: '100%', left: '50%',
               transform: 'translateX(-50%)',
               width: 0, height: 0,
               borderLeft: '5px solid transparent',
@@ -110,105 +122,114 @@ function KawaiiPiggy({
       </AnimatePresence>
 
       {/* Piggy SVG */}
-      <motion.div
+      <motion.svg
+        ref={pigRef}
+        width={size} height={size}
+        viewBox="0 0 100 100"
+        fill="none"
         onClick={onTap}
+        style={{ cursor: 'pointer', display: 'block' }}
         animate={
           isSquished ? { scaleX: 1.3, scaleY: 0.7 } :
-          isHappy ? { y: [-4, 0, -4] } :
-          isThinking ? { rotate: [-3, 3, -3] } :
+          isHappy ? { y: [0, -5, 0, -3, 0] } :
+          isThinking ? { rotate: [-2, 2, -2] } :
           { y: [0, -3, 0] }
         }
         transition={
-          isSquished ? { duration: 0.15, type: 'spring' } :
-          isHappy ? { duration: 0.4, repeat: 2 } :
-          isThinking ? { duration: 0.5, repeat: Infinity, ease: 'easeInOut' } :
-          { duration: 2.5, repeat: Infinity, ease: 'easeInOut' }
+          isSquished ? { duration: 0.12, type: 'spring', stiffness: 400 } :
+          isHappy ? { duration: 0.5, times: [0, 0.25, 0.5, 0.75, 1] } :
+          isThinking ? { duration: 0.4, repeat: Infinity, ease: 'easeInOut' } :
+          { duration: 2.8, repeat: Infinity, ease: 'easeInOut' }
         }
-        style={{ cursor: 'pointer', width: 52, height: 52 }}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
       >
-        <svg width="52" height="52" viewBox="0 0 100 100" fill="none">
-          {/* Shadow */}
-          <ellipse cx="50" cy="94" rx="22" ry="5" fill="rgba(0,0,0,0.12)" />
+        {/* Shadow */}
+        <ellipse cx="50" cy="95" rx="22" ry="4" fill="rgba(0,0,0,0.1)" />
 
-          {/* Ears */}
-          <ellipse cx="25" cy="35" rx="12" ry="14" fill="#FFB3C6" />
-          <ellipse cx="75" cy="35" rx="12" ry="14" fill="#FFB3C6" />
-          <ellipse cx="25" cy="36" rx="7" ry="9" fill="#FF85A1" />
-          <ellipse cx="75" cy="36" rx="7" ry="9" fill="#FF85A1" />
+        {/* Ears */}
+        <ellipse cx="24" cy="34" rx="12" ry="14" fill="#FFB3C6" />
+        <ellipse cx="76" cy="34" rx="12" ry="14" fill="#FFB3C6" />
+        <ellipse cx="24" cy="35" rx="7" ry="9" fill="#FF85A1" />
+        <ellipse cx="76" cy="35" rx="7" ry="9" fill="#FF85A1" />
 
-          {/* Body/head */}
-          <circle cx="50" cy="56" r="35" fill="#FFB3C6" />
-          <circle cx="50" cy="50" r="33" fill="#FFDDE7" />
+        {/* Head */}
+        <circle cx="50" cy="52" r="36" fill="#FFB3C6" />
+        <circle cx="50" cy="50" r="34" fill="#FFDDE7" />
 
-          {/* Blush */}
-          <ellipse cx="28" cy="62" rx="8" ry="5" fill="#FF85A1" opacity="0.5" />
-          <ellipse cx="72" cy="62" rx="8" ry="5" fill="#FF85A1" opacity="0.5" />
+        {/* Cheek blush */}
+        <ellipse cx="27" cy="63" rx="9" ry="5.5" fill="#FF85A1" opacity="0.45" />
+        <ellipse cx="73" cy="63" rx="9" ry="5.5" fill="#FF85A1" opacity="0.45" />
 
-          {/* Eyes */}
-          {isThinking ? (
-            <>
-              {/* Spinning eyes when thinking */}
-              <circle cx="36" cy="48" r="7" fill="white" />
-              <circle cx="64" cy="48" r="7" fill="white" />
-              <motion.circle cx="36" cy="48" r="3.5" fill="#2d1b4e"
-                animate={{ cx: [33, 36, 39, 36, 33], cy: [48, 45, 48, 51, 48] }}
-                transition={{ duration: 1, repeat: Infinity }} />
-              <motion.circle cx="64" cy="48" r="3.5" fill="#2d1b4e"
-                animate={{ cx: [61, 64, 67, 64, 61], cy: [48, 45, 48, 51, 48] }}
-                transition={{ duration: 1, repeat: Infinity, delay: 0.1 }} />
-            </>
-          ) : isHappy ? (
-            <>
-              {/* Happy ^^ eyes */}
-              <path d="M 29 48 Q 36 42 43 48" stroke="#2d1b4e" strokeWidth="3" fill="none" strokeLinecap="round" />
-              <path d="M 57 48 Q 64 42 71 48" stroke="#2d1b4e" strokeWidth="3" fill="none" strokeLinecap="round" />
-            </>
-          ) : (
-            <>
-              {/* Normal eyes with cursor tracking */}
-              <circle cx="36" cy="48" r="7" fill="white" />
-              <circle cx="64" cy="48" r="7" fill="white" />
-              <circle cx={36 + leftEye.x} cy={48 + leftEye.y} r="3.5" fill="#2d1b4e" />
-              <circle cx={64 + rightEye.x} cy={48 + rightEye.y} r="3.5" fill="#2d1b4e" />
-              {/* Eye shine */}
-              <circle cx={38 + leftEye.x} cy={46 + leftEye.y} r="1.2" fill="white" />
-              <circle cx={66 + rightEye.x} cy={46 + rightEye.y} r="1.2" fill="white" />
-            </>
-          )}
-
-          {/* Nose */}
-          <ellipse cx="50" cy="60" rx="9" ry="7" fill="#FF85A1" />
-          <circle cx="46" cy="59" r="2" fill="#d45c7a" />
-          <circle cx="54" cy="59" r="2" fill="#d45c7a" />
-
-          {/* Mouth */}
-          {isHappy ? (
-            <path d="M 40 68 Q 50 76 60 68" stroke="#d45c7a" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          ) : (
-            <path d="M 42 68 Q 50 73 58 68" stroke="#d45c7a" strokeWidth="2" fill="none" strokeLinecap="round" />
-          )}
-
-          {/* Thinking sweat drop */}
-          {isThinking && (
-            <motion.g animate={{ y: [0, 2, 0] }} transition={{ duration: 0.5, repeat: Infinity }}>
-              <ellipse cx="80" cy="30" rx="4" ry="5" fill="#60a5fa" opacity="0.8" />
-              <path d="M 80 25 L 83 20" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
+        {/* Eyes */}
+        {isThinking ? (
+          <>
+            <circle cx="36" cy="48" r="8" fill="white" />
+            <circle cx="64" cy="48" r="8" fill="white" />
+            <motion.circle cx="36" cy="48" r="4" fill="#1a0a2e"
+              animate={{ cx: [32,36,40,36,32], cy: [48,44,48,52,48] }}
+              transition={{ duration: 0.8, repeat: Infinity }} />
+            <motion.circle cx="64" cy="48" r="4" fill="#1a0a2e"
+              animate={{ cx: [60,64,68,64,60], cy: [48,44,48,52,48] }}
+              transition={{ duration: 0.8, repeat: Infinity, delay: 0.1 }} />
+            {/* Sweat drop */}
+            <motion.g animate={{ y: [0, 3, 0] }} transition={{ duration: 0.4, repeat: Infinity }}>
+              <ellipse cx="82" cy="28" rx="3.5" ry="5" fill="#93c5fd" opacity="0.9" />
+              <path d="M82 23 L85 18" stroke="#93c5fd" strokeWidth="1.5" strokeLinecap="round" opacity="0.9" />
             </motion.g>
-          )}
+          </>
+        ) : isHappy ? (
+          <>
+            {/* Happy curved eyes */}
+            <path d="M28 48 Q36 40 44 48" stroke="#1a0a2e" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+            <path d="M56 48 Q64 40 72 48" stroke="#1a0a2e" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+            {/* Sparkles */}
+            <motion.text fontSize="14" textAnchor="middle"
+              x="82" y="30"
+              animate={{ opacity: [0, 1, 0], scale: [0.5, 1.2, 0.5] }}
+              transition={{ duration: 0.7 }}>✨</motion.text>
+            <motion.text fontSize="11" textAnchor="middle"
+              x="16" y="32"
+              animate={{ opacity: [0, 1, 0], scale: [0.5, 1.2, 0.5] }}
+              transition={{ duration: 0.7, delay: 0.2 }}>⭐</motion.text>
+          </>
+        ) : (
+          <>
+            {/* Normal tracking eyes */}
+            <circle cx="36" cy="48" r="8" fill="white" />
+            <circle cx="64" cy="48" r="8" fill="white" />
+            {/* Pupils — track cursor */}
+            <circle cx={36 + eyeOffset.lx} cy={48 + eyeOffset.ly} r="4" fill="#1a0a2e" />
+            <circle cx={64 + eyeOffset.rx} cy={48 + eyeOffset.ry} r="4" fill="#1a0a2e" />
+            {/* Shine dots */}
+            <circle cx={38.5 + eyeOffset.lx * 0.5} cy={45.5 + eyeOffset.ly * 0.5} r="1.5" fill="white" />
+            <circle cx={66.5 + eyeOffset.rx * 0.5} cy={45.5 + eyeOffset.ry * 0.5} r="1.5" fill="white" />
+          </>
+        )}
 
-          {/* Happy sparkles */}
-          {isHappy && (
-            <>
-              <motion.text x="82" y="28" fontSize="12"
-                animate={{ scale: [0, 1.2, 1], opacity: [0, 1, 0] }}
-                transition={{ duration: 0.6 }}>✨</motion.text>
-              <motion.text x="10" y="30" fontSize="10"
-                animate={{ scale: [0, 1.2, 1], opacity: [0, 1, 0] }}
-                transition={{ duration: 0.6, delay: 0.15 }}>⭐</motion.text>
-            </>
-          )}
-        </svg>
-      </motion.div>
+        {/* Snout */}
+        <ellipse cx="50" cy="62" rx="10" ry="7.5" fill="#FF85A1" />
+        <circle cx="45.5" cy="61" r="2.2" fill="#d44a72" />
+        <circle cx="54.5" cy="61" r="2.2" fill="#d44a72" />
+
+        {/* Mouth */}
+        {isHappy ? (
+          <path d="M38 70 Q50 79 62 70" stroke="#d44a72" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        ) : (
+          <path d="M42 70 Q50 75 58 70" stroke="#d44a72" strokeWidth="2" fill="none" strokeLinecap="round" />
+        )}
+      </motion.svg>
+
+      {/* Tap me hint */}
+      {showTapHint && (
+        <motion.p
+          animate={{ opacity: [0.4, 0.9, 0.4] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 3 }}
+        >
+          tap me!
+        </motion.p>
+      )}
     </div>
   )
 }
@@ -381,12 +402,14 @@ RULES:
           </svg>
         </button>
 
-        {/* Piggy in header */}
+        {/* Piggy in header — small */}
         <KawaiiPiggy
           eyeTarget={eyeTarget}
           state={piggyState}
           onTap={handlePiggyTap}
           quip={null}
+          size={38}
+          showTapHint={false}
         />
 
         <div>
@@ -505,13 +528,15 @@ RULES:
       <div className="flex-shrink-0 px-4 py-4"
         style={{ background: 'rgba(7,13,31,0.95)', backdropFilter: 'blur(12px)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex items-end gap-3">
-          {/* Floating piggy buddy with speech bubble */}
+          {/* Floating piggy buddy — bigger, with tap hint */}
           <div className="relative flex-shrink-0 mb-1">
             <KawaiiPiggy
               eyeTarget={eyeTarget}
               state={piggyState}
               onTap={handlePiggyTap}
               quip={piggyQuip}
+              size={72}
+              showTapHint={messages.length <= 1}
             />
           </div>
 

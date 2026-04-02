@@ -1,15 +1,15 @@
-const TOKEN = import.meta.env.VITE_EVENTBRITE_TOKEN
-const BASE = 'https://www.eventbriteapi.com/v3'
+// Eventbrite API — all calls go through /api/eventbrite proxy to avoid CORS
 
 export interface LiveEvent {
   id: string
   name: string
   date: string
   time: string
-  rawDate: Date  // for date-based filtering
+  rawDate: Date
   url: string
   venueName?: string
   imageUrl?: string
+  venueCity?: string
 }
 
 function formatDate(iso: string): string {
@@ -28,7 +28,21 @@ function formatTime(iso: string): string {
   } catch { return iso }
 }
 
-// Search Eventbrite by LA location — returns real upcoming events
+function parseEvent(ev: any): LiveEvent {
+  return {
+    id: ev.id,
+    name: ev.name?.text ?? 'Upcoming Event',
+    date: formatDate(ev.start?.local ?? ev.start?.utc),
+    time: formatTime(ev.start?.local ?? ev.start?.utc),
+    rawDate: new Date(ev.start?.local ?? ev.start?.utc),
+    url: ev.url,
+    venueName: ev.venue?.name,
+    venueCity: ev.venue?.address?.city,
+    imageUrl: ev.logo?.url ?? ev.logo?.original?.url,
+  }
+}
+
+// Search real Eventbrite events by LA location + date range
 export async function searchEventbriteByLocation(
   startDate?: Date,
   endDate?: Date,
@@ -39,73 +53,50 @@ export async function searchEventbriteByLocation(
       ? endDate.toISOString()
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    // Search for food & drink + music events in LA
-    const queries = [
-      `${BASE}/events/search/?location.address=Los+Angeles,CA&location.within=30mi&start_date.range_start=${start}&start_date.range_end=${end}&categories=103,110&sort_by=date&expand=venue,logo&page_size=20`,
-      `${BASE}/events/search/?q=restaurant+dinner+LA&location.address=Los+Angeles,CA&location.within=20mi&start_date.range_start=${start}&start_date.range_end=${end}&sort_by=date&expand=venue,logo&page_size=10`,
-      `${BASE}/events/search/?q=jazz+live+music+Los+Angeles&location.address=Los+Angeles,CA&location.within=30mi&start_date.range_start=${start}&start_date.range_end=${end}&sort_by=date&expand=venue,logo&page_size=10`,
+    // Run 3 searches in parallel via our proxy
+    const [locationRes, jazzRes, diningRes] = await Promise.all([
+      fetch(`/api/eventbrite?type=location&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
+      fetch(`/api/eventbrite?type=keyword&q=jazz+live+music+Los+Angeles&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
+      fetch(`/api/eventbrite?type=keyword&q=restaurant+dinner+tasting+Los+Angeles&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
+    ])
+
+    const [locData, jazzData, diningData] = await Promise.all([
+      locationRes.json(),
+      jazzRes.json(),
+      diningRes.json(),
+    ])
+
+    const allRaw = [
+      ...(locData.events ?? []),
+      ...(jazzData.events ?? []),
+      ...(diningData.events ?? []),
     ]
 
-    const results = await Promise.all(queries.map(async url => {
-      try {
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/json' },
-        })
-        if (!res.ok) return []
-        const data = await res.json()
-        return data?.events ?? []
-      } catch { return [] }
-    }))
-
-    const allEvents = results.flat()
+    // Deduplicate by id
     const seen = new Set<string>()
+    return allRaw
+      .filter(ev => { if (seen.has(ev.id)) return false; seen.add(ev.id); return true })
+      .map(parseEvent)
+      .sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime())
 
-    return allEvents
-      .filter((ev: any) => {
-        if (seen.has(ev.id)) return false
-        seen.add(ev.id)
-        return true
-      })
-      .map((ev: any) => ({
-        id: ev.id,
-        name: ev.name?.text ?? 'Upcoming Event',
-        date: formatDate(ev.start?.local ?? ev.start?.utc),
-        time: formatTime(ev.start?.local ?? ev.start?.utc),
-        rawDate: new Date(ev.start?.local ?? ev.start?.utc),
-        url: ev.url,
-        venueName: ev.venue?.name,
-        imageUrl: ev.logo?.url,
-      }))
-      .sort((a: LiveEvent, b: LiveEvent) => a.rawDate.getTime() - b.rawDate.getTime())
-
-  } catch { return [] }
+  } catch (err) {
+    console.error('Eventbrite location search failed:', err)
+    return []
+  }
 }
 
-// Search by venue name (legacy)
+// Search by specific venue name — for restaurant matching
 export async function searchEventbriteEvents(
   venueName: string,
-  city: string,
-  state: string,
+  _city: string,
+  _state: string,
 ): Promise<LiveEvent[]> {
   try {
-    const now = new Date().toISOString()
-    const q = encodeURIComponent(venueName)
-    const loc = encodeURIComponent(`${city}, ${state}`)
-    const res = await fetch(
-      `${BASE}/events/search/?q=${q}&location.address=${loc}&start_date.range_start=${now}&sort_by=date&expand=venue,logo&page_size=5`,
-      { headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/json' } },
-    )
+    const res = await fetch(`/api/eventbrite?type=venue&q=${encodeURIComponent(venueName)}`)
     if (!res.ok) return []
     const data = await res.json()
-    return (data?.events ?? []).map((ev: any) => ({
-      id: ev.id,
-      name: ev.name?.text ?? 'Upcoming Event',
-      date: formatDate(ev.start?.local ?? ev.start?.utc),
-      time: formatTime(ev.start?.local ?? ev.start?.utc),
-      rawDate: new Date(ev.start?.local ?? ev.start?.utc),
-      url: ev.url,
-      venueName: ev.venue?.name,
-      imageUrl: ev.logo?.url,
-    }))
-  } catch { return [] }
+    return (data.events ?? []).map(parseEvent)
+  } catch {
+    return []
+  }
 }
