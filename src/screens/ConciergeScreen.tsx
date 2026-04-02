@@ -39,14 +39,14 @@ const PIGGY_QUIPS = [
   "I've eaten there. 10/10. 🐷",
 ]
 
-// Kawaii Piggy SVG Component — bigger, with working eye tracking
+// Full-body Kawaii Piggy — Duolingo-style with arms, legs, tail
 function KawaiiPiggy({
   eyeTarget,
   state: pigState,
   onTap,
   quip,
   size = 52,
-  showTapHint = false,
+  showTapHint: _showTapHint = false,
 }: {
   eyeTarget: { x: number; y: number } | null
   state: 'idle' | 'thinking' | 'happy' | 'squished'
@@ -58,201 +58,146 @@ function KawaiiPiggy({
   const pigRef = useRef<SVGSVGElement>(null)
   const [eyeOffset, setEyeOffset] = useState({ lx: 0, ly: 0, rx: 0, ry: 0 })
 
-  // Recalculate eye direction whenever cursor moves
   useEffect(() => {
-    if (!eyeTarget || !pigRef.current) {
-      setEyeOffset({ lx: 0, ly: 0, rx: 0, ry: 0 })
-      return
-    }
+    if (!eyeTarget || !pigRef.current) { setEyeOffset({ lx: 0, ly: 0, rx: 0, ry: 0 }); return }
     const rect = pigRef.current.getBoundingClientRect()
-    // Eye centers in screen coords (matching SVG viewBox positions scaled)
-    const scale = rect.width / 100
-    const leftEyeScreen = { x: rect.left + 36 * scale, y: rect.top + 48 * scale }
-    const rightEyeScreen = { x: rect.left + 64 * scale, y: rect.top + 48 * scale }
-
-    const calcOffset = (eyeScreen: { x: number; y: number }) => {
-      const dx = eyeTarget.x - eyeScreen.x
-      const dy = eyeTarget.y - eyeScreen.y
+    const scale = rect.width / 120
+    const calcOff = (ex: number, ey: number) => {
+      const dx = eyeTarget.x - (rect.left + ex * scale)
+      const dy = eyeTarget.y - (rect.top + ey * scale)
       const dist = Math.sqrt(dx * dx + dy * dy)
       if (dist === 0) return { x: 0, y: 0 }
-      const maxPx = 2.8
-      return {
-        x: (dx / dist) * Math.min(maxPx, dist * 0.12),
-        y: (dy / dist) * Math.min(maxPx, dist * 0.12),
-      }
+      const m = Math.min(3, dist * 0.1)
+      return { x: (dx / dist) * m, y: (dy / dist) * m }
     }
-
-    const l = calcOffset(leftEyeScreen)
-    const r = calcOffset(rightEyeScreen)
+    const l = calcOff(44, 52); const r = calcOff(76, 52)
     setEyeOffset({ lx: l.x, ly: l.y, rx: r.x, ry: r.y })
   }, [eyeTarget])
 
   const isThinking = pigState === 'thinking'
   const isHappy = pigState === 'happy'
   const isSquished = pigState === 'squished'
+  const leftArmAngle = isHappy ? -40 : isThinking ? 20 : isSquished ? -60 : 10
+  const rightArmAngle = isHappy ? 40 : isThinking ? -10 : isSquished ? 60 : -10
 
   return (
     <div className="relative flex-shrink-0 flex flex-col items-center">
-      {/* Speech bubble */}
       <AnimatePresence>
         {quip && (
           <motion.div
             initial={{ opacity: 0, scale: 0.7, y: 6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.7 }}
-            className="absolute whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold"
+            className="absolute whitespace-nowrap px-3 py-1.5 rounded-2xl text-xs font-bold"
             style={{
               bottom: '105%', left: '50%', transform: 'translateX(-50%)',
-              background: '#0048f9', color: '#fff',
-              fontFamily: 'Open Sans', zIndex: 10,
+              background: '#0048f9', color: '#fff', fontFamily: 'Open Sans', zIndex: 10,
               boxShadow: '0 4px 12px rgba(0,72,249,0.4)',
             }}
           >
             {quip}
             <div style={{
-              position: 'absolute', top: '100%', left: '50%',
-              transform: 'translateX(-50%)',
-              width: 0, height: 0,
-              borderLeft: '5px solid transparent',
-              borderRight: '5px solid transparent',
-              borderTop: '5px solid #0048f9',
+              position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+              width: 0, height: 0, borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent', borderTop: '5px solid #0048f9',
             }} />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Piggy SVG */}
       <motion.svg
         ref={pigRef}
-        width={size} height={size}
-        viewBox="0 0 100 100"
+        width={size} height={size * 1.17}
+        viewBox="0 0 120 140"
         fill="none"
         onClick={onTap}
-        style={{ cursor: 'pointer', display: 'block' }}
+        style={{ cursor: 'pointer', display: 'block', filter: 'drop-shadow(0 4px 8px rgba(255,100,150,0.25))' }}
         animate={
-          isSquished ? { scaleX: 1.3, scaleY: 0.7 } :
-          isHappy ? { y: [0, -5, 0, -3, 0] } :
-          isThinking ? { rotate: [-2, 2, -2] } :
-          { y: [0, -3, 0] }
+          isSquished ? { scaleX: 1.25, scaleY: 0.75 } :
+          isHappy ? { y: [0, -8, 0, -5, 0], rotate: [0, -3, 3, -2, 0] } :
+          isThinking ? { rotate: [-3, 3, -3] } :
+          { y: [0, -4, 0] }
         }
         transition={
-          isSquished ? { duration: 0.12, type: 'spring', stiffness: 400 } :
-          isHappy ? { duration: 0.5, times: [0, 0.25, 0.5, 0.75, 1] } :
-          isThinking ? { duration: 0.4, repeat: Infinity, ease: 'easeInOut' } :
-          { duration: 2.8, repeat: Infinity, ease: 'easeInOut' }
+          isSquished ? { duration: 0.1, type: 'spring', stiffness: 500 } :
+          isHappy ? { duration: 0.6, times: [0, 0.2, 0.5, 0.75, 1] } :
+          isThinking ? { duration: 0.5, repeat: Infinity, ease: 'easeInOut' } :
+          { duration: 2.5, repeat: Infinity, ease: 'easeInOut' }
         }
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.9 }}
       >
-        {/* Shadow */}
-        <ellipse cx="50" cy="95" rx="22" ry="4" fill="rgba(0,0,0,0.1)" />
-
-        {/* Ears */}
-        <ellipse cx="24" cy="34" rx="12" ry="14" fill="#FFB3C6" />
-        <ellipse cx="76" cy="34" rx="12" ry="14" fill="#FFB3C6" />
-        <ellipse cx="24" cy="35" rx="7" ry="9" fill="#FF85A1" />
-        <ellipse cx="76" cy="35" rx="7" ry="9" fill="#FF85A1" />
-
-        {/* Head */}
-        <circle cx="50" cy="52" r="36" fill="#FFB3C6" />
-        <circle cx="50" cy="50" r="34" fill="#FFDDE7" />
-
-        {/* Cheek blush */}
-        <ellipse cx="27" cy="63" rx="9" ry="5.5" fill="#FF85A1" opacity="0.45" />
-        <ellipse cx="73" cy="63" rx="9" ry="5.5" fill="#FF85A1" opacity="0.45" />
-
-        {/* Eyes */}
+        <ellipse cx="60" cy="136" rx="28" ry="5" fill="rgba(0,0,0,0.1)" />
+        <ellipse cx="38" cy="116" rx="13" ry="10" fill="#FFB3C6" />
+        <ellipse cx="38" cy="116" rx="10" ry="7" fill="#F48FB1" />
+        <ellipse cx="82" cy="116" rx="13" ry="10" fill="#FFB3C6" />
+        <ellipse cx="82" cy="116" rx="10" ry="7" fill="#F48FB1" />
+        <ellipse cx="60" cy="90" rx="36" ry="32" fill="#FFB3C6" />
+        <ellipse cx="60" cy="88" rx="28" ry="24" fill="#FFDDE7" />
+        <ellipse cx="60" cy="92" rx="16" ry="12" fill="rgba(255,255,255,0.4)" />
+        <motion.g animate={{ rotate: leftArmAngle }} style={{ transformOrigin: '26px 80px' }} transition={{ duration: 0.3 }}>
+          <ellipse cx="16" cy="85" rx="12" ry="9" fill="#FFB3C6" transform="rotate(-20 16 85)" />
+          <ellipse cx="10" cy="90" rx="7" ry="6" fill="#F48FB1" />
+        </motion.g>
+        <motion.g animate={{ rotate: rightArmAngle }} style={{ transformOrigin: '94px 80px' }} transition={{ duration: 0.3 }}>
+          <ellipse cx="104" cy="85" rx="12" ry="9" fill="#FFB3C6" transform="rotate(20 104 85)" />
+          <ellipse cx="110" cy="90" rx="7" ry="6" fill="#F48FB1" />
+        </motion.g>
+        <ellipse cx="30" cy="38" rx="14" ry="17" fill="#FFB3C6" />
+        <ellipse cx="90" cy="38" rx="14" ry="17" fill="#FFB3C6" />
+        <ellipse cx="30" cy="39" rx="8" ry="11" fill="#FF85A1" />
+        <ellipse cx="90" cy="39" rx="8" ry="11" fill="#FF85A1" />
+        <circle cx="60" cy="58" r="38" fill="#FFB3C6" />
+        <circle cx="60" cy="56" r="36" fill="#FFDDE7" />
+        <ellipse cx="34" cy="68" rx="10" ry="6" fill="#FF85A1" opacity="0.5" />
+        <ellipse cx="86" cy="68" rx="10" ry="6" fill="#FF85A1" opacity="0.5" />
         {isThinking ? (
           <>
-            <circle cx="36" cy="48" r="8" fill="white" />
-            <circle cx="64" cy="48" r="8" fill="white" />
-            <motion.circle cx="36" cy="48" r="4" fill="#1a0a2e"
-              animate={{ cx: [32,36,40,36,32], cy: [48,44,48,52,48] }}
-              transition={{ duration: 0.8, repeat: Infinity }} />
-            <motion.circle cx="64" cy="48" r="4" fill="#1a0a2e"
-              animate={{ cx: [60,64,68,64,60], cy: [48,44,48,52,48] }}
-              transition={{ duration: 0.8, repeat: Infinity, delay: 0.1 }} />
-            {/* Sweat drop */}
+            <circle cx="44" cy="52" r="9" fill="white" />
+            <circle cx="76" cy="52" r="9" fill="white" />
+            <motion.circle cx="44" cy="52" r="5" fill="#1a0a2e"
+              animate={{ cx: [40,44,48,44,40], cy: [52,47,52,57,52] }}
+              transition={{ duration: 0.9, repeat: Infinity }} />
+            <motion.circle cx="76" cy="52" r="5" fill="#1a0a2e"
+              animate={{ cx: [72,76,80,76,72], cy: [52,47,52,57,52] }}
+              transition={{ duration: 0.9, repeat: Infinity, delay: 0.1 }} />
             <motion.g animate={{ y: [0, 3, 0] }} transition={{ duration: 0.4, repeat: Infinity }}>
-              <ellipse cx="82" cy="28" rx="3.5" ry="5" fill="#93c5fd" opacity="0.9" />
-              <path d="M82 23 L85 18" stroke="#93c5fd" strokeWidth="1.5" strokeLinecap="round" opacity="0.9" />
+              <ellipse cx="96" cy="32" rx="4" ry="6" fill="#93c5fd" opacity="0.9" />
+              <path d="M96 26 L99 20" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" />
             </motion.g>
           </>
         ) : isHappy ? (
           <>
-            {/* Happy curved eyes */}
-            <path d="M28 48 Q36 40 44 48" stroke="#1a0a2e" strokeWidth="3.5" fill="none" strokeLinecap="round" />
-            <path d="M56 48 Q64 40 72 48" stroke="#1a0a2e" strokeWidth="3.5" fill="none" strokeLinecap="round" />
-            {/* Sparkles */}
-            <motion.text fontSize="14" textAnchor="middle"
-              x="82" y="30"
-              animate={{ opacity: [0, 1, 0], scale: [0.5, 1.2, 0.5] }}
-              transition={{ duration: 0.7 }}>✨</motion.text>
-            <motion.text fontSize="11" textAnchor="middle"
-              x="16" y="32"
-              animate={{ opacity: [0, 1, 0], scale: [0.5, 1.2, 0.5] }}
-              transition={{ duration: 0.7, delay: 0.2 }}>⭐</motion.text>
+            <path d="M34 52 Q44 42 54 52" stroke="#1a0a2e" strokeWidth="4" fill="none" strokeLinecap="round" />
+            <path d="M66 52 Q76 42 86 52" stroke="#1a0a2e" strokeWidth="4" fill="none" strokeLinecap="round" />
+            <motion.text fontSize="16" textAnchor="middle" x="98" y="34"
+              animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8 }}>✨</motion.text>
+            <motion.text fontSize="13" textAnchor="middle" x="18" y="36"
+              animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, delay: 0.2 }}>⭐</motion.text>
           </>
         ) : (
           <>
-            {/* Normal tracking eyes */}
-            <circle cx="36" cy="48" r="8" fill="white" />
-            <circle cx="64" cy="48" r="8" fill="white" />
-            {/* Pupils — track cursor */}
-            <circle cx={36 + eyeOffset.lx} cy={48 + eyeOffset.ly} r="4" fill="#1a0a2e" />
-            <circle cx={64 + eyeOffset.rx} cy={48 + eyeOffset.ry} r="4" fill="#1a0a2e" />
-            {/* Shine dots */}
-            <circle cx={38.5 + eyeOffset.lx * 0.5} cy={45.5 + eyeOffset.ly * 0.5} r="1.5" fill="white" />
-            <circle cx={66.5 + eyeOffset.rx * 0.5} cy={45.5 + eyeOffset.ry * 0.5} r="1.5" fill="white" />
+            <circle cx="44" cy="52" r="9" fill="white" />
+            <circle cx="76" cy="52" r="9" fill="white" />
+            <circle cx={44 + eyeOffset.lx} cy={52 + eyeOffset.ly} r="5" fill="#1a0a2e" />
+            <circle cx={76 + eyeOffset.rx} cy={52 + eyeOffset.ry} r="5" fill="#1a0a2e" />
+            <circle cx={46.5 + eyeOffset.lx * 0.5} cy={49.5 + eyeOffset.ly * 0.5} r="2" fill="white" />
+            <circle cx={78.5 + eyeOffset.rx * 0.5} cy={49.5 + eyeOffset.ry * 0.5} r="2" fill="white" />
           </>
         )}
-
-        {/* Snout */}
-        <ellipse cx="50" cy="62" rx="10" ry="7.5" fill="#FF85A1" />
-        <circle cx="45.5" cy="61" r="2.2" fill="#d44a72" />
-        <circle cx="54.5" cy="61" r="2.2" fill="#d44a72" />
-
-        {/* Mouth */}
+        <ellipse cx="60" cy="66" rx="13" ry="9" fill="#FF85A1" />
+        <circle cx="55" cy="65" r="3" fill="#d44a72" />
+        <circle cx="65" cy="65" r="3" fill="#d44a72" />
         {isHappy ? (
-          <path d="M38 70 Q50 79 62 70" stroke="#d44a72" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+          <path d="M48 75 Q60 85 72 75" stroke="#d44a72" strokeWidth="3" fill="none" strokeLinecap="round" />
         ) : (
-          <path d="M42 70 Q50 75 58 70" stroke="#d44a72" strokeWidth="2" fill="none" strokeLinecap="round" />
+          <path d="M51 74 Q60 80 69 74" stroke="#d44a72" strokeWidth="2.5" fill="none" strokeLinecap="round" />
         )}
       </motion.svg>
-
-      {/* Tap me — speech bubble style */}
-      {showTapHint && (
-        <motion.div
-          animate={{ opacity: [0.7, 1, 0.7], y: [0, -2, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          style={{
-            position: 'absolute',
-            bottom: '108%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(255,255,255,0.15)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.25)',
-            borderRadius: 12,
-            padding: '5px 10px',
-            whiteSpace: 'nowrap',
-            zIndex: 5,
-          }}
-        >
-          <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 10, fontWeight: 700 }}>
-            👆 Tap me!
-          </span>
-          <div style={{
-            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
-            width: 0, height: 0,
-            borderLeft: '5px solid transparent', borderRight: '5px solid transparent',
-            borderTop: '5px solid rgba(255,255,255,0.15)',
-          }} />
-        </motion.div>
-      )}
     </div>
   )
 }
+
 
 export default function CraveScreen() {
   const navigate = useNavigate()
