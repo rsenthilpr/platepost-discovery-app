@@ -1,12 +1,12 @@
 // api/eventbrite.ts — Serverless proxy for Eventbrite
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+
 
 const TOKEN = process.env.VITE_EVENTBRITE_TOKEN
 const BASE = 'https://www.eventbriteapi.com/v3'
 const FOOD_DRINK_CATEGORY = '110'
 const MUSIC_CATEGORY = '103'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -32,7 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return { events: [] }
     }
     try {
-      const data = JSON.parse(text)
+      const data = JSON.parse(text) as any
       return { events: data.events ?? [] }
     } catch {
       return { events: [] }

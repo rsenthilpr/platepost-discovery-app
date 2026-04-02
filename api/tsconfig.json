@@ -7,10 +7,12 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "strict": false,
+    "noImplicitAny": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "esModuleInterop": true,
-    "outDir": ".vercel/output"
+    "allowSyntheticDefaultImports": true
   },
-  "include": ["./**/*.ts"]
+  "include": ["./**/*.ts"],
+  "exclude": ["../src", "../node_modules"]
 }

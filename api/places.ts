@@ -93,7 +93,7 @@ const SEARCH_QUERIES = [
 async function searchPlaces(query: string): Promise<any[]> {
   const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${GOOGLE_API_KEY}&type=restaurant|cafe|bar&language=en`
   const res = await fetch(url)
-  const data = await res.json()
+  const data = await res.json() as any
   return data.results || []
 }
 
@@ -101,7 +101,7 @@ async function getPlaceDetails(placeId: string): Promise<any> {
   const fields = 'place_id,name,formatted_address,formatted_phone_number,geometry,rating,user_ratings_total,opening_hours,photos,website,price_level,types'
   const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${GOOGLE_API_KEY}`
   const res = await fetch(url)
-  const data = await res.json()
+  const data = await res.json() as any
   return data.result || null
 }
 
