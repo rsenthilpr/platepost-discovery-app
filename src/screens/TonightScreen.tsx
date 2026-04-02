@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
-import { searchEventbriteByLocation, searchEventbriteEvents } from '../lib/eventbrite'
+import { searchEventbriteByLocation } from '../lib/eventbrite'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 
@@ -83,24 +83,22 @@ export default function TonightScreen() {
 
   async function loadAllEvents() {
     setLoading(true)
-    const collected: EventItem[] = []
 
-    // 1. Pull real Eventbrite events for all of LA (next 30 days)
+    // Single location-based search — food & drink + music in LA for next 90 days
     const startDate = new Date()
-    const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    const endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
     const liveEvents = await searchEventbriteByLocation(startDate, endDate)
 
-    // Get restaurants for matching
+    // Get restaurants for matching venue names
     const { data: restaurantData } = await supabase.from('restaurants').select('*')
     const restaurants: Restaurant[] = restaurantData ?? []
 
-    for (const ev of liveEvents) {
-      // Try to match event venue to a restaurant in our DB
+    const collected: EventItem[] = liveEvents.map(ev => {
       const matched = restaurants.find(r =>
-        ev.venueName?.toLowerCase().includes(r.name.toLowerCase()) ||
+        (ev.venueName ?? '').toLowerCase().includes(r.name.toLowerCase()) ||
         r.name.toLowerCase().includes((ev.venueName ?? '').toLowerCase())
       )
-      collected.push({
+      return {
         id: ev.id,
         name: ev.name,
         date: ev.date,
@@ -108,55 +106,21 @@ export default function TonightScreen() {
         rawDate: ev.rawDate,
         url: ev.url,
         restaurant: matched ?? null,
-        venueName: ev.venueName ?? 'Los Angeles',
+        venueName: ev.venueName ?? ev.venueCity ?? 'Los Angeles',
         heroImage: ev.imageUrl ?? matched?.image_url ?? null,
-        source: 'eventbrite',
-      })
-    }
-
-    // 2. Also search by venue name for known restaurants
-    const venueSearches = restaurants.slice(0, 15).map(async r => {
-      const evs = await searchEventbriteEvents(r.name, r.city, r.state)
-      return evs.map(ev => ({
-        id: ev.id,
-        name: ev.name,
-        date: ev.date,
-        time: ev.time,
-        rawDate: ev.rawDate,
-        url: ev.url,
-        restaurant: r,
-        venueName: r.name,
-        heroImage: ev.imageUrl ?? r.image_url,
         source: 'eventbrite' as const,
-      }))
+      }
     })
-    const venueResults = await Promise.all(venueSearches)
-    const venueEvents = venueResults.flat()
 
-    // 3. Supabase seeded events as fallback
-    const { data: seededData } = await supabase.from('events').select('*, restaurants(*)')
-    const seededEvents: EventItem[] = (seededData ?? []).map((ev: any) => ({
-      id: String(ev.id),
-      name: ev.event_name,
-      date: ev.event_date,
-      time: ev.event_time,
-      rawDate: new Date(`${ev.event_date} ${ev.event_time}`),
-      url: ev.eventbrite_url,
-      restaurant: ev.restaurants ?? null,
-      venueName: ev.restaurants?.name ?? 'Los Angeles',
-      heroImage: ev.restaurants?.image_url ?? null,
-      source: 'supabase' as const,
-    }))
-
-    // Merge, deduplicate by id
-    const allMerged = [...collected, ...venueEvents, ...seededEvents]
+    // Deduplicate by id
     const seen = new Set<string>()
-    const deduped = allMerged.filter(ev => {
+    const deduped = collected.filter(ev => {
       if (seen.has(ev.id)) return false
       seen.add(ev.id)
       return true
     }).sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime())
 
+    console.log(`Events loaded: ${deduped.length}`)
     setAllEvents(deduped)
     setLoading(false)
   }

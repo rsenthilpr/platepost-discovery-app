@@ -8,6 +8,8 @@ import RestaurantDetail from '../components/RestaurantDetail'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY
 const PLATEPOST_IDS = new Set([4, 5, 17, 18])
+// Must be defined outside component to prevent re-render reloads
+const GOOGLE_MAPS_LIBRARIES: ('places')[] = ['places']
 
 function loadFavorites(): Set<number> {
   try { return new Set(JSON.parse(localStorage.getItem('pp_favorites') ?? '[]')) } catch { return new Set() }
@@ -72,7 +74,7 @@ export default function MapViewScreen() {
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_KEY,
-    libraries: ['places'],
+    libraries: GOOGLE_MAPS_LIBRARIES,
   })
 
   // Load restaurants
@@ -125,18 +127,18 @@ export default function MapViewScreen() {
 
   // Auto-fit when filter changes
   useEffect(() => {
-    if (!map || filtered.length === 0) return
+    if (!map || !isLoaded || filtered.length === 0) return
     const ca = filtered.filter(r => r.latitude >= 32 && r.latitude <= 35.5 && r.longitude >= -119.5 && r.longitude <= -116)
     const toFit = ca.length > 0 ? ca : filtered
     if (toFit.length === 1) {
       map.setCenter({ lat: toFit[0].latitude, lng: toFit[0].longitude })
       map.setZoom(14)
     } else if (toFit.length > 1) {
-      const bounds = new google.maps.LatLngBounds()
+      const bounds = new window.google.maps.LatLngBounds()
       toFit.forEach(r => bounds.extend({ lat: r.latitude, lng: r.longitude }))
       map.fitBounds(bounds, { top: 60, bottom: 180, left: 20, right: 20 })
     }
-  }, [activeFilter, restaurants.length])
+  }, [activeFilter, restaurants.length, isLoaded])
 
   function toggleFavorite(id: number) {
     setFavorites(prev => {
