@@ -1,17 +1,10 @@
 // api/eventbrite.ts — Serverless proxy for Eventbrite
-// Pulls real Food & Drink events in LA exactly like the URLs:
-// eventbrite.com/b/ca--los-angeles/food-and-drink/
-// Runtime: Node.js
-
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const TOKEN = process.env.VITE_EVENTBRITE_TOKEN
 const BASE = 'https://www.eventbriteapi.com/v3'
-
-// Eventbrite category IDs
-const FOOD_DRINK_CATEGORY = '110'    // Food & Drink
-const MUSIC_CATEGORY = '103'         // Music
-const ARTS_CATEGORY = '105'          // Arts
+const FOOD_DRINK_CATEGORY = '110'
+const MUSIC_CATEGORY = '103'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -30,20 +23,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const endDate = (end as string) ?? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
 
   const makeRequest = async (url: string) => {
-    console.log('Eventbrite request:', url.replace(TOKEN, 'TOKEN'))
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/json' },
     })
     const text = await response.text()
     if (!response.ok) {
       console.error('Eventbrite error:', response.status, text.slice(0, 200))
-      return { events: [], error: `${response.status}: ${text.slice(0, 100)}` }
+      return { events: [] }
     }
     try {
       const data = JSON.parse(text)
-      return { events: data.events ?? [], pagination: data.pagination, error: null }
+      return { events: data.events ?? [] }
     } catch {
-      return { events: [], error: 'Parse error' }
+      return { events: [] }
     }
   }
 
@@ -51,7 +43,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let results: any[] = []
 
     if (type === 'food-drink') {
-      // Pull Food & Drink events in LA — matches eventbrite.com/b/ca--los-angeles/food-and-drink/
       const url = `${BASE}/events/search/?location.address=Los+Angeles%2C+CA&location.within=30mi` +
         `&categories=${FOOD_DRINK_CATEGORY}` +
         `&start_date.range_start=${encodeURIComponent(startDate)}` +
@@ -61,7 +52,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       results = data.events
 
     } else if (type === 'music') {
-      // Music events in LA
       const url = `${BASE}/events/search/?location.address=Los+Angeles%2C+CA&location.within=30mi` +
         `&categories=${MUSIC_CATEGORY}` +
         `&start_date.range_start=${encodeURIComponent(startDate)}` +
@@ -71,7 +61,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       results = data.events
 
     } else if (type === 'festivals') {
-      // Food festivals
       const url = `${BASE}/events/search/?q=food+festival+dinner+tasting` +
         `&location.address=Los+Angeles%2C+CA&location.within=30mi` +
         `&start_date.range_start=${encodeURIComponent(startDate)}` +
@@ -81,7 +70,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       results = data.events
 
     } else if (type === 'parties') {
-      // Food & drink parties
       const url = `${BASE}/events/search/?q=dinner+party+popup+restaurant` +
         `&location.address=Los+Angeles%2C+CA&location.within=30mi` +
         `&start_date.range_start=${encodeURIComponent(startDate)}` +
@@ -91,8 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       results = data.events
 
     } else if (type === 'keyword') {
-      // Keyword search
-      const url = `${BASE}/events/search/?q=${encodeURIComponent(q as string || 'food')}` +
+      const url = `${BASE}/events/search/?q=${encodeURIComponent((q as string) || 'food')}` +
         `&location.address=Los+Angeles%2C+CA&location.within=30mi` +
         `&start_date.range_start=${encodeURIComponent(startDate)}` +
         `&start_date.range_end=${encodeURIComponent(endDate)}` +
@@ -101,8 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       results = data.events
 
     } else if (type === 'venue') {
-      // Search by venue name
-      const url = `${BASE}/events/search/?q=${encodeURIComponent(q as string || '')}` +
+      const url = `${BASE}/events/search/?q=${encodeURIComponent((q as string) || '')}` +
         `&location.address=Los+Angeles%2C+CA&location.within=50mi` +
         `&start_date.range_start=${encodeURIComponent(startDate)}` +
         `&sort_by=date&expand=venue,logo&page_size=10`
@@ -110,7 +96,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       results = data.events
 
     } else {
-      // Default: all food & music events
       const [foodData, musicData] = await Promise.all([
         makeRequest(`${BASE}/events/search/?location.address=Los+Angeles%2C+CA&location.within=30mi&categories=${FOOD_DRINK_CATEGORY}&start_date.range_start=${encodeURIComponent(startDate)}&start_date.range_end=${encodeURIComponent(endDate)}&sort_by=date&expand=venue,logo&page_size=30`),
         makeRequest(`${BASE}/events/search/?location.address=Los+Angeles%2C+CA&location.within=30mi&categories=${MUSIC_CATEGORY}&start_date.range_start=${encodeURIComponent(startDate)}&start_date.range_end=${encodeURIComponent(endDate)}&sort_by=date&expand=venue,logo&page_size=20`),

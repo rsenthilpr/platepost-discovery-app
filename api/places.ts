@@ -67,6 +67,27 @@ const SEARCH_QUERIES = [
   { query: 'best cafe bakery Los Angeles', cuisine: 'Cafe', neighborhood: 'Los Angeles' },
   { query: 'best bakery West Hollywood', cuisine: 'Cafe', neighborhood: 'West Hollywood' },
   { query: 'best breakfast cafe Los Angeles', cuisine: 'Cafe', neighborhood: 'Los Angeles' },
+  // Expanded geography — Long Beach, San Diego, Riverside
+  { query: 'best coffee shop Long Beach California', cuisine: 'Coffee', neighborhood: 'Long Beach' },
+  { query: 'best restaurant Long Beach California', cuisine: 'American', neighborhood: 'Long Beach' },
+  { query: 'best coffee shop San Diego California', cuisine: 'Coffee', neighborhood: 'San Diego' },
+  { query: 'best brunch San Diego', cuisine: 'American', neighborhood: 'San Diego' },
+  { query: 'best coffee shop Riverside California', cuisine: 'Coffee', neighborhood: 'Riverside' },
+  { query: 'best coffee shop Pomona California', cuisine: 'Coffee', neighborhood: 'Pomona' },
+  { query: 'best coffee shop Pasadena California', cuisine: 'Coffee', neighborhood: 'Pasadena' },
+  { query: 'best restaurant Pasadena California', cuisine: 'American', neighborhood: 'Pasadena' },
+  { query: 'best coffee shop Burbank California', cuisine: 'Coffee', neighborhood: 'Burbank' },
+  { query: 'best coffee shop Glendale California', cuisine: 'Coffee', neighborhood: 'Glendale' },
+  // More LA neighborhoods
+  { query: 'best restaurant Boyle Heights Los Angeles', cuisine: 'Mexican', neighborhood: 'Boyle Heights' },
+  { query: 'best restaurant Inglewood California', cuisine: 'American', neighborhood: 'Inglewood' },
+  { query: 'best coffee shop Leimert Park Los Angeles', cuisine: 'Coffee', neighborhood: 'Leimert Park' },
+  { query: 'best restaurant Mar Vista Los Angeles', cuisine: 'American', neighborhood: 'Mar Vista' },
+  { query: 'best date night restaurant Los Angeles', cuisine: 'American', neighborhood: 'Los Angeles' },
+  { query: 'best happy hour bar Los Angeles', cuisine: 'American', neighborhood: 'Los Angeles' },
+  { query: 'best wine bar Los Angeles', cuisine: 'American', neighborhood: 'Los Angeles' },
+  { query: 'best ramen shop Los Angeles', cuisine: 'Japanese', neighborhood: 'Los Angeles' },
+  { query: 'best pho Vietnamese Los Angeles', cuisine: 'Vietnamese', neighborhood: 'Los Angeles' },
 ]
 
 async function searchPlaces(query: string): Promise<any[]> {
@@ -88,13 +109,6 @@ function getPhotoUrl(photoReference: string, maxWidth = 1600): string {
   return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoReference}&key=${GOOGLE_API_KEY}`
 }
 
-function extractNeighborhood(address: string): string {
-  // Extract neighborhood/area from address
-  const parts = address.split(',')
-  if (parts.length >= 2) return parts[1].trim()
-  return 'Los Angeles'
-}
-
 function extractCity(address: string): string {
   const lower = address.toLowerCase()
   if (lower.includes('orange')) return 'Orange'
@@ -111,9 +125,6 @@ function extractCity(address: string): string {
   if (lower.includes('glendale')) return 'Glendale'
   return 'Los Angeles'
 }
-
-// IDs of PlatePost pro customers — never overwrite these
-const PROTECTED_IDS = [4, 5, 17, 18]
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
