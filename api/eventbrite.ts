@@ -1,5 +1,7 @@
 // api/eventbrite.ts — Serverless proxy for Eventbrite
 
+export const config = { runtime: "nodejs" }
+
 
 const TOKEN = process.env.VITE_EVENTBRITE_TOKEN
 const BASE = 'https://www.eventbriteapi.com/v3'
