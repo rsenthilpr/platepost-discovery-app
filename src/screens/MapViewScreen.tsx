@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 
-const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY
+const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? import.meta.env.VITE_GOOGLE_PLACES_KEY
 const PLATEPOST_IDS = new Set([4, 5, 17, 18])
 // Must be defined outside component to prevent re-render reloads
 const GOOGLE_MAPS_LIBRARIES: ('places')[] = ['places']
@@ -151,10 +151,17 @@ export default function MapViewScreen() {
 
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
     setMap(mapInstance)
-    mapInstance.addListener('zoom_changed', () => setCurrentZoom(mapInstance.getZoom() ?? 11))
+    mapInstance.addListener('zoom_changed', () => {
+      setCurrentZoom(mapInstance.getZoom() ?? 11)
+    })
+    // Throttle center updates to avoid flooding React state
+    let centerTimer: ReturnType<typeof setTimeout> | null = null
     mapInstance.addListener('center_changed', () => {
-      const c = mapInstance.getCenter()
-      if (c) setMapCenter({ lat: c.lat(), lng: c.lng() })
+      if (centerTimer) clearTimeout(centerTimer)
+      centerTimer = setTimeout(() => {
+        const c = mapInstance.getCenter()
+        if (c) setMapCenter({ lat: c.lat(), lng: c.lng() })
+      }, 300)
     })
   }, [])
 
