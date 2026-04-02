@@ -96,15 +96,15 @@ function ListCard({
       />
       <div className="flex-1 min-w-0">
         <p className="font-bold text-sm leading-snug mb-0.5 truncate"
-          style={{ color: '#FAFBFF', fontFamily: 'Manrope, sans-serif' }}>
+          style={{ color: '#FAFBFF', fontFamily: 'Open Sans, sans-serif' }}>
           {r.name}
         </p>
         <span className="text-xs px-2 py-0.5 rounded-full inline-block mb-1"
-          style={{ background: 'rgba(69,118,239,0.15)', color: '#6B9EFF', fontFamily: 'Manrope' }}>
+          style={{ background: 'rgba(69,118,239,0.15)', color: '#6B9EFF', fontFamily: 'Open Sans' }}>
           {r.cuisine}
         </span>
         <p className="text-xs opacity-50"
-          style={{ color: '#FAFBFF', fontFamily: 'Manrope, sans-serif' }}>
+          style={{ color: '#FAFBFF', fontFamily: 'Open Sans, sans-serif' }}>
           {r.city}, {r.state}
         </p>
       </div>
@@ -326,7 +326,7 @@ export default function ListViewScreen() {
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 rounded-full border-2 animate-spin"
             style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: '#fff' }} />
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Manrope, sans-serif', fontSize: 13 }}>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Open Sans, sans-serif', fontSize: 13 }}>
             Loading…
           </p>
         </div>
@@ -359,7 +359,7 @@ export default function ListViewScreen() {
                 onClick={() => setActiveFilter(f)}
                 className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all"
                 style={{
-                  fontFamily: 'Manrope, sans-serif',
+                  fontFamily: 'Open Sans, sans-serif',
                   background: activeFilter === f ? '#4576EF' : 'rgba(255,255,255,0.07)',
                   color: activeFilter === f ? '#fff' : 'rgba(250,251,255,0.55)',
                   border: activeFilter === f ? '1px solid #4576EF' : '1px solid rgba(255,255,255,0.1)',
@@ -372,7 +372,7 @@ export default function ListViewScreen() {
         </div>
 
         <div className="px-4 py-2 flex-shrink-0">
-          <p className="text-xs opacity-40" style={{ fontFamily: 'Manrope', color: '#FAFBFF' }}>
+          <p className="text-xs opacity-40" style={{ fontFamily: 'Open Sans', color: '#FAFBFF' }}>
             {filteredList.length} place{filteredList.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -402,7 +402,7 @@ export default function ListViewScreen() {
           <button
             onClick={() => navigate('/map')}
             className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold"
-            style={{ background: '#FAFBFF', color: '#071126', fontFamily: 'Manrope', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
+            style={{ background: '#FAFBFF', color: '#071126', fontFamily: 'Open Sans', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#071126" />
@@ -437,7 +437,7 @@ export default function ListViewScreen() {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
           <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span style={{ fontFamily: 'Manrope, sans-serif', color: 'white', fontSize: 12, fontWeight: 600 }}>Home</span>
+        <span style={{ fontFamily: 'Open Sans, sans-serif', color: 'white', fontSize: 12, fontWeight: 600 }}>Home</span>
       </button>
 
       {/* Scrollable reel container */}
@@ -493,7 +493,7 @@ export default function ListViewScreen() {
           <button
             onClick={() => navigate('/map')}
             className="flex items-center gap-2 px-5 py-2.5"
-            style={{ fontFamily: 'Manrope, sans-serif', color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600 }}
+            style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600 }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="currentColor" />
@@ -503,7 +503,7 @@ export default function ListViewScreen() {
           <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.15)' }} />
           <div
             className="flex items-center gap-2 px-5 py-2.5 rounded-full"
-            style={{ fontFamily: 'Manrope, sans-serif', color: '#fff', fontSize: 13, fontWeight: 700, background: 'rgba(255,255,255,0.18)' }}
+            style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 13, fontWeight: 700, background: 'rgba(255,255,255,0.18)' }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="white">
               <polygon points="5,3 19,12 5,21" />

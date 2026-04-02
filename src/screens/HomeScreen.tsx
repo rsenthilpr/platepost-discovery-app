@@ -330,7 +330,7 @@ export default function HomeScreen() {
 
             <motion.button
               whileTap={{ scale: 0.93 }}
-              onClick={() => navigate('/tonight')}
+              onClick={() => navigate('/events')}
               className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold flex-shrink-0"
               style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.4)', color: '#fff', fontFamily: 'Open Sans', backdropFilter: 'blur(12px)' }}
             >
@@ -395,21 +395,39 @@ export default function HomeScreen() {
                   Popular in LA
                 </h2>
               </div>
-              <motion.div
-                className="flex items-center gap-1"
-                animate={{ x: [0, 4, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'Open Sans', fontWeight: 600 }}
-              >
-                <span>swipe</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.6)" strokeWidth="2.5" strokeLinecap="round" />
-                </svg>
-              </motion.div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const el = document.getElementById('top10-carousel')
+                    if (el) el.scrollBy({ left: -200, behavior: 'smooth' })
+                  }}
+                  style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => {
+                    const el = document.getElementById('top10-carousel')
+                    if (el) el.scrollBy({ left: 200, behavior: 'smooth' })
+                  }}
+                  style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 18l6-6-6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div
+              id="top10-carousel"
               className="flex gap-3 overflow-x-auto pl-5 pr-5 pb-2"
               style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}
+              onWheel={e => {
+                const el = document.getElementById('top10-carousel')
+                if (el) { e.preventDefault(); el.scrollBy({ left: e.deltaY * 2, behavior: 'smooth' }) }
+              }}
             >
               {top10.map((r, i) => (
                 <div key={r.id} style={{ scrollSnapAlign: 'start' }}>

@@ -94,9 +94,18 @@ export default function EventsScreen() {
         fetch(`/api/eventbrite?type=parties&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
       ])
 
+      console.log('API status codes:', r1.status, r2.status, r3.status, r4.status)
+
       const [d1, d2, d3, d4] = await Promise.all([r1.json(), r2.json(), r3.json(), r4.json()])
 
-      console.log('Eventbrite responses:', d1.count, d2.count, d3.count, d4.count)
+      console.log('food-drink:', d1.count, 'error:', d1.error)
+      console.log('music:', d2.count, 'error:', d2.error)
+      console.log('festivals:', d3.count, 'error:', d3.error)
+      console.log('parties:', d4.count, 'error:', d4.error)
+
+      if (d1.error || d2.error) {
+        console.error('Eventbrite API error:', d1.error || d2.error)
+      }
 
       const allRaw = [...(d1.events ?? []), ...(d2.events ?? []), ...(d3.events ?? []), ...(d4.events ?? [])]
       const seen = new Set<string>()

@@ -193,7 +193,7 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
           {r.tier === 'pro' && (
             <div
               className="absolute top-3 left-3 text-xs font-bold px-2 py-1 rounded-lg"
-              style={{ background: '#4576EF', color: '#fff', fontFamily: 'Manrope' }}
+              style={{ background: '#4576EF', color: '#fff', fontFamily: 'Open Sans' }}
             >
               PRO
             </div>
@@ -247,13 +247,13 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span
               className="text-xs px-2.5 py-1 rounded-full font-semibold"
-              style={{ background: 'rgba(69,118,239,0.18)', color: '#6B9EFF', fontFamily: 'Manrope' }}
+              style={{ background: 'rgba(69,118,239,0.18)', color: '#6B9EFF', fontFamily: 'Open Sans' }}
             >
               {r.cuisine}
             </span>
             <span
               className="text-xs opacity-50 flex items-center gap-1"
-              style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}
+              style={{ color: '#FAFBFF', fontFamily: 'Open Sans' }}
             >
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="currentColor" />
@@ -267,11 +267,11 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
           ) : placeInfo.rating ? (
             <div className="flex items-center gap-2">
               <Stars rating={placeInfo.rating} />
-              <span className="text-sm font-bold" style={{ color: '#FBBF24', fontFamily: 'Manrope' }}>
+              <span className="text-sm font-bold" style={{ color: '#FBBF24', fontFamily: 'Open Sans' }}>
                 {placeInfo.rating.toFixed(1)}
               </span>
               {placeInfo.userRatingsTotal && (
-                <span className="text-xs opacity-40" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
+                <span className="text-xs opacity-40" style={{ color: '#FAFBFF', fontFamily: 'Open Sans' }}>
                   ({placeInfo.userRatingsTotal.toLocaleString()} reviews)
                 </span>
               )}
@@ -281,7 +281,7 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
           {r.description && (
             <p
               className="text-sm leading-relaxed mt-3 opacity-60"
-              style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}
+              style={{ color: '#FAFBFF', fontFamily: 'Open Sans' }}
             >
               {r.description}
             </p>
@@ -294,23 +294,23 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
             style={{ background: 'rgba(69,118,239,0.12)', border: '1px solid rgba(69,118,239,0.25)' }}>
             <span style={{ fontSize: 22 }}>🎟️</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
+              <p className="text-sm font-semibold truncate" style={{ color: '#FAFBFF', fontFamily: 'Open Sans' }}>
                 {events[0].name}
               </p>
-              <p className="text-xs opacity-50" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
+              <p className="text-xs opacity-50" style={{ color: '#FAFBFF', fontFamily: 'Open Sans' }}>
                 {events[0].date} · {events[0].time}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {events[0].source === 'eventbrite' && (
                 <span className="text-xs font-bold px-1.5 py-0.5 rounded-md"
-                  style={{ background: '#F05537', color: '#fff', fontFamily: 'Manrope', fontSize: 9 }}>
+                  style={{ background: '#F05537', color: '#fff', fontFamily: 'Open Sans', fontSize: 9 }}>
                   LIVE
                 </span>
               )}
               {events.length > 1 && (
                 <span className="text-xs font-bold px-2 py-1 rounded-full"
-                  style={{ background: '#4576EF', color: '#fff', fontFamily: 'Manrope' }}>
+                  style={{ background: '#4576EF', color: '#fff', fontFamily: 'Open Sans' }}>
                   +{events.length - 1}
                 </span>
               )}
@@ -357,17 +357,6 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
               <p style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>{r.phone}</p>
             </div>
           )}
-          {r.website_url && (
-            <button
-              onClick={() => setIframeUrl(r.website_url)}
-              className="flex items-center gap-2"
-            >
-              <span style={{ fontSize: 14 }}>🔗</span>
-              <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#60a5fa', fontSize: 13, textDecoration: 'underline' }}>
-                Visit Website
-              </span>
-            </button>
-          )}
         </div>
 
         {/* Full events list */}
@@ -375,12 +364,12 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
           <div id="events-section" ref={eventsSectionRef} className="px-4 mb-8">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold uppercase tracking-widest opacity-40"
-                style={{ fontFamily: 'Manrope', color: '#FAFBFF' }}>
+                style={{ fontFamily: 'Open Sans', color: '#FAFBFF' }}>
                 Upcoming Events
               </h3>
               {events[0].source === 'eventbrite' && (
                 <span className="text-xs px-2 py-0.5 rounded-full font-bold"
-                  style={{ background: '#F05537', color: '#fff', fontFamily: 'Manrope', fontSize: 9 }}>
+                  style={{ background: '#F05537', color: '#fff', fontFamily: 'Open Sans', fontSize: 9 }}>
                   LIVE FROM EVENTBRITE
                 </span>
               )}
@@ -401,10 +390,10 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
                     🎟️
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
+                    <p className="text-sm font-semibold truncate" style={{ color: '#FAFBFF', fontFamily: 'Open Sans' }}>
                       {ev.name}
                     </p>
-                    <p className="text-xs opacity-50" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
+                    <p className="text-xs opacity-50" style={{ color: '#FAFBFF', fontFamily: 'Open Sans' }}>
                       {ev.date} · {ev.time}
                     </p>
                   </div>

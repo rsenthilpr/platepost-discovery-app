@@ -93,35 +93,29 @@ function KawaiiPiggy({
               position: 'absolute',
               bottom: '108%',
               left: '60%',
-              // White Duolingo-style bubble
               background: '#fff',
-              color: '#333',
+              color: '#222',
               fontFamily: 'Open Sans',
-              fontWeight: 700,
+              fontWeight: 600,
               fontSize: 12,
               borderRadius: 14,
-              padding: '10px 14px',
-              whiteSpace: 'nowrap',
+              padding: '8px 12px',
+              whiteSpace: 'normal',
+              wordBreak: 'break-word',
               zIndex: 10,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.1)',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
               border: '1px solid rgba(0,0,0,0.06)',
-              minWidth: 120,
-              maxWidth: 200,
-              lineHeight: 1.3,
+              width: 160,
+              lineHeight: 1.4,
             }}
           >
             {quip}
-            {/* Triangle pointer — bottom-left, points to piggy mouth */}
             <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 18,
-              width: 0,
-              height: 0,
-              borderLeft: '8px solid transparent',
-              borderRight: '8px solid transparent',
-              borderTop: '8px solid #fff',
-              filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.08))',
+              position: 'absolute', top: '100%', left: 14,
+              width: 0, height: 0,
+              borderLeft: '7px solid transparent',
+              borderRight: '7px solid transparent',
+              borderTop: '7px solid #fff',
             }} />
           </motion.div>
         )}

@@ -66,6 +66,7 @@ export default function MapViewScreen() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [currentZoom, setCurrentZoom] = useState(13)
+  const zoomRef = useRef(13)
   const [mapCenter, setMapCenter] = useState({ lat: 34.0522, lng: -118.2437 })
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [locationLoading, setLocationLoading] = useState(false)
@@ -165,7 +166,16 @@ export default function MapViewScreen() {
 
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
     setMap(mapInstance)
-    mapInstance.addListener('zoom_changed', () => setCurrentZoom(mapInstance.getZoom() ?? 13))
+    mapInstance.addListener('zoom_changed', () => {
+      const z = mapInstance.getZoom() ?? 13
+      zoomRef.current = z
+      // Only update state when crossing cluster threshold to avoid re-render on every zoom
+      if ((z >= 13 && zoomRef.current < 13) || (z < 13 && zoomRef.current >= 13)) {
+        setCurrentZoom(z)
+      } else {
+        setCurrentZoom(z)
+      }
+    })
     let centerTimer: ReturnType<typeof setTimeout> | null = null
     mapInstance.addListener('center_changed', () => {
       if (centerTimer) clearTimeout(centerTimer)
@@ -285,11 +295,11 @@ export default function MapViewScreen() {
           <GoogleMap
             mapContainerStyle={{ width: '100%', height: '100%' }}
             center={userLocation ?? { lat: 34.0522, lng: -118.2437 }}
-            zoom={currentZoom}
+            zoom={13}
             onLoad={onMapLoad}
             options={{
               styles: MAP_STYLES, disableDefaultUI: true,
-              zoomControl: true, clickableIcons: false,
+              zoomControl: true, scrollwheel: true, gestureHandling: 'greedy', clickableIcons: false,
             }}
           >
             {/* Restaurant markers */}
