@@ -117,7 +117,7 @@ export default function SurpriseMeScreen() {
 
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-center"
-      style={{ background: '#070d1f', fontFamily: 'Manrope, sans-serif' }}>
+      style={{ background: '#070d1f', fontFamily: 'Open Sans, sans-serif' }}>
 
       <Confetti active={showConfetti} />
 

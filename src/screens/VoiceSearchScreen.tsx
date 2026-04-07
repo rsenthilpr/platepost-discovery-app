@@ -239,7 +239,7 @@ export default function VoiceSearchScreen() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               className="text-lg font-semibold tracking-wide"
-              style={{ fontFamily: 'Manrope, sans-serif', color: '#4576EF' }}
+              style={{ fontFamily: 'Open Sans, sans-serif', color: '#4576EF' }}
             >
               Listening...
             </motion.p>
@@ -251,7 +251,7 @@ export default function VoiceSearchScreen() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               className="text-lg font-semibold tracking-wide"
-              style={{ fontFamily: 'Manrope, sans-serif', color: '#FAFBFF' }}
+              style={{ fontFamily: 'Open Sans, sans-serif', color: '#FAFBFF' }}
             >
               Finding results...
             </motion.p>
@@ -263,7 +263,7 @@ export default function VoiceSearchScreen() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               className="text-base opacity-50"
-              style={{ fontFamily: 'Manrope, sans-serif', color: '#FAFBFF' }}
+              style={{ fontFamily: 'Open Sans, sans-serif', color: '#FAFBFF' }}
             >
               Tap the mic to start
             </motion.p>
@@ -285,7 +285,7 @@ export default function VoiceSearchScreen() {
             >
               <p
                 className="text-base"
-                style={{ fontFamily: 'Manrope, sans-serif', color: '#FAFBFF' }}
+                style={{ fontFamily: 'Open Sans, sans-serif', color: '#FAFBFF' }}
               >
                 {transcript || 'Start speaking...'}
               </p>
@@ -302,7 +302,7 @@ export default function VoiceSearchScreen() {
             >
               <p
                 className="text-sm opacity-40"
-                style={{ fontFamily: 'Manrope, sans-serif', color: '#FAFBFF' }}
+                style={{ fontFamily: 'Open Sans, sans-serif', color: '#FAFBFF' }}
               >
                 Start speaking...
               </p>
@@ -316,7 +316,7 @@ export default function VoiceSearchScreen() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="text-sm text-center px-4"
-            style={{ color: '#f87171', fontFamily: 'Manrope, sans-serif' }}
+            style={{ color: '#f87171', fontFamily: 'Open Sans, sans-serif' }}
           >
             {error}
           </motion.p>
@@ -330,14 +330,14 @@ export default function VoiceSearchScreen() {
             transition={{ delay: 0.3 }}
             className="flex flex-col items-center gap-2 mt-2"
           >
-            <p className="text-xs opacity-30 mb-1" style={{ color: '#FAFBFF', fontFamily: 'Manrope' }}>
+            <p className="text-xs opacity-30 mb-1" style={{ color: '#FAFBFF', fontFamily: 'Open Sans' }}>
               Try saying
             </p>
             {['"best sushi near me"', '"dinner for two"', '"jazz bar tonight"'].map((hint) => (
               <p
                 key={hint}
                 className="text-sm opacity-50 italic"
-                style={{ color: '#FAFBFF', fontFamily: 'Manrope, sans-serif' }}
+                style={{ color: '#FAFBFF', fontFamily: 'Open Sans, sans-serif' }}
               >
                 {hint}
               </p>
@@ -351,7 +351,7 @@ export default function VoiceSearchScreen() {
         <button
           onClick={() => navigate('/map')}
           className="text-sm underline underline-offset-4 opacity-40 hover:opacity-70 transition-opacity"
-          style={{ fontFamily: 'Manrope, sans-serif', color: '#FAFBFF' }}
+          style={{ fontFamily: 'Open Sans, sans-serif', color: '#FAFBFF' }}
         >
           Skip to Discovery Map
         </button>

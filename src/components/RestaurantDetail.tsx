@@ -190,14 +190,7 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
             className="absolute inset-0"
             style={{ background: 'linear-gradient(to top, rgba(14,31,66,0.85) 0%, transparent 55%)' }}
           />
-          {r.tier === 'pro' && (
-            <div
-              className="absolute top-3 left-3 text-xs font-bold px-2 py-1 rounded-lg"
-              style={{ background: '#4576EF', color: '#fff', fontFamily: 'Open Sans' }}
-            >
-              PRO
-            </div>
-          )}
+
           <button
             onClick={onClose}
             className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center"
@@ -239,7 +232,7 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
         <div className="px-4 mb-4">
           <h2
             className="font-bold text-xl mb-1 leading-tight"
-            style={{ fontFamily: 'Bungee, cursive', color: '#FAFBFF', letterSpacing: '0.03em' }}
+            style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, color: '#FAFBFF', fontSize: '1.25rem', letterSpacing: '-0.01em' }}
           >
             {r.name}
           </h2>
@@ -251,6 +244,14 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
             >
               {r.cuisine}
             </span>
+            {r.tier === 'pro' && (
+              <span
+                className="text-xs px-2 py-0.5 rounded-md font-bold"
+                style={{ background: '#0048f9', color: '#fff', fontFamily: 'Open Sans' }}
+              >
+                PRO
+              </span>
+            )}
             <span
               className="text-xs opacity-50 flex items-center gap-1"
               style={{ color: '#FAFBFF', fontFamily: 'Open Sans' }}
@@ -318,12 +319,12 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
           </div>
         )}
 
-        {/* Action buttons — VideoMenu full width on top for PlatePost customers */}
-        <div className="px-4 mb-4">
-          {r.platepost_menu_url && (
+        {/* VideoMenu button — primary CTA for PlatePost pro customers */}
+        {r.platepost_menu_url && (
+          <div className="px-4 mb-4">
             <button
               onClick={() => setIframeUrl(r.platepost_menu_url)}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl mb-3 text-sm font-bold"
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
               style={{ background: '#0048f9', color: '#fff', fontFamily: 'Open Sans, sans-serif' }}
             >
               <svg width="16" height="16" viewBox="0 0 100 100" fill="none">
@@ -333,17 +334,10 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
               </svg>
               VideoMenu
             </button>
-          )}
-          <button
-            onClick={() => { onClose(); navigate(`/menu/${r.id}`) }}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-            style={{ background: 'rgba(255,255,255,0.07)', color: '#FAFBFF', border: '1px solid rgba(255,255,255,0.12)', fontFamily: 'Open Sans, sans-serif' }}
-          >
-            🍽️ More Info
-          </button>
-        </div>
+          </div>
+        )}
 
-        {/* Address + hours */}
+        {/* Address + phone */}
         <div className="px-4 mb-4">
           {r.address && (
             <div className="flex items-start gap-2 mb-2">
@@ -357,6 +351,17 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
               <p style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>{r.phone}</p>
             </div>
           )}
+        </div>
+
+        {/* More Info — always at the bottom before events */}
+        <div className="px-4 mb-4">
+          <button
+            onClick={() => { onClose(); navigate(`/menu/${r.id}`) }}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
+            style={{ background: 'rgba(255,255,255,0.07)', color: '#FAFBFF', border: '1px solid rgba(255,255,255,0.12)', fontFamily: 'Open Sans, sans-serif' }}
+          >
+            🍽️ More Info
+          </button>
         </div>
 
         {/* Full events list */}

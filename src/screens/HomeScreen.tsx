@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { PlatePostLogo, PlatePostOrbMark } from '../components/PlatePostLogo'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -24,75 +24,7 @@ function removeFromSearchHistory(term: string) {
   } catch {}
 }
 
-// Draggable orb — fixed position, draggable anywhere
-function DraggableOrb({ id, defaultBottom, defaultRight, onClick, children }: {
-  id: string
-  defaultBottom: number
-  defaultRight: number
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  const getSavedPos = () => {
-    try {
-      const saved = localStorage.getItem(`orb_pos_${id}`)
-      return saved ? JSON.parse(saved) : null
-    } catch { return null }
-  }
 
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(getSavedPos)
-  const [dragging, setDragging] = useState(false)
-  const dragStart = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
-  const moved = useRef(false)
-
-  const getDefaultXY = () => ({
-    x: window.innerWidth - defaultRight - 56,
-    y: window.innerHeight - defaultBottom - 56,
-  })
-
-  const currentPos = pos ?? getDefaultXY()
-
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    e.currentTarget.setPointerCapture(e.pointerId)
-    dragStart.current = { x: e.clientX, y: e.clientY, px: currentPos.x, py: currentPos.y }
-    moved.current = false
-    setDragging(true)
-  }, [currentPos])
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragStart.current) return
-    const dx = e.clientX - dragStart.current.x
-    const dy = e.clientY - dragStart.current.y
-    if (Math.abs(dx) + Math.abs(dy) > 6) moved.current = true
-    const newX = Math.max(8, Math.min(window.innerWidth - 64, dragStart.current.px + dx))
-    const newY = Math.max(60, Math.min(window.innerHeight - 100, dragStart.current.py + dy))
-    setPos({ x: newX, y: newY })
-  }, [])
-
-  const onPointerUp = useCallback(() => {
-    setDragging(false)
-    dragStart.current = null
-    if (pos) localStorage.setItem(`orb_pos_${id}`, JSON.stringify(pos))
-    if (!moved.current) onClick()
-  }, [id, pos, onClick])
-
-  return (
-    <div
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      className="fixed z-30 flex flex-col items-center gap-1 select-none"
-      style={{
-        left: currentPos.x, top: currentPos.y,
-        cursor: dragging ? 'grabbing' : 'grab',
-        touchAction: 'none',
-        opacity: dragging ? 0.85 : 1,
-        transition: dragging ? 'none' : 'opacity 0.2s',
-      }}
-    >
-      {children}
-    </div>
-  )
-}
 
 // Top 10 carousel restaurant card
 function Top10Card({ restaurant, rank, onClick }: { restaurant: Restaurant; rank: number; onClick: () => void }) {
@@ -446,26 +378,9 @@ export default function HomeScreen() {
         <div style={{ height: 120 }} />
       </div>
 
-      {/* ── Draggable Floating Orbs ── */}
-      <DraggableOrb id="surprise-orb" defaultBottom={420} defaultRight={20} onClick={() => navigate('/surprise')}>
-        <motion.div className="absolute rounded-full"
-          style={{ width: 68, height: 68, background: 'rgba(245,158,11,0.2)', top: -6, left: -6 }}
-          animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          animate={{ boxShadow: ['0 0 20px rgba(245,158,11,0.4)', '0 0 36px rgba(239,68,68,0.5)', '0 0 20px rgba(245,158,11,0.4)'] }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-          className="w-14 h-14 rounded-full flex items-center justify-center"
-          style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: '2.5px solid rgba(255,255,255,0.35)' }}
-        >
-          <motion.span animate={{ rotate: [0, 15, -15, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ fontSize: 26, lineHeight: 1 }}>🎲</motion.span>
-        </motion.div>
-        <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase' as const, opacity: 0.8, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Surprise</span>
-      </DraggableOrb>
-
-      <DraggableOrb id="crave-orb" defaultBottom={320} defaultRight={20} onClick={() => navigate('/concierge')}>
+      {/* ── Stationary Floating Orbs — fixed bottom-right ── */}
+      {/* Crave orb */}
+      <div className="fixed z-30 flex flex-col items-center gap-1" style={{ bottom: 120, right: 20 }}>
         <motion.div className="absolute rounded-full"
           style={{ width: 68, height: 68, background: 'rgba(0,72,249,0.25)', top: -6, left: -6 }}
           animate={{ scale: [1, 1.5, 1], opacity: [0.7, 0, 0.7] }}
@@ -476,16 +391,39 @@ export default function HomeScreen() {
           animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
           transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
         />
-        <motion.div
+        <motion.button
+          onClick={() => navigate('/concierge')}
+          whileTap={{ scale: 0.92 }}
           animate={{ boxShadow: ['0 0 20px rgba(0,72,249,0.5)', '0 0 40px rgba(0,72,249,0.7)', '0 0 20px rgba(0,72,249,0.5)'] }}
           transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-          className="w-14 h-14 rounded-full flex items-center justify-center"
+          className="w-14 h-14 rounded-full flex items-center justify-center relative z-10"
           style={{ background: 'linear-gradient(135deg, #0048f9, #3b82f6)', border: '2.5px solid rgba(255,255,255,0.35)' }}
         >
           <PlatePostOrbMark size={24} />
-        </motion.div>
+        </motion.button>
         <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase' as const, opacity: 0.8, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Crave</span>
-      </DraggableOrb>
+      </div>
+
+      {/* Surprise orb */}
+      <div className="fixed z-30 flex flex-col items-center gap-1" style={{ bottom: 36, right: 20 }}>
+        <motion.div className="absolute rounded-full"
+          style={{ width: 68, height: 68, background: 'rgba(245,158,11,0.2)', top: -6, left: -6 }}
+          animate={{ scale: [1, 1.4, 1], opacity: [0.6, 0, 0.6] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.button
+          onClick={() => navigate('/surprise')}
+          whileTap={{ scale: 0.92 }}
+          animate={{ boxShadow: ['0 0 20px rgba(245,158,11,0.4)', '0 0 36px rgba(239,68,68,0.5)', '0 0 20px rgba(245,158,11,0.4)'] }}
+          transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+          className="w-14 h-14 rounded-full flex items-center justify-center relative z-10"
+          style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: '2.5px solid rgba(255,255,255,0.35)' }}
+        >
+          <motion.span animate={{ rotate: [0, 15, -15, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ fontSize: 26, lineHeight: 1 }}>🎲</motion.span>
+        </motion.button>
+        <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase' as const, opacity: 0.8, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Surprise</span>
+      </div>
 
       {/* ── Search overlay ── */}
       <AnimatePresence>

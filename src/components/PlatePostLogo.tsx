@@ -7,15 +7,21 @@
 
 export function PlatePostLogo({ size = 'md', white = false }: {
   size?: 'sm' | 'md' | 'lg'
-  white?: boolean  // true = force white (for dark backgrounds)
+  white?: boolean
 }) {
-  const heights = { sm: 20, md: 26, lg: 36 }
+  // Responsive: scales with screen width, clamped between min and max
+  const heights = {
+    sm: 'clamp(16px, 4vw, 20px)',
+    md: 'clamp(20px, 5vw, 26px)',
+    lg: 'clamp(26px, 7vw, 36px)',
+  }
   return (
     <img
       src="/pp-logo.png"
       alt="PlatePost"
-      height={heights[size]}
       style={{
+        height: heights[size],
+        width: 'auto',
         objectFit: 'contain',
         display: 'block',
         filter: white ? 'brightness(0) invert(1)' : 'none',

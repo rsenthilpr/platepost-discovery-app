@@ -70,6 +70,7 @@ export default function MapViewScreen() {
   const [mapCenter, setMapCenter] = useState({ lat: 34.0522, lng: -118.2437 })
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [locationLoading, setLocationLoading] = useState(false)
+  const [trayOpen, setTrayOpen] = useState(false)
   const topBarRef = useRef<HTMLDivElement>(null)
   const [topBarHeight, setTopBarHeight] = useState(160)
 
@@ -115,11 +116,12 @@ export default function MapViewScreen() {
     return true
   })
 
-  // Nearby tray — sorted by distance from map center, pro first
+  // Nearby tray — sorted by distance from user location (if available) or map center, pro first
   const nearbyRestaurants = (() => {
+    const center = userLocation ?? mapCenter
     const sorted = [...filtered].sort((a, b) => {
-      const da = Math.pow(a.latitude - mapCenter.lat, 2) + Math.pow(a.longitude - mapCenter.lng, 2)
-      const db = Math.pow(b.latitude - mapCenter.lat, 2) + Math.pow(b.longitude - mapCenter.lng, 2)
+      const da = Math.pow(a.latitude - center.lat, 2) + Math.pow(a.longitude - center.lng, 2)
+      const db = Math.pow(b.latitude - center.lat, 2) + Math.pow(b.longitude - center.lng, 2)
       return da - db
     })
     const pro = sorted.filter(r => PLATEPOST_IDS.has(r.id))
@@ -214,7 +216,7 @@ export default function MapViewScreen() {
               <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="#071126" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          <img src="/pp-logo.png" alt="PlatePost" height={22} style={{ objectFit: 'contain' }} />
+          <img src="/pp-logo.png" alt="PlatePost" style={{ height: 'clamp(18px, 4.5vw, 22px)', width: 'auto', objectFit: 'contain', display: 'block' }} />
           <div style={{ flex: 1 }} />
           <span style={{ fontFamily: 'Open Sans', fontSize: 12, fontWeight: 600, color: '#888' }}>
             {filtered.length} places
@@ -290,7 +292,7 @@ export default function MapViewScreen() {
       </div>
 
       {/* Map */}
-      <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: 188 }}>
+      <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: trayOpen ? 210 : 52, transition: 'bottom 0.3s ease' }}>
         {isLoaded ? (
           <GoogleMap
             mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -367,7 +369,7 @@ export default function MapViewScreen() {
       </div>
 
       {/* Near me button */}
-      <div style={{ position: 'absolute', bottom: 200, right: 16, zIndex: 50 }}>
+      <div style={{ position: 'absolute', bottom: trayOpen ? 220 : 62, right: 16, zIndex: 50, transition: 'bottom 0.3s ease' }}>
         <button onClick={requestUserLocation} style={{
           width: 44, height: 44, borderRadius: '50%',
           background: userLocation ? '#0048f9' : '#fff',
@@ -387,67 +389,97 @@ export default function MapViewScreen() {
         </button>
       </div>
 
-      {/* Restaurant Tray */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 100,
-        background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(16px)',
-        borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 12, paddingBottom: 28,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 16, paddingRight: 16, marginBottom: 10 }}>
-          <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: '#071126', margin: 0 }}>
-            Nearby · {nearbyRestaurants.length} places
-          </p>
-          <button onClick={() => navigate('/list')} style={{
-            display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px',
-            borderRadius: 999, background: '#071126', border: 'none', cursor: 'pointer',
-            fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#fff',
-          }}>
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21" /></svg>
-            Feed
-          </button>
-        </div>
+      {/* Restaurant Tray — collapsible, like Google Maps */}
+      <motion.div
+        animate={{ height: trayOpen ? 'auto' : 44 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+        style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 100,
+          background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(16px)',
+          borderTop: '1px solid rgba(0,0,0,0.06)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Pull tab — always visible, tap to toggle */}
+        <button
+          onClick={() => setTrayOpen(o => !o)}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 16px', background: 'transparent', border: 'none', cursor: 'pointer',
+            minHeight: 44,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Drag pill */}
+            <div style={{ width: 32, height: 4, borderRadius: 2, background: '#d1d5db', marginRight: 4 }} />
+            <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: '#071126', margin: 0 }}>
+              Nearby · {nearbyRestaurants.length} places
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={(e) => { e.stopPropagation(); navigate('/list') }} style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px',
+              borderRadius: 999, background: '#071126', border: 'none', cursor: 'pointer',
+              fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#fff',
+            }}>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21" /></svg>
+              Feed
+            </button>
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none"
+              style={{ transform: trayOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', flexShrink: 0 }}
+            >
+              <path d="M6 9l6 6 6-6" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </button>
 
-        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingLeft: 16, paddingRight: 16, scrollbarWidth: 'none' as const }}>
-          {nearbyRestaurants.map(r => {
-            const isPro = PLATEPOST_IDS.has(r.id)
-            const isSelected = selectedRestaurant?.id === r.id
-            return (
-              <motion.button key={r.id} whileTap={{ scale: 0.96 }}
-                onClick={() => { setSelectedRestaurant(r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
-                style={{
-                  flexShrink: 0, width: 130, borderRadius: 14, overflow: 'hidden', background: '#fff',
-                  border: `2px solid ${isSelected ? '#0048f9' : isPro ? '#0048f9' : '#f3f4f6'}`,
-                  cursor: 'pointer', textAlign: 'left', padding: 0,
-                  boxShadow: isSelected ? '0 4px 16px rgba(0,72,249,0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
-                  transition: 'all 0.2s',
-                }}>
-                <div style={{ position: 'relative', height: 80 }}>
-                  <img src={r.image_url} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  {isPro && (
-                    <div style={{ position: 'absolute', top: 5, left: 5, background: '#0048f9', borderRadius: 6, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <img src="/pp-mark.png" alt="" width={8} height={8} style={{ filter: 'brightness(0) invert(1)', objectFit: 'contain' }} />
-                      <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 8, fontWeight: 700 }}>PRO</span>
-                    </div>
-                  )}
-                </div>
-                <div style={{ padding: '7px 8px' }}>
-                  <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 11, color: '#071126', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {r.name}
-                  </p>
-                  <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: '#9ca3af', margin: '2px 0 0' }}>
-                    {CUISINE_EMOJI[r.cuisine] ?? '🍽️'} {r.cuisine}
-                  </p>
-                  {r.rating && (
-                    <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: '#FBBF24', margin: '1px 0 0', fontWeight: 600 }}>
-                      ★ {r.rating.toFixed(1)}
+        {/* Cards — only visible when open */}
+        {trayOpen && (
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingLeft: 16, paddingRight: 16, paddingBottom: 28, scrollbarWidth: 'none' as const }}>
+            {nearbyRestaurants.map(r => {
+              const isPro = PLATEPOST_IDS.has(r.id)
+              const isSelected = selectedRestaurant?.id === r.id
+              return (
+                <motion.button key={r.id} whileTap={{ scale: 0.96 }}
+                  onClick={() => { setSelectedRestaurant(r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
+                  style={{
+                    flexShrink: 0, width: 130, borderRadius: 14, overflow: 'hidden',
+                    background: isPro ? '#0a1628' : '#fff',
+                    border: `2px solid ${isSelected ? '#0048f9' : '#f3f4f6'}`,
+                    cursor: 'pointer', textAlign: 'left', padding: 0,
+                    boxShadow: isSelected ? '0 4px 16px rgba(0,72,249,0.25)' : isPro ? '0 2px 12px rgba(0,72,249,0.15)' : '0 2px 8px rgba(0,0,0,0.06)',
+                    transition: 'all 0.2s',
+                  }}>
+                  {/* Image — dark background prevents white gap */}
+                  <div style={{ position: 'relative', height: 80, background: '#111' }}>
+                    <img src={r.image_url} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    {isPro && (
+                      <div style={{ position: 'absolute', top: 5, left: 5, background: '#0048f9', borderRadius: 6, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <img src="/pp-mark.png" alt="" width={8} height={8} style={{ filter: 'brightness(0) invert(1)', objectFit: 'contain' }} />
+                        <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 8, fontWeight: 700 }}>PRO</span>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ padding: '7px 8px' }}>
+                    <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 11, color: isPro ? '#fff' : '#071126', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.name}
                     </p>
-                  )}
-                </div>
-              </motion.button>
-            )
-          })}
-        </div>
-      </div>
+                    <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: isPro ? 'rgba(255,255,255,0.55)' : '#9ca3af', margin: '2px 0 0' }}>
+                      {CUISINE_EMOJI[r.cuisine] ?? '🍽️'} {r.cuisine}
+                    </p>
+                    {r.rating && (
+                      <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: '#FBBF24', margin: '1px 0 0', fontWeight: 600 }}>
+                        ★ {r.rating.toFixed(1)}
+                      </p>
+                    )}
+                  </div>
+                </motion.button>
+              )
+            })}
+          </div>
+        )}
+      </motion.div>
 
       {/* Restaurant Detail */}
       <AnimatePresence>
