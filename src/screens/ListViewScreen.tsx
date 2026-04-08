@@ -50,31 +50,25 @@ const YOUTUBE_QUERY_MAP: Record<string, string> = {
   Mediterranean: 'mediterranean restaurant food',
 }
 
-// Fetch YouTube video ID for a restaurant — tries restaurant name first, falls back to cuisine query
+// Fetch YouTube video ID — uses cuisine-specific food queries for relevant results
+// Never uses restaurantName alone (returns unrelated content)
 async function fetchYouTubeVideoId(restaurantName: string, cuisine: string): Promise<string | null> {
   if (!YOUTUBE_KEY) return null
   try {
-    // First try: search for the actual restaurant
-    const q1 = encodeURIComponent(`${restaurantName} restaurant`)
-    const r1 = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${q1}&type=video&videoCategoryId=26&videoEmbeddable=true&maxResults=5&key=${YOUTUBE_KEY}`
+    // Always use cuisine-specific food query — guarantees relevant food content
+    const cuisineQuery = YOUTUBE_QUERY_MAP[cuisine] ?? `${cuisine} food restaurant`
+    const q = encodeURIComponent(cuisineQuery)
+    // No videoCategoryId filter — food content spans multiple categories
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${q}&type=video&videoEmbeddable=true&videoDuration=short&maxResults=10&order=viewCount&key=${YOUTUBE_KEY}`
     )
-    if (r1.ok) {
-      const d1 = await r1.json()
-      const items = d1.items ?? []
-      if (items.length > 0) return items[0].id?.videoId ?? null
-    }
-    // Fallback: cuisine-based query
-    const fallbackQ = encodeURIComponent(YOUTUBE_QUERY_MAP[cuisine] ?? `${cuisine} restaurant food`)
-    const r2 = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${fallbackQ}&type=video&videoCategoryId=26&videoEmbeddable=true&maxResults=5&key=${YOUTUBE_KEY}`
-    )
-    if (r2.ok) {
-      const d2 = await r2.json()
-      const items = d2.items ?? []
-      if (items.length > 0) return items[0].id?.videoId ?? null
-    }
-    return null
+    if (!res.ok) return null
+    const data = await res.json()
+    const items: any[] = data.items ?? []
+    if (items.length === 0) return null
+    // Pick a consistent video per restaurant using name hash (same restaurant always gets same video)
+    const hash = restaurantName.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0)
+    return items[hash % items.length]?.id?.videoId ?? items[0]?.id?.videoId ?? null
   } catch {
     return null
   }
@@ -626,21 +620,24 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
     >
       {/* Background — YouTube video when available, HD photo with Ken Burns as fallback */}
       {slide.youtubeId && isActive ? (
-        <iframe
-          key={slide.youtubeId}
-          src={`https://www.youtube.com/embed/${slide.youtubeId}?autoplay=1&mute=1&loop=1&playlist=${slide.youtubeId}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=0`}
-          allow="autoplay; encrypted-media"
-          allowFullScreen={false}
-          style={{
-            position: 'absolute', top: '50%', left: '50%',
-            width: 'max(100%, 177.78vh)',  // 16:9 scaled to fill
-            height: 'max(100%, 56.25vw)',
-            transform: 'translate(-50%, -50%)',
-            border: 'none',
-            pointerEvents: 'none',
-          }}
-          title={r.name}
-        />
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          <iframe
+            key={slide.youtubeId}
+            src={`https://www.youtube.com/embed/${slide.youtubeId}?autoplay=1&mute=1&loop=1&playlist=${slide.youtubeId}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=0&fs=0&iv_load_policy=3`}
+            allow="autoplay; encrypted-media; picture-in-picture"
+            style={{
+              position: 'absolute',
+              top: '50%', left: '50%',
+              // Scale to always fill the screen regardless of device aspect ratio
+              width: 'max(100vw, calc(100vh * 16 / 9))',
+              height: 'max(100vh, calc(100vw * 9 / 16))',
+              transform: 'translate(-50%, -50%)',
+              border: 'none',
+              pointerEvents: 'none',
+            }}
+            title={r.name}
+          />
+        </div>
       ) : (
         <img
           key={kenBurnsKey}

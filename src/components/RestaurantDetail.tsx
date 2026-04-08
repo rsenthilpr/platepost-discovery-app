@@ -353,6 +353,70 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
           )}
         </div>
 
+        {/* Website button — opens in new tab directly, never iframe */}
+        {r.website_url && (
+          <div className="px-4 mb-3">
+            <a
+              href={r.website_url}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold"
+              style={{ background: 'rgba(255,255,255,0.07)', color: '#FAFBFF', border: '1px solid rgba(255,255,255,0.12)', fontFamily: 'Open Sans, sans-serif', textDecoration: 'none', display: 'flex' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+              Visit Website
+            </a>
+          </div>
+        )}
+
+        {/* Website — direct new tab, never iframe */}
+        {r.website_url && (
+          <div className="px-4 mb-3">
+            <a
+              href={r.website_url}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px', borderRadius: 16, textDecoration: 'none',
+                background: 'rgba(255,255,255,0.07)', color: '#FAFBFF',
+                border: '1px solid rgba(255,255,255,0.12)',
+                fontFamily: 'Open Sans, sans-serif', fontWeight: 600, fontSize: 14,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+              Visit Website
+            </a>
+          </div>
+        )}
+
+        {/* Visit Website — opens directly in new tab, never iframe */}
+        {r.website_url && (
+          <div className="px-4 mb-3">
+            <a
+              href={r.website_url}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px', borderRadius: 16, textDecoration: 'none',
+                background: 'rgba(255,255,255,0.07)', color: '#FAFBFF',
+                border: '1px solid rgba(255,255,255,0.12)',
+                fontFamily: 'Open Sans, sans-serif', fontWeight: 600, fontSize: 14,
+              }}
+            >
+              🌐 Visit Website
+            </a>
+          </div>
+        )}
+
         {/* More Info — always at the bottom before events */}
         <div className="px-4 mb-4">
           <button

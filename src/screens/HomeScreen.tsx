@@ -3,6 +3,7 @@ import { PlatePostLogo, PlatePostOrbMark } from '../components/PlatePostLogo'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
+import { fetchPexelsVideo } from '../lib/pexels'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 
@@ -78,6 +79,7 @@ export default function HomeScreen() {
   const navigate = useNavigate()
   const [heroImages, setHeroImages] = useState<string[]>([])
   const [imageIndex, setImageIndex] = useState(0)
+  const [heroVideoUrl, setHeroVideoUrl] = useState<string | null>(null)
   const [top10, setTop10] = useState<Restaurant[]>([])
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -138,6 +140,10 @@ export default function HomeScreen() {
       // Hero images from top restaurants
       const images = scored.slice(0, 6).map(r => r.image_url).filter(Boolean)
       setHeroImages(images)
+      // Fetch a food hero video for the background
+      fetchPexelsVideo('restaurant food dining atmosphere').then(v => {
+        if (v?.url) setHeroVideoUrl(v.url)
+      })
     }
     load()
   }, [])
@@ -184,8 +190,22 @@ export default function HomeScreen() {
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#000' }}>
 
-      {/* ── Hero background — crossfading real photos ── */}
-      <div className="absolute inset-0">
+      {/* ── Hero background — video when loaded, crossfading photos as fallback ── */}
+      <div className="absolute inset-0" style={{ background: '#000' }}>
+        {/* Pexels hero video — muted autoplay loop */}
+        {heroVideoUrl && (
+          <video
+            key={heroVideoUrl}
+            src={heroVideoUrl}
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ zIndex: 2, opacity: 0.85 }}
+          />
+        )}
+        {/* Crossfading photos — shown until video loads or as fallback */}
         {heroImages.map((img, i) => (
           <img
             key={img}
@@ -193,13 +213,13 @@ export default function HomeScreen() {
             alt=""
             className="absolute inset-0 w-full h-full object-cover"
             style={{
-              opacity: i === imageIndex ? 1 : 0,
+              opacity: heroVideoUrl ? 0 : (i === imageIndex ? 1 : 0),
               transition: 'opacity 1.5s ease',
               zIndex: i === imageIndex ? 1 : 0,
             }}
           />
         ))}
-        {heroImages.length === 0 && (
+        {heroImages.length === 0 && !heroVideoUrl && (
           <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #0a1628, #1a2f5e)' }} />
         )}
       </div>

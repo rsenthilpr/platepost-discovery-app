@@ -353,11 +353,7 @@ export default function MapViewScreen() {
             options={{
               styles: MAP_STYLES,
               disableDefaultUI: true,
-              // Show only zoom control, positioned bottom-right (above our tray)
               zoomControl: true,
-              zoomControlOptions: {
-                position: typeof google !== 'undefined' ? google.maps.ControlPosition.RIGHT_BOTTOM : undefined,
-              },
               scrollwheel: true,
               gestureHandling: 'greedy',
               clickableIcons: false,
@@ -432,11 +428,11 @@ export default function MapViewScreen() {
         )}
       </div>
 
-      {/* Near Me button — right side, above zoom controls */}
+      {/* Near Me button — left side bottom, never overlaps Google zoom controls (which are right) */}
       <div style={{
         position: 'absolute',
-        bottom: trayHeight + 64,  // sits above the Google zoom buttons
-        right: 10,
+        bottom: trayHeight + 12,
+        left: 12,
         zIndex: 50,
         transition: 'bottom 0.3s ease',
       }}>
