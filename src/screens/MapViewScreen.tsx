@@ -9,12 +9,22 @@ import RestaurantDetail from '../components/RestaurantDetail'
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? import.meta.env.VITE_GOOGLE_PLACES_KEY
 const PLATEPOST_IDS = new Set([4, 5, 17, 18])
 const GOOGLE_MAPS_LIBRARIES: ('places')[] = ['places']
+const LA_CENTER = { lat: 34.0522, lng: -118.2437 }
 
 function loadFavorites(): Set<number> {
   try { return new Set(JSON.parse(localStorage.getItem('pp_favorites') ?? '[]')) } catch { return new Set() }
 }
 function saveFavorites(f: Set<number>) {
   localStorage.setItem('pp_favorites', JSON.stringify([...f]))
+}
+
+// Distance in km between two lat/lng points
+function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
 const MAP_STYLES = [
@@ -55,6 +65,10 @@ function clusterRestaurants(restaurants: Restaurant[], zoom: number) {
 
 const FILTERS = ['All', 'Saved', 'Coffee', 'Music', 'Jazz', 'American', 'Italian', 'Japanese', 'Cafe', 'Korean', 'Mexican']
 
+// Tray height constants
+const TRAY_COLLAPSED = 52   // just the pull tab
+const TRAY_OPEN = 210       // tab + cards visible
+
 export default function MapViewScreen() {
   const navigate = useNavigate()
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
@@ -67,10 +81,11 @@ export default function MapViewScreen() {
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [currentZoom, setCurrentZoom] = useState(13)
   const zoomRef = useRef(13)
-  const [mapCenter, setMapCenter] = useState({ lat: 34.0522, lng: -118.2437 })
+  const [mapCenter, setMapCenter] = useState(LA_CENTER)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [locationLoading, setLocationLoading] = useState(false)
-  const [trayOpen, setTrayOpen] = useState(false)
+  const [trayOpen, setTrayOpen] = useState(true)   // open by default like Google Maps
+  const [noNearbyResults, setNoNearbyResults] = useState(false)
   const topBarRef = useRef<HTMLDivElement>(null)
   const [topBarHeight, setTopBarHeight] = useState(160)
 
@@ -81,7 +96,6 @@ export default function MapViewScreen() {
 
   useEffect(() => {
     supabase.from('restaurants').select('*').then(({ data }) => setRestaurants(data ?? []))
-    // Ask for location on mount
     requestUserLocation()
   }, [])
 
@@ -97,7 +111,8 @@ export default function MapViewScreen() {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
         setUserLocation(loc)
         setMapCenter(loc)
-        if (map) { map.setCenter(loc); map.setZoom(14) }
+        // Zoom to level 12 — wide enough to see nearby restaurants in ~10mi radius
+        if (map) { map.setCenter(loc); map.setZoom(12) }
         setLocationLoading(false)
       },
       () => setLocationLoading(false),
@@ -116,9 +131,43 @@ export default function MapViewScreen() {
     return true
   })
 
-  // Nearby tray — sorted by distance from user location (if available) or map center, pro first
+  // Nearby tray logic:
+  // If user has a real location, check if any restaurants are within 80km.
+  // If none nearby, fall back to LA restaurants with a banner message.
   const nearbyRestaurants = (() => {
     const center = userLocation ?? mapCenter
+
+    if (userLocation) {
+      // Sort by distance from user
+      const withDist = filtered.map(r => ({
+        r,
+        dist: distanceKm(userLocation.lat, userLocation.lng, r.latitude, r.longitude)
+      })).sort((a, b) => a.dist - b.dist)
+
+      // Check if any are within 80km
+      const within80 = withDist.filter(x => x.dist <= 80)
+
+      if (within80.length === 0) {
+        // No restaurants near user — fall back to LA
+        setNoNearbyResults(true)
+        const laRestaurants = [...filtered].sort((a, b) => {
+          const da = Math.pow(a.latitude - LA_CENTER.lat, 2) + Math.pow(a.longitude - LA_CENTER.lng, 2)
+          const db = Math.pow(b.latitude - LA_CENTER.lat, 2) + Math.pow(b.longitude - LA_CENTER.lng, 2)
+          return da - db
+        })
+        const pro = laRestaurants.filter(r => PLATEPOST_IDS.has(r.id))
+        const rest = laRestaurants.filter(r => !PLATEPOST_IDS.has(r.id))
+        return [...pro, ...rest].slice(0, 20)
+      } else {
+        setNoNearbyResults(false)
+        const sorted = withDist.map(x => x.r)
+        const pro = sorted.filter(r => PLATEPOST_IDS.has(r.id))
+        const rest = sorted.filter(r => !PLATEPOST_IDS.has(r.id))
+        return [...pro, ...rest].slice(0, 20)
+      }
+    }
+
+    // No user location — sort by distance from map center (LA by default)
     const sorted = [...filtered].sort((a, b) => {
       const da = Math.pow(a.latitude - center.lat, 2) + Math.pow(a.longitude - center.lng, 2)
       const db = Math.pow(b.latitude - center.lat, 2) + Math.pow(b.longitude - center.lng, 2)
@@ -146,7 +195,7 @@ export default function MapViewScreen() {
   useEffect(() => {
     if (!map || !isLoaded || filtered.length === 0) return
     if (userLocation) {
-      map.setCenter(userLocation); map.setZoom(13); return
+      map.setCenter(userLocation); map.setZoom(12); return
     }
     const ca = filtered.filter(r => r.latitude >= 32 && r.latitude <= 35.5 && r.longitude >= -119.5 && r.longitude <= -116)
     const toFit = ca.length > 0 ? ca : filtered
@@ -171,12 +220,7 @@ export default function MapViewScreen() {
     mapInstance.addListener('zoom_changed', () => {
       const z = mapInstance.getZoom() ?? 13
       zoomRef.current = z
-      // Only update state when crossing cluster threshold to avoid re-render on every zoom
-      if ((z >= 13 && zoomRef.current < 13) || (z < 13 && zoomRef.current >= 13)) {
-        setCurrentZoom(z)
-      } else {
-        setCurrentZoom(z)
-      }
+      setCurrentZoom(z)
     })
     let centerTimer: ReturnType<typeof setTimeout> | null = null
     mapInstance.addListener('center_changed', () => {
@@ -195,6 +239,8 @@ export default function MapViewScreen() {
     </div>
   )
 
+  const trayHeight = trayOpen ? TRAY_OPEN : TRAY_COLLAPSED
+
   return (
     <div className="fixed inset-0" style={{ background: '#f0f0f0', fontFamily: 'Open Sans, sans-serif' }}>
 
@@ -205,7 +251,7 @@ export default function MapViewScreen() {
         boxShadow: '0 1px 8px rgba(0,0,0,0.08)',
         paddingTop: 48, paddingBottom: 10, paddingLeft: 16, paddingRight: 16,
       }}>
-        {/* Header */}
+        {/* Header row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
           <button onClick={() => navigate('/')} style={{
             width: 36, height: 36, borderRadius: '50%', border: '1.5px solid #e5e7eb',
@@ -291,17 +337,30 @@ export default function MapViewScreen() {
         </div>
       </div>
 
-      {/* Map */}
-      <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: trayOpen ? 210 : 52, transition: 'bottom 0.3s ease' }}>
+      {/* Map — bottom adjusts with tray */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        top: topBarHeight,
+        bottom: trayHeight,
+        transition: 'bottom 0.3s ease',
+      }}>
         {isLoaded ? (
           <GoogleMap
             mapContainerStyle={{ width: '100%', height: '100%' }}
-            center={userLocation ?? { lat: 34.0522, lng: -118.2437 }}
+            center={userLocation ?? LA_CENTER}
             zoom={13}
             onLoad={onMapLoad}
             options={{
-              styles: MAP_STYLES, disableDefaultUI: true,
-              zoomControl: true, scrollwheel: true, gestureHandling: 'greedy', clickableIcons: false,
+              styles: MAP_STYLES,
+              disableDefaultUI: true,
+              // Show only zoom control, positioned bottom-right (above our tray)
+              zoomControl: true,
+              zoomControlOptions: {
+                position: typeof google !== 'undefined' ? google.maps.ControlPosition.RIGHT_BOTTOM : undefined,
+              },
+              scrollwheel: true,
+              gestureHandling: 'greedy',
+              clickableIcons: false,
             }}
           >
             {/* Restaurant markers */}
@@ -312,9 +371,11 @@ export default function MapViewScreen() {
               const isSelected = selectedRestaurant?.id === r.id
               const isCluster = cluster.count > 1
               return (
-                <OverlayView key={`${r.id}-${cluster.lat}-${cluster.lng}`}
+                <OverlayView
+                  key={`${r.id}-${cluster.lat}-${cluster.lng}`}
                   position={{ lat: cluster.lat, lng: cluster.lng }}
-                  mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                  mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                >
                   <motion.div
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -323,7 +384,9 @@ export default function MapViewScreen() {
                       if (isCluster && map) {
                         map.setZoom((map.getZoom() ?? 11) + 2)
                         map.panTo({ lat: cluster.lat, lng: cluster.lng })
-                      } else setSelectedRestaurant(r)
+                      } else {
+                        setSelectedRestaurant(r)
+                      }
                     }}
                     style={{
                       width: isCluster ? 46 : isPro ? 46 : isSelected ? 48 : 38,
@@ -335,7 +398,8 @@ export default function MapViewScreen() {
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       cursor: 'pointer', transform: 'translate(-50%, -50%)',
                       zIndex: isPro ? 10 : isSelected ? 9 : isCluster ? 5 : 1, transition: 'all 0.2s',
-                    }}>
+                    }}
+                  >
                     {isCluster ? (
                       <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', fontFamily: 'Open Sans' }}>{cluster.count}</span>
                     ) : isPro ? (
@@ -348,7 +412,7 @@ export default function MapViewScreen() {
               )
             })}
 
-            {/* User location dot */}
+            {/* User location blue dot */}
             {userLocation && (
               <OverlayView position={userLocation} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                 <div style={{
@@ -368,19 +432,29 @@ export default function MapViewScreen() {
         )}
       </div>
 
-      {/* Near me button */}
-      <div style={{ position: 'absolute', bottom: trayOpen ? 220 : 62, right: 16, zIndex: 50, transition: 'bottom 0.3s ease' }}>
-        <button onClick={requestUserLocation} style={{
-          width: 44, height: 44, borderRadius: '50%',
-          background: userLocation ? '#0048f9' : '#fff',
-          border: 'none', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-        }}>
+      {/* Near Me button — right side, above zoom controls */}
+      <div style={{
+        position: 'absolute',
+        bottom: trayHeight + 64,  // sits above the Google zoom buttons
+        right: 10,
+        zIndex: 50,
+        transition: 'bottom 0.3s ease',
+      }}>
+        <button
+          onClick={requestUserLocation}
+          title="Show my location"
+          style={{
+            width: 40, height: 40, borderRadius: '50%',
+            background: userLocation ? '#0048f9' : '#fff',
+            border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          }}
+        >
           {locationLoading ? (
-            <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(0,0,0,0.1)', borderTopColor: '#0048f9', animation: 'spin 1s linear infinite' }} />
+            <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(0,0,0,0.1)', borderTopColor: '#0048f9', animation: 'spin 1s linear infinite' }} />
           ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="3" fill={userLocation ? '#fff' : '#0048f9'} />
               <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke={userLocation ? '#fff' : '#0048f9'} strokeWidth="2" strokeLinecap="round" />
               <circle cx="12" cy="12" r="8" stroke={userLocation ? '#fff' : '#0048f9'} strokeWidth="1.5" opacity="0.4" />
@@ -389,99 +463,153 @@ export default function MapViewScreen() {
         </button>
       </div>
 
-      {/* Restaurant Tray — collapsible, like Google Maps */}
-      <motion.div
-        animate={{ height: trayOpen ? 'auto' : 44 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 100,
-          background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(16px)',
-          borderTop: '1px solid rgba(0,0,0,0.06)',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Pull tab — always visible, tap to toggle */}
+      {/* Restaurant Tray — starts open, collapsible */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 100,
+        background: '#fff',
+        borderTopLeftRadius: 16, borderTopRightRadius: 16,
+        boxShadow: '0 -2px 16px rgba(0,0,0,0.10)',
+        overflow: 'hidden',
+        height: trayHeight,
+        transition: 'height 0.3s cubic-bezier(0.4,0,0.2,1)',
+      }}>
+        {/* Pull tab row — always visible */}
         <button
           onClick={() => setTrayOpen(o => !o)}
           style={{
             width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 16px', background: 'transparent', border: 'none', cursor: 'pointer',
-            minHeight: 44,
+            padding: '0 16px', background: 'transparent', border: 'none', cursor: 'pointer',
+            height: TRAY_COLLAPSED, flexShrink: 0,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {/* Drag pill */}
-            <div style={{ width: 32, height: 4, borderRadius: 2, background: '#d1d5db', marginRight: 4 }} />
-            <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: '#071126', margin: 0 }}>
-              Nearby · {nearbyRestaurants.length} places
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Drag pill — centered at top */}
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: '#d1d5db' }} />
+            <div>
+              <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: '#071126', margin: 0, lineHeight: 1.2 }}>
+                Nearby · {nearbyRestaurants.length} places
+              </p>
+              {/* Fallback banner when no local results */}
+              {noNearbyResults && userLocation && (
+                <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: '#f59e0b', margin: 0, fontWeight: 600 }}>
+                  No restaurants near you · Showing Los Angeles
+                </p>
+              )}
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={(e) => { e.stopPropagation(); navigate('/list') }} style={{
-              display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px',
-              borderRadius: 999, background: '#071126', border: 'none', cursor: 'pointer',
-              fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#fff',
-            }}>
+            <button
+              onClick={e => { e.stopPropagation(); navigate('/list') }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px',
+                borderRadius: 999, background: '#071126', border: 'none', cursor: 'pointer',
+                fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#fff',
+              }}
+            >
               <svg width="9" height="9" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21" /></svg>
               Feed
             </button>
+            {/* Chevron rotates with tray state */}
             <svg
-              width="14" height="14" viewBox="0 0 24 24" fill="none"
+              width="16" height="16" viewBox="0 0 24 24" fill="none"
               style={{ transform: trayOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', flexShrink: 0 }}
             >
-              <path d="M6 9l6 6 6-6" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M6 9l6 6 6-6" stroke="#9ca3af" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
         </button>
 
-        {/* Cards — only visible when open */}
+        {/* Cards row — visible when open */}
         {trayOpen && (
-          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingLeft: 16, paddingRight: 16, paddingBottom: 28, scrollbarWidth: 'none' as const }}>
-            {nearbyRestaurants.map(r => {
-              const isPro = PLATEPOST_IDS.has(r.id)
-              const isSelected = selectedRestaurant?.id === r.id
-              return (
-                <motion.button key={r.id} whileTap={{ scale: 0.96 }}
-                  onClick={() => { setSelectedRestaurant(r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
-                  style={{
-                    flexShrink: 0, width: 130, borderRadius: 14, overflow: 'hidden',
-                    background: isPro ? '#0a1628' : '#fff',
-                    border: `2px solid ${isSelected ? '#0048f9' : '#f3f4f6'}`,
-                    cursor: 'pointer', textAlign: 'left', padding: 0,
-                    boxShadow: isSelected ? '0 4px 16px rgba(0,72,249,0.25)' : isPro ? '0 2px 12px rgba(0,72,249,0.15)' : '0 2px 8px rgba(0,0,0,0.06)',
-                    transition: 'all 0.2s',
-                  }}>
-                  {/* Image — dark background prevents white gap */}
-                  <div style={{ position: 'relative', height: 80, background: '#111' }}>
-                    <img src={r.image_url} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    {isPro && (
-                      <div style={{ position: 'absolute', top: 5, left: 5, background: '#0048f9', borderRadius: 6, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <img src="/pp-mark.png" alt="" width={8} height={8} style={{ filter: 'brightness(0) invert(1)', objectFit: 'contain' }} />
-                        <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 8, fontWeight: 700 }}>PRO</span>
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ padding: '7px 8px' }}>
-                    <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 11, color: isPro ? '#fff' : '#071126', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {r.name}
-                    </p>
-                    <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: isPro ? 'rgba(255,255,255,0.55)' : '#9ca3af', margin: '2px 0 0' }}>
-                      {CUISINE_EMOJI[r.cuisine] ?? '🍽️'} {r.cuisine}
-                    </p>
-                    {r.rating && (
-                      <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: '#FBBF24', margin: '1px 0 0', fontWeight: 600 }}>
-                        ★ {r.rating.toFixed(1)}
+          <div style={{ position: 'relative', height: TRAY_OPEN - TRAY_COLLAPSED }}>
+            <div
+              style={{
+                display: 'flex', gap: 10,
+                overflowX: 'auto', overflowY: 'hidden',
+                paddingLeft: 16, paddingRight: 40,  // extra right pad to show scroll hint
+                paddingBottom: 16,
+                height: '100%',
+                scrollbarWidth: 'none' as const,
+                WebkitOverflowScrolling: 'touch' as any,
+                alignItems: 'flex-start',
+              }}
+            >
+              {nearbyRestaurants.map(r => {
+                const isPro = PLATEPOST_IDS.has(r.id)
+                const isSelected = selectedRestaurant?.id === r.id
+                return (
+                  <motion.button
+                    key={r.id}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      setSelectedRestaurant(r)
+                      if (map) map.panTo({ lat: r.latitude, lng: r.longitude })
+                    }}
+                    style={{
+                      flexShrink: 0, width: 130, borderRadius: 14, overflow: 'hidden',
+                      background: isPro ? '#0a1628' : '#fff',
+                      border: `2px solid ${isSelected ? '#0048f9' : '#f0f0f0'}`,
+                      cursor: 'pointer', textAlign: 'left', padding: 0,
+                      boxShadow: isSelected
+                        ? '0 4px 16px rgba(0,72,249,0.25)'
+                        : isPro
+                        ? '0 2px 12px rgba(0,72,249,0.15)'
+                        : '0 2px 8px rgba(0,0,0,0.07)',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ position: 'relative', height: 80, background: '#111' }}>
+                      <img
+                        src={r.image_url} alt={r.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                      {isPro && (
+                        <div style={{ position: 'absolute', top: 5, left: 5, background: '#0048f9', borderRadius: 6, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <img src="/pp-mark.png" alt="" width={8} height={8} style={{ filter: 'brightness(0) invert(1)', objectFit: 'contain' }} />
+                          <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 8, fontWeight: 700 }}>PRO</span>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: '7px 8px 9px' }}>
+                      <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 11, color: isPro ? '#fff' : '#071126', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.name}
                       </p>
-                    )}
-                  </div>
-                </motion.button>
-              )
-            })}
+                      <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: isPro ? 'rgba(255,255,255,0.55)' : '#9ca3af', margin: '2px 0 0' }}>
+                        {CUISINE_EMOJI[r.cuisine] ?? '🍽️'} {r.cuisine}
+                      </p>
+                      {r.rating && (
+                        <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: '#FBBF24', margin: '2px 0 0', fontWeight: 600 }}>
+                          ★ {r.rating.toFixed(1)}
+                        </p>
+                      )}
+                    </div>
+                  </motion.button>
+                )
+              })}
+            </div>
+
+            {/* Scroll gradient hint — right edge fade showing more cards exist */}
+            <div style={{
+              position: 'absolute', top: 0, right: 0, bottom: 0, width: 40,
+              background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.95))',
+              pointerEvents: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 6,
+            }}>
+              {/* Animated right arrow hint */}
+              <motion.div
+                animate={{ x: [0, 4, 0] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 18l6-6-6-6" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </motion.div>
+            </div>
           </div>
         )}
-      </motion.div>
+      </div>
 
-      {/* Restaurant Detail */}
+      {/* Restaurant Detail sheet */}
       <AnimatePresence>
         {selectedRestaurant && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 200 }}>

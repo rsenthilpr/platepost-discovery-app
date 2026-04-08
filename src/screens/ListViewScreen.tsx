@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
-import { fetchPexelsPortraitVideo } from '../lib/pexels'
+// pexels import removed — using YouTube
 import { fetchPlaceDetails } from '../lib/googlePlaces'
 import { searchEventbriteEvents } from '../lib/eventbrite'
 import type { Restaurant } from '../types'
@@ -31,15 +31,53 @@ interface LocationState {
   searchQuery?: string
 }
 
-const VIDEO_QUERY_POOLS: Record<string, string[]> = {
-  Japanese: ['sushi chef knife skills', 'ramen noodles cooking', 'japanese food plating', 'sashimi fresh fish', 'tempura frying'],
-  Italian: ['pasta dough kneading', 'pizza wood fired oven', 'italian cooking sauce', 'risotto stirring', 'tiramisu dessert'],
-  American: ['burger grilling flames', 'bbq smoke grill meat', 'fried chicken crispy', 'cocktail bartender mixing', 'smash burger cooking'],
-  Coffee: ['latte art pouring', 'coffee espresso machine', 'barista pour over', 'coffee roasting beans', 'cappuccino foam milk'],
-  Cafe: ['brunch avocado toast', 'pastry bakery morning', 'cafe interior cozy', 'eggs benedict breakfast', 'french press coffee'],
-  Music: ['concert crowd lights', 'dj turntable nightclub', 'live band performance', 'music venue stage', 'nightclub dancing'],
-  Jazz: ['jazz band performance', 'saxophone jazz music', 'piano jazz bar', 'trumpet musician', 'jazz club atmosphere'],
-  Mexican: ['tacos street food', 'guacamole fresh made', 'mexican grill cooking', 'tortilla making', 'margarita cocktail'],
+const YOUTUBE_KEY = (import.meta.env as any).VITE_YOUTUBE_KEY as string | undefined
+
+const YOUTUBE_QUERY_MAP: Record<string, string> = {
+  Japanese: 'japanese restaurant food tour',
+  Italian: 'italian restaurant pasta pizza',
+  American: 'american burger restaurant food',
+  Coffee: 'coffee shop cafe latte art',
+  Cafe: 'cafe brunch food restaurant',
+  Music: 'live music bar nightclub',
+  Jazz: 'jazz bar live music',
+  Mexican: 'mexican restaurant tacos food',
+  Korean: 'korean bbq restaurant food',
+  Thai: 'thai restaurant food',
+  Vietnamese: 'vietnamese restaurant pho food',
+  Chinese: 'chinese restaurant dim sum food',
+  Indian: 'indian restaurant curry food',
+  Mediterranean: 'mediterranean restaurant food',
+}
+
+// Fetch YouTube video ID for a restaurant — tries restaurant name first, falls back to cuisine query
+async function fetchYouTubeVideoId(restaurantName: string, cuisine: string): Promise<string | null> {
+  if (!YOUTUBE_KEY) return null
+  try {
+    // First try: search for the actual restaurant
+    const q1 = encodeURIComponent(`${restaurantName} restaurant`)
+    const r1 = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${q1}&type=video&videoCategoryId=26&videoEmbeddable=true&maxResults=5&key=${YOUTUBE_KEY}`
+    )
+    if (r1.ok) {
+      const d1 = await r1.json()
+      const items = d1.items ?? []
+      if (items.length > 0) return items[0].id?.videoId ?? null
+    }
+    // Fallback: cuisine-based query
+    const fallbackQ = encodeURIComponent(YOUTUBE_QUERY_MAP[cuisine] ?? `${cuisine} restaurant food`)
+    const r2 = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${fallbackQ}&type=video&videoCategoryId=26&videoEmbeddable=true&maxResults=5&key=${YOUTUBE_KEY}`
+    )
+    if (r2.ok) {
+      const d2 = await r2.json()
+      const items = d2.items ?? []
+      if (items.length > 0) return items[0].id?.videoId ?? null
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 // PlatePost customers with real video menus
@@ -50,19 +88,12 @@ const PLATEPOST_MENU_URLS: Record<number, string> = {
   18: 'https://platepost.io/apecoffeeplacentia',    // Ape Coffee - Placentia
 }
 
-function getVideoQuery(cuisine: string, restaurantName: string): string {
-  const pool = VIDEO_QUERY_POOLS[cuisine]
-  if (pool) {
-    // Use restaurant name hash to pick consistently but differently per restaurant
-    const hash = restaurantName.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-    return pool[hash % pool.length]
-  }
-  return `${cuisine} restaurant food cooking`
-}
+// getVideoQuery removed — using YouTube search instead
 
 interface ReelSlide {
   restaurant: Restaurant
-  videoUrl: string | null
+  videoUrl: string | null    // kept for backwards compat (unused)
+  youtubeId: string | null   // YouTube video ID for background iframe
   rating: number | null
   reviewCount: number | null
   heroImage: string | null
@@ -237,6 +268,7 @@ export default function ListViewScreen() {
     const initial: ReelSlide[] = filtered.map((r) => ({
       restaurant: r,
       videoUrl: null,
+      youtubeId: null,
       rating: null,
       reviewCount: null,
       heroImage: r.image_url,
@@ -252,13 +284,13 @@ export default function ListViewScreen() {
     if (loadedIndices.current.has(index)) return
     loadedIndices.current.add(index)
 
-    const [videoResult, placeResult, events] = await Promise.all([
-      fetchPexelsPortraitVideo(getVideoQuery(r.cuisine, r.name)),
+    const [youtubeId, placeResult, events] = await Promise.all([
+      fetchYouTubeVideoId(r.name, r.cuisine),
       fetchPlaceDetails(r.name, r.city),
       searchEventbriteEvents(r.name, r.city, r.state),
     ])
 
-    // Fetch Yelp photos in parallel for better image quality
+    // Fetch Yelp photos for better image quality
     let yelpPhotos: string[] = []
     try {
       const yelpRes = await fetch(`/api/yelp?name=${encodeURIComponent(r.name)}&city=${encodeURIComponent(r.city)}`)
@@ -267,11 +299,9 @@ export default function ListViewScreen() {
         yelpPhotos = yelpData.photos || []
       }
     } catch {
-      // Yelp failure is non-fatal
+      // non-fatal
     }
 
-    // Pick best image: prefer Google HD photo (scored for venue shots),
-    // fall back to Yelp photos, then original image_url
     const googlePhoto = placeResult?.photoUrl
     const bestImage = googlePhoto || yelpPhotos[0] || r.image_url
 
@@ -280,7 +310,8 @@ export default function ListViewScreen() {
       if (next[index]) {
         next[index] = {
           ...next[index],
-          videoUrl: videoResult?.url ?? null,
+          videoUrl: null,
+          youtubeId: youtubeId ?? null,
           rating: (r.rating ?? placeResult?.rating) ?? null,
           reviewCount: (r.review_count ?? placeResult?.userRatingsTotal) ?? null,
           heroImage: bestImage,
@@ -593,17 +624,35 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
       className="relative w-full flex-shrink-0 overflow-hidden"
       style={{ height: '100dvh', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
     >
-      {/* Background — real HD photo with Ken Burns animation */}
-      <img
-        key={kenBurnsKey}
-        src={bgImage}
-        alt={r.name}
-        className="absolute inset-0 w-full h-full object-cover"
-        style={{
-          animation: isActive ? 'kenBurns 8s ease-in-out infinite alternate' : 'none',
-          transformOrigin: 'center center',
-        }}
-      />
+      {/* Background — YouTube video when available, HD photo with Ken Burns as fallback */}
+      {slide.youtubeId && isActive ? (
+        <iframe
+          key={slide.youtubeId}
+          src={`https://www.youtube.com/embed/${slide.youtubeId}?autoplay=1&mute=1&loop=1&playlist=${slide.youtubeId}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=0`}
+          allow="autoplay; encrypted-media"
+          allowFullScreen={false}
+          style={{
+            position: 'absolute', top: '50%', left: '50%',
+            width: 'max(100%, 177.78vh)',  // 16:9 scaled to fill
+            height: 'max(100%, 56.25vw)',
+            transform: 'translate(-50%, -50%)',
+            border: 'none',
+            pointerEvents: 'none',
+          }}
+          title={r.name}
+        />
+      ) : (
+        <img
+          key={kenBurnsKey}
+          src={bgImage}
+          alt={r.name}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{
+            animation: isActive ? 'kenBurns 8s ease-in-out infinite alternate' : 'none',
+            transformOrigin: 'center center',
+          }}
+        />
+      )}
 
       {/* Gradients */}
       <div className="absolute top-0 left-0 right-0 pointer-events-none"
