@@ -34,20 +34,20 @@ interface LocationState {
 const YOUTUBE_KEY = (import.meta.env as any).VITE_YOUTUBE_KEY as string | undefined
 
 const YOUTUBE_QUERY_MAP: Record<string, string> = {
-  Japanese: 'japanese restaurant food tour',
-  Italian: 'italian restaurant pasta pizza',
-  American: 'american burger restaurant food',
-  Coffee: 'coffee shop cafe latte art',
-  Cafe: 'cafe brunch food restaurant',
-  Music: 'live music bar nightclub',
-  Jazz: 'jazz bar live music',
-  Mexican: 'mexican restaurant tacos food',
-  Korean: 'korean bbq restaurant food',
-  Thai: 'thai restaurant food',
-  Vietnamese: 'vietnamese restaurant pho food',
-  Chinese: 'chinese restaurant dim sum food',
-  Indian: 'indian restaurant curry food',
-  Mediterranean: 'mediterranean restaurant food',
+  Japanese: 'sushi ramen japanese food restaurant mukbang',
+  Italian: 'pasta pizza italian food restaurant eating',
+  American: 'smash burger bbq american food eating',
+  Coffee: 'latte art barista coffee pour slow motion',
+  Cafe: 'brunch cafe food plating aesthetic',
+  Music: 'live concert music bar performance',
+  Jazz: 'jazz live music saxophone trumpet bar',
+  Mexican: 'tacos street food mexican restaurant eating',
+  Korean: 'korean bbq beef samgyeopsal eating',
+  Thai: 'pad thai tom yum thai food eating',
+  Vietnamese: 'pho banh mi vietnamese food eating',
+  Chinese: 'dim sum dumplings chinese food eating',
+  Indian: 'butter chicken biryani indian food cooking',
+  Mediterranean: 'hummus shawarma greek food eating',
 }
 
 // Fetch YouTube video ID — uses cuisine-specific food queries for relevant results
@@ -102,6 +102,7 @@ function ListCard({
 }: {
   restaurant: Restaurant
   onClick: () => void
+  [key: string]: any
 }) {
   return (
     <motion.button
@@ -172,7 +173,7 @@ export default function ListViewScreen() {
 
   function toggleFavorite(id: number) {
     setFavorites((prev) => {
-      const next = new Set(prev)
+      const next = new Set<number>(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       saveFavorites(next)
@@ -413,7 +414,7 @@ export default function ListViewScreen() {
               <ListCard
                 key={r.id}
                 restaurant={r}
-                onClick={() => setSelectedRestaurant(r)}
+                onClick={(): void => { setSelectedRestaurant(r) }}
               />
             ))}
           </motion.div>
@@ -589,6 +590,7 @@ interface ReelSlideProps {
   onMenu: () => void
   onVideoMenu: (url: string) => void
   onEvents: () => void
+  [key: string]: any
 }
 
 function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slideRef, onMoreInfo, onDirections, onMenu, onVideoMenu, onEvents }: ReelSlideProps) {

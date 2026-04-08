@@ -202,7 +202,7 @@ export default function MapViewScreen() {
     if (toFit.length === 1) {
       map.setCenter({ lat: toFit[0].latitude, lng: toFit[0].longitude }); map.setZoom(14)
     } else if (toFit.length > 1) {
-      const bounds = new window.google.maps.LatLngBounds()
+      const bounds = new (window as any).google.maps.LatLngBounds()
       toFit.forEach(r => bounds.extend({ lat: r.latitude, lng: r.longitude }))
       map.fitBounds(bounds, { top: 60, bottom: 200, left: 20, right: 20 })
     }
@@ -210,7 +210,7 @@ export default function MapViewScreen() {
 
   function toggleFavorite(id: number) {
     setFavorites(prev => {
-      const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id)
+      const next = new Set<number>(prev); if (next.has(id)) next.delete(id); else next.add(id)
       saveFavorites(next); return next
     })
   }

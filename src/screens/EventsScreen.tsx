@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const TM_KEY = import.meta.env.VITE_TICKETMASTER_KEY
+const TM_KEY = (import.meta.env as any).VITE_TICKETMASTER_KEY as string | undefined
 
 interface TMEvent {
   id: string
@@ -193,7 +193,7 @@ export default function EventsScreen() {
           const raw = data._embedded?.events ?? []
           const seen = new Set<string>()
           const unique = raw
-            .filter((ev: any) => { if (!ev?.id || seen.has(ev.id)) return false; seen.add(ev.id); return true })
+            .filter((ev: any) => { if (!(ev as any)?.id || seen.has((ev as any).id)) return false; seen.add((ev as any).id); return true })
             .map(parseTMEvent)
             .filter((ev: EventItem) => !isNaN(ev.rawDate.getTime()))
             .sort((a: EventItem, b: EventItem) => a.rawDate.getTime() - b.rawDate.getTime())
@@ -239,12 +239,12 @@ export default function EventsScreen() {
   ]
 
   function prevMonth() {
-    if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1) }
-    else setCalMonth(m => m - 1)
+    if (calMonth === 0) { setCalMonth(11); setCalYear((y: number) => y - 1) }
+    else setCalMonth((m: number) => m - 1)
   }
   function nextMonth() {
-    if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1) }
-    else setCalMonth(m => m + 1)
+    if (calMonth === 11) { setCalMonth(0); setCalYear((y: number) => y + 1) }
+    else setCalMonth((m: number) => m + 1)
   }
 
   function selectDay(day: number) {
@@ -518,7 +518,7 @@ export default function EventsScreen() {
 
                 {/* Rest — list rows like the inspo */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {filtered.slice(1).map((ev, i) => (
+                  {filtered.slice(1).map((ev: EventItem, i: number) => (
                     <motion.div
                       key={ev.id}
                       initial={{ opacity: 0, y: 8 }}
@@ -594,7 +594,7 @@ export default function EventsScreen() {
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-              onClick={e => e.stopPropagation()}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
               style={{
                 width: '100%', background: '#0e1628',
                 borderRadius: '22px 22px 0 0',
