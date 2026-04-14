@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
-// pexels import removed — using YouTube
+import { fetchPexelsPortraitVideo } from '../lib/pexels'
 import { fetchPlaceDetails } from '../lib/googlePlaces'
 import { searchEventbriteEvents } from '../lib/eventbrite'
 import type { Restaurant } from '../types'
@@ -31,47 +31,15 @@ interface LocationState {
   searchQuery?: string
 }
 
-const YOUTUBE_KEY = (import.meta.env as any).VITE_YOUTUBE_KEY as string | undefined
-
-const YOUTUBE_QUERY_MAP: Record<string, string> = {
-  Japanese: 'sushi ramen japanese food restaurant mukbang',
-  Italian: 'pasta pizza italian food restaurant eating',
-  American: 'smash burger bbq american food eating',
-  Coffee: 'latte art barista coffee pour slow motion',
-  Cafe: 'brunch cafe food plating aesthetic',
-  Music: 'live concert music bar performance',
-  Jazz: 'jazz live music saxophone trumpet bar',
-  Mexican: 'tacos street food mexican restaurant eating',
-  Korean: 'korean bbq beef samgyeopsal eating',
-  Thai: 'pad thai tom yum thai food eating',
-  Vietnamese: 'pho banh mi vietnamese food eating',
-  Chinese: 'dim sum dumplings chinese food eating',
-  Indian: 'butter chicken biryani indian food cooking',
-  Mediterranean: 'hummus shawarma greek food eating',
-}
-
-// Fetch YouTube video ID — uses cuisine-specific food queries for relevant results
-// Never uses restaurantName alone (returns unrelated content)
-async function fetchYouTubeVideoId(restaurantName: string, cuisine: string): Promise<string | null> {
-  if (!YOUTUBE_KEY) return null
-  try {
-    // Always use cuisine-specific food query — guarantees relevant food content
-    const cuisineQuery = YOUTUBE_QUERY_MAP[cuisine] ?? `${cuisine} food restaurant`
-    const q = encodeURIComponent(cuisineQuery)
-    // No videoCategoryId filter — food content spans multiple categories
-    const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${q}&type=video&videoEmbeddable=true&videoDuration=short&maxResults=10&order=viewCount&key=${YOUTUBE_KEY}`
-    )
-    if (!res.ok) return null
-    const data = await res.json()
-    const items: any[] = data.items ?? []
-    if (items.length === 0) return null
-    // Pick a consistent video per restaurant using name hash (same restaurant always gets same video)
-    const hash = restaurantName.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0)
-    return items[hash % items.length]?.id?.videoId ?? items[0]?.id?.videoId ?? null
-  } catch {
-    return null
-  }
+const VIDEO_QUERY_POOLS: Record<string, string[]> = {
+  Japanese: ['sushi chef knife skills', 'ramen noodles cooking', 'japanese food plating', 'sashimi fresh fish', 'tempura frying'],
+  Italian: ['pasta dough kneading', 'pizza wood fired oven', 'italian cooking sauce', 'risotto stirring', 'tiramisu dessert'],
+  American: ['burger grilling flames', 'bbq smoke grill meat', 'fried chicken crispy', 'cocktail bartender mixing', 'smash burger cooking'],
+  Coffee: ['latte art pouring', 'coffee espresso machine', 'barista pour over', 'coffee roasting beans', 'cappuccino foam milk'],
+  Cafe: ['brunch avocado toast', 'pastry bakery morning', 'cafe interior cozy', 'eggs benedict breakfast', 'french press coffee'],
+  Music: ['concert crowd lights', 'dj turntable nightclub', 'live band performance', 'music venue stage', 'nightclub dancing'],
+  Jazz: ['jazz band performance', 'saxophone jazz music', 'piano jazz bar', 'trumpet musician', 'jazz club atmosphere'],
+  Mexican: ['tacos street food', 'guacamole fresh made', 'mexican grill cooking', 'tortilla making', 'margarita cocktail'],
 }
 
 // PlatePost customers with real video menus
@@ -82,12 +50,19 @@ const PLATEPOST_MENU_URLS: Record<number, string> = {
   18: 'https://platepost.io/apecoffeeplacentia',    // Ape Coffee - Placentia
 }
 
-// getVideoQuery removed — using YouTube search instead
+function getVideoQuery(cuisine: string, restaurantName: string): string {
+  const pool = VIDEO_QUERY_POOLS[cuisine]
+  if (pool) {
+    // Use restaurant name hash to pick consistently but differently per restaurant
+    const hash = restaurantName.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+    return pool[hash % pool.length]
+  }
+  return `${cuisine} restaurant food cooking`
+}
 
 interface ReelSlide {
   restaurant: Restaurant
-  videoUrl: string | null    // kept for backwards compat (unused)
-  youtubeId: string | null   // YouTube video ID for background iframe
+  videoUrl: string | null
   rating: number | null
   reviewCount: number | null
   heroImage: string | null
@@ -102,7 +77,6 @@ function ListCard({
 }: {
   restaurant: Restaurant
   onClick: () => void
-  [key: string]: any
 }) {
   return (
     <motion.button
@@ -173,7 +147,7 @@ export default function ListViewScreen() {
 
   function toggleFavorite(id: number) {
     setFavorites((prev) => {
-      const next = new Set<number>(prev)
+      const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       saveFavorites(next)
@@ -206,13 +180,16 @@ export default function ListViewScreen() {
     const list = data ?? []
     setAllRestaurants(list)
 
-    const PLATEPOST_CUSTOMER_IDS = new Set([4, 5, 17, 18]) // Kei, Wish You Were Here, Ape Coffee
+    const PLATEPOST_CUSTOMER_IDS = new Set([4, 5, 17, 18])
     const baseFiltered = applyFilter(list, state.filter ?? 'All')
-    // PlatePost customers always appear first
-    const filtered = [
-      ...baseFiltered.filter(r => PLATEPOST_CUSTOMER_IDS.has(r.id)),
-      ...baseFiltered.filter(r => !PLATEPOST_CUSTOMER_IDS.has(r.id)),
-    ]
+    // Sort by rating naturally — no pinning
+    const filtered = baseFiltered.sort((a, b) => {
+      const scoreA = (a.rating ?? 0) * Math.log10((a.review_count ?? 1) + 1)
+      const scoreB = (b.rating ?? 0) * Math.log10((b.review_count ?? 1) + 1)
+      return scoreB - scoreA
+    })
+    // Still mark pro customers but don't pin them
+    void PLATEPOST_CUSTOMER_IDS
     initSlides(filtered)
     setLoading(false)
   }
@@ -263,7 +240,6 @@ export default function ListViewScreen() {
     const initial: ReelSlide[] = filtered.map((r) => ({
       restaurant: r,
       videoUrl: null,
-      youtubeId: null,
       rating: null,
       reviewCount: null,
       heroImage: r.image_url,
@@ -279,13 +255,13 @@ export default function ListViewScreen() {
     if (loadedIndices.current.has(index)) return
     loadedIndices.current.add(index)
 
-    const [youtubeId, placeResult, events] = await Promise.all([
-      fetchYouTubeVideoId(r.name, r.cuisine),
+    const [videoResult, placeResult, events] = await Promise.all([
+      fetchPexelsPortraitVideo(getVideoQuery(r.cuisine, r.name)),
       fetchPlaceDetails(r.name, r.city),
       searchEventbriteEvents(r.name, r.city, r.state),
     ])
 
-    // Fetch Yelp photos for better image quality
+    // Fetch Yelp photos in parallel for better image quality
     let yelpPhotos: string[] = []
     try {
       const yelpRes = await fetch(`/api/yelp?name=${encodeURIComponent(r.name)}&city=${encodeURIComponent(r.city)}`)
@@ -294,9 +270,11 @@ export default function ListViewScreen() {
         yelpPhotos = yelpData.photos || []
       }
     } catch {
-      // non-fatal
+      // Yelp failure is non-fatal
     }
 
+    // Pick best image: prefer Google HD photo (scored for venue shots),
+    // fall back to Yelp photos, then original image_url
     const googlePhoto = placeResult?.photoUrl
     const bestImage = googlePhoto || yelpPhotos[0] || r.image_url
 
@@ -305,8 +283,7 @@ export default function ListViewScreen() {
       if (next[index]) {
         next[index] = {
           ...next[index],
-          videoUrl: null,
-          youtubeId: youtubeId ?? null,
+          videoUrl: videoResult?.url ?? null,
           rating: (r.rating ?? placeResult?.rating) ?? null,
           reviewCount: (r.review_count ?? placeResult?.userRatingsTotal) ?? null,
           heroImage: bestImage,
@@ -414,7 +391,7 @@ export default function ListViewScreen() {
               <ListCard
                 key={r.id}
                 restaurant={r}
-                onClick={(): void => { setSelectedRestaurant(r) }}
+                onClick={() => setSelectedRestaurant(r)}
               />
             ))}
           </motion.div>
@@ -590,7 +567,6 @@ interface ReelSlideProps {
   onMenu: () => void
   onVideoMenu: (url: string) => void
   onEvents: () => void
-  [key: string]: any
 }
 
 function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slideRef, onMoreInfo, onDirections, onMenu, onVideoMenu, onEvents }: ReelSlideProps) {
@@ -620,38 +596,17 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
       className="relative w-full flex-shrink-0 overflow-hidden"
       style={{ height: '100dvh', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
     >
-      {/* Background — YouTube video when available, HD photo with Ken Burns as fallback */}
-      {slide.youtubeId && isActive ? (
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-          <iframe
-            key={slide.youtubeId}
-            src={`https://www.youtube.com/embed/${slide.youtubeId}?autoplay=1&mute=1&loop=1&playlist=${slide.youtubeId}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=0&fs=0&iv_load_policy=3`}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            style={{
-              position: 'absolute',
-              top: '50%', left: '50%',
-              // Scale to always fill the screen regardless of device aspect ratio
-              width: 'max(100vw, calc(100vh * 16 / 9))',
-              height: 'max(100vh, calc(100vw * 9 / 16))',
-              transform: 'translate(-50%, -50%)',
-              border: 'none',
-              pointerEvents: 'none',
-            }}
-            title={r.name}
-          />
-        </div>
-      ) : (
-        <img
-          key={kenBurnsKey}
-          src={bgImage}
-          alt={r.name}
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{
-            animation: isActive ? 'kenBurns 8s ease-in-out infinite alternate' : 'none',
-            transformOrigin: 'center center',
-          }}
-        />
-      )}
+      {/* Background — real HD photo with Ken Burns animation */}
+      <img
+        key={kenBurnsKey}
+        src={bgImage}
+        alt={r.name}
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{
+          animation: isActive ? 'kenBurns 8s ease-in-out infinite alternate' : 'none',
+          transformOrigin: 'center center',
+        }}
+      />
 
       {/* Gradients */}
       <div className="absolute top-0 left-0 right-0 pointer-events-none"

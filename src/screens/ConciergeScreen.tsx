@@ -127,7 +127,7 @@ function KawaiiPiggy({
         viewBox="0 0 120 140"
         fill="none"
         onClick={onTap}
-        style={{ cursor: 'pointer', display: 'block', filter: 'drop-shadow(0 4px 8px rgba(255,100,150,0.25))' }}
+        style={{ cursor: 'pointer', display: 'block', filter: 'drop-shadow(0 4px 8px rgba(255,100,150,0.25))', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         animate={
           isSquished ? { scaleX: 1.25, scaleY: 0.75 } :
           isHappy ? { y: [0, -10, 0], rotate: [0, -4, 4, 0] } :
@@ -318,9 +318,9 @@ Your personality:
 Available restaurants in PlatePost:
 ${restaurantList}
 
-PlatePost pro customers with VideoMenus (always mention these first when relevant):
+PlatePost pro customers have VideoMenus you can reference:
 - Kei Coffee House (ID 4) - platepost.io/kch
-- Wish You Were Here Coffee Roasters (ID 5) - platepost.io/wywhcoffee  
+- Wish You Were Here Coffee Roasters (ID 5) - platepost.io/wywhcoffee
 - Ape Coffee Orange (ID 17) - platepost.io/apecoffeeorange
 - Ape Coffee Placentia (ID 18) - platepost.io/apecoffeeplacentia
 
@@ -534,7 +534,7 @@ RULES:
               onKeyDown={e => e.key === 'Enter' && sendMessage(input)}
               placeholder="Tell me what you're craving..."
               className="flex-1 bg-transparent outline-none text-sm"
-              style={{ color: '#fff', fontFamily: 'Open Sans' }}
+              style={{ color: '#fff', fontFamily: 'Open Sans', fontSize: 16 }}
             />
             <motion.button whileTap={{ scale: 0.9 }}
               onClick={() => sendMessage(input)}
