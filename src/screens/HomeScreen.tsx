@@ -19,7 +19,7 @@ function removeFromSearchHistory(term: string) {
   try { localStorage.setItem('pp_search_history', JSON.stringify(getSearchHistory().filter(s => s !== term))) } catch {}
 }
 
-function Top10Card({ restaurant, rank, onClick }: { restaurant: Restaurant; rank: number; onClick: () => void }) {
+function Top10Card({ restaurant, onClick }: { restaurant: Restaurant; onClick: () => void }) {
   return (
     <motion.button
       whileTap={{ scale: 0.97 }}
@@ -33,12 +33,6 @@ function Top10Card({ restaurant, rank, onClick }: { restaurant: Restaurant; rank
       <div style={{ position: 'relative', height: 100 }}>
         <img src={restaurant.image_url} alt={restaurant.name}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        <div style={{
-          position: 'absolute', top: 8, left: 8, width: 24, height: 24, borderRadius: '50%',
-          background: '#0048f9', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <span style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#fff', fontSize: 11 }}>{rank}</span>
-        </div>
       </div>
       <div style={{ padding: '8px 10px 10px' }}>
         <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 12, color: '#071126', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -218,7 +212,25 @@ export default function HomeScreen() {
         </div>
 
         {/* White content area below hero */}
-        <div style={{ background: '#f8f9fa', borderRadius: '24px 24px 0 0', minHeight: '55vh', paddingTop: 24 }}>
+        <div style={{ background: '#f8f9fa', borderRadius: '24px 24px 0 0', minHeight: '55vh', paddingTop: 20 }}>
+
+          {/* Search bar in white area */}
+          <div className="px-5 mb-4">
+            <button
+              onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 12,
+                padding: '11px 14px', cursor: 'pointer', textAlign: 'left',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+              }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.35, flexShrink: 0 }}>
+                <circle cx="11" cy="11" r="8" stroke="#071126" strokeWidth="2" />
+                <path d="M21 21l-4.35-4.35" stroke="#071126" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <span style={{ fontFamily: 'Open Sans', fontSize: 14, color: '#9ca3af' }}>Search restaurants, cuisines...</span>
+            </button>
+          </div>
 
           {/* Popular in LA carousel */}
           {top10.length > 0 && (
@@ -242,9 +254,9 @@ export default function HomeScreen() {
               <div id="top10-carousel" className="flex gap-3 overflow-x-auto pl-5 pr-5 pb-1"
                 style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}
                 onWheel={e => { const el = document.getElementById('top10-carousel'); if (el) { e.preventDefault(); el.scrollBy({ left: e.deltaY * 2, behavior: 'smooth' }) } }}>
-                {top10.map((r, i) => (
+                {top10.map((r) => (
                   <div key={r.id} style={{ scrollSnapAlign: 'start' }}>
-                    <Top10Card restaurant={r} rank={i + 1} onClick={() => setSelectedRestaurant(r)} />
+                    <Top10Card restaurant={r} onClick={() => setSelectedRestaurant(r)} />
                   </div>
                 ))}
               </div>
@@ -284,31 +296,31 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* Fixed stationary orbs — bottom right, NOT draggable */}
-      <div style={{ position: 'fixed', bottom: 100, right: 20, zIndex: 50, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Fixed stationary orbs — always visible, high z-index */}
+      <div style={{ position: 'fixed', bottom: 90, right: 20, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
         {/* Surprise orb */}
-        <motion.button
-          onClick={() => navigate('/surprise')}
-          animate={{ boxShadow: ['0 0 20px rgba(245,158,11,0.4)', '0 0 36px rgba(239,68,68,0.5)', '0 0 20px rgba(245,158,11,0.4)'] }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: '2.5px solid rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexDirection: 'column', gap: 2 }}>
-          <motion.span animate={{ rotate: [0, 15, -15, 0] }} transition={{ duration: 3, repeat: Infinity }} style={{ fontSize: 24, lineHeight: 1 }}>🎲</motion.span>
-        </motion.button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <motion.button
+            onClick={() => navigate('/surprise')}
+            animate={{ boxShadow: ['0 0 16px rgba(245,158,11,0.5)', '0 0 28px rgba(239,68,68,0.6)', '0 0 16px rgba(245,158,11,0.5)'] }}
+            transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: '2px solid rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
+            <motion.span animate={{ rotate: [0, 15, -15, 0] }} transition={{ duration: 3, repeat: Infinity }} style={{ fontSize: 22 }}>🎲</motion.span>
+          </motion.button>
+          <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase', textShadow: '0 1px 6px rgba(0,0,0,0.8)', background: 'rgba(0,0,0,0.4)', padding: '1px 5px', borderRadius: 4 }}>Surprise</span>
+        </div>
 
         {/* Crave orb */}
-        <motion.button
-          onClick={() => navigate('/concierge')}
-          animate={{ boxShadow: ['0 0 20px rgba(0,72,249,0.5)', '0 0 40px rgba(0,72,249,0.7)', '0 0 20px rgba(0,72,249,0.5)'] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #0048f9, #3b82f6)', border: '2.5px solid rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <PlatePostOrbMark size={22} />
-        </motion.button>
-      </div>
-
-      {/* Orb labels */}
-      <div style={{ position: 'fixed', bottom: 104, right: 80, zIndex: 50, display: 'flex', flexDirection: 'column', gap: 24, pointerEvents: 'none' }}>
-        <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>Surprise</span>
-        <span style={{ color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>Crave</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <motion.button
+            onClick={() => navigate('/concierge')}
+            animate={{ boxShadow: ['0 0 16px rgba(0,72,249,0.6)', '0 0 32px rgba(0,72,249,0.8)', '0 0 16px rgba(0,72,249,0.6)'] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #0048f9, #3b82f6)', border: '2px solid rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
+            <PlatePostOrbMark size={20} />
+          </motion.button>
+          <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase', textShadow: '0 1px 6px rgba(0,0,0,0.8)', background: 'rgba(0,0,0,0.4)', padding: '1px 5px', borderRadius: 4 }}>Crave</span>
+        </div>
       </div>
 
       {/* Search overlay */}
