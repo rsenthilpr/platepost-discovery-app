@@ -8,6 +8,7 @@ import { searchEventbriteEvents } from '../lib/eventbrite'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
+import { useCityStore } from '../lib/cityStore'
 import SurpriseOrb from '../components/SurpriseOrb'
 
 function loadFavorites(): Set<number> {
@@ -72,9 +73,8 @@ const FILTERS = ['All', 'Coffee', 'Japanese', 'Italian', 'American', 'Cafe', 'Ko
 export default function ListViewScreen() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { city } = useCityStore()
   const state = (location.state ?? {}) as LocationState
-
-  const isListView = !!state.listView
 
   const [slides, setSlides] = useState<ReelSlide[]>([])
   const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([])
@@ -86,6 +86,7 @@ export default function ListViewScreen() {
   const [menuIframeUrl, setMenuIframeUrl] = useState<string | null>(null)
   const [listSearch, setListSearch] = useState(state.searchQuery ?? '')
   const [showSearchBar, setShowSearchBar] = useState(false)
+  const [isListView, _setIsListView] = useState(false)
   const listSearchRef = useRef<HTMLInputElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -339,7 +340,7 @@ export default function ListViewScreen() {
         <div style={{ padding: '8px 20px 4px', flexShrink: 0 }}>
           <p style={{ fontFamily: 'Open Sans', fontSize: 12, color: '#9ca3af', margin: 0 }}>
             {filteredList.length} place{filteredList.length !== 1 ? 's' : ''}
-            {listSearch ? ` for "${listSearch}"` : activeFilter !== 'All' ? ` in ${activeFilter}` : ''}
+            {listSearch ? ` for "${listSearch}"` : activeFilter !== 'All' ? ` in ${activeFilter}` : ` in ${city.name}`}
           </p>
         </div>
 

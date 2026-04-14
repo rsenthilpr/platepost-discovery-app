@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
+import BottomNav from '../components/BottomNav'
+import SurpriseOrb from '../components/SurpriseOrb'
+import { useCityStore } from '../lib/cityStore'
 
 function loadFavorites(): Set<number> {
   try { return new Set(JSON.parse(localStorage.getItem('pp_favorites') ?? '[]')) } catch { return new Set() }
@@ -222,9 +225,11 @@ export default function CraveScreen() {
     role: 'assistant',
     text: "Hi! I'm PlatePost Crave 🍽️\n\nTell me what you're craving tonight — the more detail the better. I'll find the perfect spot.",
   }])
+  const { city } = useCityStore()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
+  const [googleRestaurants, setGoogleRestaurants] = useState<Restaurant[]>([])
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
   const [piggyState, setPiggyState] = useState<'idle' | 'thinking' | 'happy' | 'squished'>('idle')
@@ -237,10 +242,23 @@ export default function CraveScreen() {
 
   useEffect(() => {
     supabase.from('restaurants').select('*').then(({ data }) => setRestaurants(data ?? []))
-    // Clear welcome quip after 4 seconds
     const t = setTimeout(() => setPiggyQuip(null), 4000)
     return () => clearTimeout(t)
   }, [])
+
+  // Load Google Places for selected city
+  useEffect(() => {
+    async function loadCityRestaurants() {
+      try {
+        const res = await fetch(`/api/places-search?city=${encodeURIComponent(city.name)}&lat=${city.lat}&lng=${city.lng}`)
+        if (res.ok) {
+          const data = await res.json()
+          setGoogleRestaurants(data.places ?? [])
+        }
+      } catch {}
+    }
+    loadCityRestaurants()
+  }, [city.name])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -302,35 +320,44 @@ export default function CraveScreen() {
     conversationHistory.current.push({ role: 'user', content: text })
 
     try {
-      const restaurantList = restaurants.map(r =>
-        `ID:${r.id} | ${r.name} | ${r.cuisine} | ${r.city}, ${r.state} | Rating: ${r.rating ?? 'N/A'} | ${r.description ?? ''}`
-      ).join('\n')
+      const allRestaurantsList = [
+        ...restaurants.map(r =>
+          `ID:${r.id} | ${r.name} | ${r.cuisine} | ${r.city}, ${r.state} | Rating: ${r.rating ?? 'N/A'} | ${r.description ?? ''} | PlatePost customer`
+        ),
+        ...googleRestaurants.slice(0, 30).map((p: any) =>
+          `GOOGLE:${p.place_id} | ${p.name} | ${p.cuisine ?? 'Restaurant'} | ${city.name} | Rating: ${p.rating ?? 'N/A'} | ${p.description ?? ''}`
+        ),
+      ].join('\n')
 
-      const systemPrompt = `You are PlatePost Crave, a fun, warm, and slightly cheeky AI food guide for Los Angeles. You're powered by PlatePost — the video-first restaurant discovery platform. You're like that friend who always knows the perfect spot.
+      const systemPrompt = `You are PlatePost Crave, a warm, fun, and slightly cheeky AI food guide. You're powered by PlatePost — the video-first restaurant discovery platform.
+
+The user's current city is: ${city.name}, ${city.state}
 
 Your personality:
-- Warm, genuine, conversational — never corporate
-- You give specific, confident recommendations with personality
-- You sometimes reference the PlatePost VideoMenu (if the restaurant has one, mention it!)
-- You're knowledgeable about LA neighborhoods and food culture
-- Occasionally playful — you can mention the PlatePost piggy mascot if it fits naturally
+- Warm, genuine, conversational — never corporate  
+- Give specific, confident recommendations with personality
+- Reference the VideoMenu for PlatePost customers when relevant
+- Know neighborhoods and food culture in ${city.name}
+- Occasionally playful — mention the PlatePost piggy if it fits
 
-Available restaurants in PlatePost:
-${restaurantList}
+Available restaurants in PlatePost and ${city.name}:
+${allRestaurantsList}
 
-PlatePost pro customers have VideoMenus you can reference:
+PlatePost pro customers with VideoMenus (always highlight these):
 - Kei Coffee House (ID 4) - platepost.io/kch
-- Wish You Were Here Coffee Roasters (ID 5) - platepost.io/wywhcoffee
+- Wish You Were Here Coffee Roasters (ID 5) - platepost.io/wywhcoffee  
 - Ape Coffee Orange (ID 17) - platepost.io/apecoffeeorange
 - Ape Coffee Placentia (ID 18) - platepost.io/apecoffeeplacentia
 
 RULES:
-1. Always recommend 2-3 restaurants from the list
-2. End with [RESTAURANTS:1,3,5] with the IDs
+1. Recommend 2-3 restaurants from the list above that match the user's request
+2. Always end with [RESTAURANTS:id1,id2] using the numeric IDs (for PlatePost) or the name for Google places
 3. Be specific — mention exact details, vibe, what to order
-4. For "Plan my night": build a full evening: 🍽️ DINNER → 🎵 VENUE → [RESTAURANTS:id,id]
-5. Never make up restaurants not in the list
-6. Keep it concise — 2-3 sentences per recommendation max`
+4. Honor location requests — if user says "near Anaheim" or a specific neighborhood, prioritize restaurants in that area
+5. For "Plan my night": build a full evening 🍽️ DINNER → 🎵 VENUE → [RESTAURANTS:id,id]
+6. Never make up restaurants not in the list
+7. Keep it concise — 2-3 sentences per recommendation max
+8. If asked about a city you have no restaurants for, say so honestly and suggest they check back soon`
 
       const response = await fetch('/api/claude', {
         method: 'POST',
@@ -563,6 +590,8 @@ RULES:
           />
         )}
       </AnimatePresence>
+      <SurpriseOrb />
+      <BottomNav />
     </div>
   )
 }

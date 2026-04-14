@@ -12,18 +12,14 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   if (!TM_KEY) {
-    console.error('VITE_TICKETMASTER_KEY not set')
     return res.status(200).json({ events: [], error: 'API key not configured' })
   }
 
-  const { category, size = '50', page = '0' } = req.query
+  const { category, size = '50' } = req.query
 
-  // Build params — broad search, not limited to LA
-  // Use keyword search for food/restaurant related events when category=food
   const commonParams = new URLSearchParams({
-    apikey: TM_KEY,
+    apikey: TM_KEY as string,
     size: String(size),
-    page: String(page),
     sort: 'date,asc',
     countryCode: 'US',
   })
@@ -32,13 +28,11 @@ export default async function handler(req: any, res: any) {
     let urls: string[] = []
 
     if (category === 'food') {
-      // Food/restaurant events — use keyword search since TM doesn't have a food segment
       urls = [
         `${BASE}?${commonParams}&keyword=food+festival`,
         `${BASE}?${commonParams}&keyword=restaurant+popup`,
         `${BASE}?${commonParams}&keyword=food+drink`,
         `${BASE}?${commonParams}&keyword=wine+tasting`,
-        `${BASE}?${commonParams}&keyword=dining`,
       ]
     } else if (category === 'music') {
       urls = [`${BASE}?${commonParams}&classificationName=music`]
@@ -49,11 +43,9 @@ export default async function handler(req: any, res: any) {
     } else if (category === 'sports') {
       urls = [`${BASE}?${commonParams}&classificationName=sports`]
     } else {
-      // Default: fetch music + food-related in parallel
       urls = [
         `${BASE}?${commonParams}&classificationName=music`,
         `${BASE}?${commonParams}&keyword=food+festival`,
-        `${BASE}?${commonParams}&keyword=dining+experience`,
         `${BASE}?${commonParams}&classificationName=arts%26theatre&size=30`,
       ]
     }
@@ -61,7 +53,7 @@ export default async function handler(req: any, res: any) {
     const responses = await Promise.all(
       urls.map(url =>
         fetch(url, { headers: { Accept: 'application/json' } })
-          .then(r => r.json())
+          .then(r => r.json() as Promise<any>)
           .catch(() => ({ _embedded: { events: [] } }))
       )
     )
@@ -70,7 +62,7 @@ export default async function handler(req: any, res: any) {
     const allEvents: any[] = []
 
     for (const data of responses) {
-      const events = data?._embedded?.events ?? []
+      const events: any[] = data?._embedded?.events ?? []
       for (const ev of events) {
         if (ev?.id && !seen.has(ev.id)) {
           seen.add(ev.id)
@@ -79,8 +71,7 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // Sort by date
-    allEvents.sort((a, b) => {
+    allEvents.sort((a: any, b: any) => {
       const da = new Date(a.dates?.start?.localDate ?? '').getTime()
       const db = new Date(b.dates?.start?.localDate ?? '').getTime()
       return da - db

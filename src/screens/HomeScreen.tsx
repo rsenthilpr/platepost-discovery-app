@@ -7,6 +7,8 @@ import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
 import SurpriseOrb from '../components/SurpriseOrb'
+import CityPicker from '../components/CityPicker'
+import { useCityStore } from '../lib/cityStore'
 
 function getSearchHistory(): string[] {
   try { return JSON.parse(localStorage.getItem('pp_search_history') ?? '[]') } catch { return [] }
@@ -56,6 +58,8 @@ function Top10Card({ restaurant, onClick }: { restaurant: Restaurant; onClick: (
 
 export default function HomeScreen() {
   const navigate = useNavigate()
+  const { city } = useCityStore()
+  const [showCityPicker, setShowCityPicker] = useState(false)
   const [heroImages, setHeroImages] = useState<string[]>([])
   const [imageIndex, setImageIndex] = useState(0)
   const [top10, setTop10] = useState<Restaurant[]>([])
@@ -140,18 +144,17 @@ export default function HomeScreen() {
         <div className="pointer-events-auto">
           <PlatePostLogo size="md" white={true} />
         </div>
-        {/* Location pill — wider to fit text on one line (Emilia fix) */}
-        <button onClick={() => navigate('/map')}
+        {/* Location pill — opens city picker */}
+        <button onClick={() => setShowCityPicker(true)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-full pointer-events-auto"
-          style={{
-            background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.25)',
-            whiteSpace: 'nowrap',
-          }}>
+          style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.25)', whiteSpace: 'nowrap' }}>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
           </svg>
-          <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 12, fontWeight: 600 }}>Los Angeles</span>
+          <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 12, fontWeight: 600 }}>{city.name}</span>
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+            <path d="M6 9l6 6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
         </button>
       </div>
 
@@ -166,7 +169,7 @@ export default function HomeScreen() {
               Discover
             </p>
             <h1 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#fff', fontSize: 'clamp(2rem, 9vw, 3.2rem)', lineHeight: 1.05, textShadow: '0 2px 20px rgba(0,0,0,0.4)' }}>
-              LA's Best<br />Restaurants
+              Discover<br />Restaurants
             </h1>
           </motion.div>
 
@@ -246,7 +249,7 @@ export default function HomeScreen() {
               <div className="px-5 mb-3 flex items-center justify-between">
                 <div>
                   <p style={{ fontFamily: 'Open Sans', color: '#9ca3af', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', margin: 0 }}>Top Rated</p>
-                  <h2 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#071126', fontSize: 20, margin: '2px 0 0' }}>Popular in LA</h2>
+                  <h2 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#071126', fontSize: 20, margin: '2px 0 0' }}>Popular in {city.name}</h2>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => { const el = document.getElementById('top10-carousel'); if (el) el.scrollBy({ left: -170, behavior: 'smooth' }) }}
@@ -403,6 +406,12 @@ export default function HomeScreen() {
 
       <SurpriseOrb />
       <BottomNav />
+
+      <CityPicker
+        isOpen={showCityPicker}
+        onClose={() => setShowCityPicker(false)}
+        currentCity={city}
+      />
     </div>
   )
 }
