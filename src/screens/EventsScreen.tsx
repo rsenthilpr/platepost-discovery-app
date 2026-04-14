@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import BottomNav from '../components/BottomNav'
 
-const TM_KEY = (import.meta.env as any).VITE_TICKETMASTER_KEY as string | undefined
-
 interface TMEvent {
   id: string
   name: string
@@ -108,31 +106,29 @@ export default function EventsScreen() {
     setLoading(true)
     setError(null)
 
-    if (!TM_KEY) {
-      setError('no_key')
-      setLoading(false)
-      return
-    }
-
     try {
-      const base = `https://app.ticketmaster.com/discovery/v2/events.json`
-      const params = `city=Los%20Angeles&stateCode=CA&size=50&sort=date,asc&apikey=${TM_KEY}`
-
+      // Call our serverless proxy — avoids CORS and keeps API key server-side
       const [r1, r2, r3, r4] = await Promise.all([
-        fetch(`${base}?${params}&classificationName=music`),
-        fetch(`${base}?${params}&classificationName=arts%26theatre&size=30`),
-        fetch(`${base}?${params}&classificationName=comedy&size=25`),
-        fetch(`${base}?${params}&classificationName=sports&size=25`),
+        fetch('/api/ticketmaster?category=music&size=50'),
+        fetch('/api/ticketmaster?category=food&size=30'),
+        fetch('/api/ticketmaster?category=arts&size=25'),
+        fetch('/api/ticketmaster?category=comedy&size=20'),
       ])
 
       const [d1, d2, d3, d4] = await Promise.all([r1.json(), r2.json(), r3.json(), r4.json()])
 
       const rawAll = [
-        ...(d1._embedded?.events ?? []),
-        ...(d2._embedded?.events ?? []),
-        ...(d3._embedded?.events ?? []),
-        ...(d4._embedded?.events ?? []),
+        ...(d1.events ?? []),
+        ...(d2.events ?? []),
+        ...(d3.events ?? []),
+        ...(d4.events ?? []),
       ]
+
+      if (d1.error === 'API key not configured') {
+        setError('no_key')
+        setLoading(false)
+        return
+      }
 
       const seen = new Set<string>()
       const unique = rawAll
@@ -143,7 +139,7 @@ export default function EventsScreen() {
 
       setEvents(unique)
 
-      // Auto-select first date that has events, if today has none
+      // Auto-select first date that has events if today has none
       if (unique.length > 0) {
         const hasTodayEvent = unique.some(e => e.isoDate === todayStr)
         if (!hasTodayEvent) setSelectedDate(unique[0].isoDate)
@@ -206,21 +202,21 @@ export default function EventsScreen() {
         paddingTop: 'env(safe-area-inset-top, 44px)',
         paddingBottom: 12,
       }}>
-        <div style={{ padding: '12px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '12px 20px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => navigate(-1)}
+            style={{ width: 36, height: 36, borderRadius: '50%', background: '#f3f4f6', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="#071126" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
           <div>
             <h1 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, fontSize: 22, color: '#071126', margin: 0 }}>
               Events
             </h1>
             <p style={{ fontFamily: 'Open Sans, sans-serif', fontSize: 12, color: '#9ca3af', margin: '2px 0 0' }}>
-              Los Angeles
+              Discover what's happening
             </p>
           </div>
-          <button onClick={() => navigate('/')}
-            style={{ width: 36, height: 36, borderRadius: '50%', background: '#f3f4f6', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="#071126" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
         </div>
       </div>
 

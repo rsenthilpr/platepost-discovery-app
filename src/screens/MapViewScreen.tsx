@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
+import SurpriseOrb from '../components/SurpriseOrb'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? import.meta.env.VITE_GOOGLE_PLACES_KEY
 const PLATEPOST_IDS = new Set([4, 5, 17, 18])
@@ -338,83 +339,6 @@ export default function MapViewScreen() {
               )
             })}
 
-            {/* Chubbygroup-style popup — appears on map when marker tapped */}
-            {popupRestaurant && (
-              <OverlayView
-                position={{ lat: popupRestaurant.latitude, lng: popupRestaurant.longitude }}
-                mapPaneName={OverlayView.FLOAT_PANE}
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  style={{
-                    position: 'absolute', bottom: 54, left: '50%', transform: 'translateX(-50%)',
-                    width: 260, background: '#1f2937', borderRadius: 16,
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.12)',
-                    overflow: 'hidden', zIndex: 50,
-                  }}
-                  onClick={e => e.stopPropagation()}
-                >
-                  {/* Image */}
-                  <div style={{ position: 'relative', height: 120 }}>
-                    <img src={popupRestaurant.image_url} alt={popupRestaurant.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(31,41,55,0.9), transparent)' }} />
-                    <button onClick={() => setPopupRestaurant(null)}
-                      style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                        <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                    {PLATEPOST_IDS.has(popupRestaurant.id) && (
-                      <div style={{ position: 'absolute', top: 8, left: 8, background: '#0048f9', borderRadius: 6, padding: '2px 8px' }}>
-                        <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 9, fontWeight: 700 }}>VIDEOMENU</span>
-                      </div>
-                    )}
-                  </div>
-                  {/* Info */}
-                  <div style={{ padding: '10px 14px 12px' }}>
-                    <p style={{ fontFamily: 'Open Sans', fontWeight: 800, fontSize: 14, color: '#fff', margin: '0 0 2px' }}>
-                      {popupRestaurant.name}
-                    </p>
-                    <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: 'rgba(255,255,255,0.5)', margin: '0 0 4px' }}>
-                      {popupRestaurant.cuisine} · {popupRestaurant.city}
-                    </p>
-                    {popupRestaurant.address && (
-                      <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: 'rgba(255,255,255,0.35)', margin: '0 0 8px' }}>
-                        📍 {popupRestaurant.address}
-                      </p>
-                    )}
-                    {popupRestaurant.rating && (
-                      <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#fbbf24', margin: '0 0 10px', fontWeight: 600 }}>
-                        ★ {popupRestaurant.rating.toFixed(1)} · {popupRestaurant.review_count ? `${popupRestaurant.review_count} reviews` : ''}
-                      </p>
-                    )}
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        onClick={() => {
-                          const addr = encodeURIComponent(popupRestaurant.address ?? popupRestaurant.name)
-                          window.open(`https://www.google.com/maps/dir/?api=1&destination=${addr}`, '_blank')
-                        }}
-                        style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontFamily: 'Open Sans', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
-                        </svg>
-                        Directions
-                      </button>
-                      <button
-                        onClick={() => { setShowDetail(true); setSelectedRestaurant(popupRestaurant) }}
-                        style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: '#0048f9', border: 'none', color: '#fff', fontFamily: 'Open Sans', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                        View Details →
-                      </button>
-                    </div>
-                  </div>
-                  {/* Triangle pointer */}
-                  <div style={{ position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderTop: '8px solid #1f2937' }} />
-                </motion.div>
-              </OverlayView>
-            )}
 
             {/* User location dot */}
             {userLocation && (
@@ -431,21 +355,124 @@ export default function MapViewScreen() {
         )}
       </div>
 
-      {/* Zoom controls + Near Me — always visible right side */}
-      <div style={{ position: 'absolute', right: 16, bottom: trayHeight + 16, zIndex: 200, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {/* Zoom in */}
+      {/* Restaurant popup — rendered OUTSIDE GoogleMap as fixed overlay to fix pointer-event issues */}
+      <AnimatePresence>
+        {popupRestaurant && (
+          <>
+            {/* Invisible backdrop to close popup */}
+            <div
+              style={{ position: 'absolute', inset: 0, zIndex: 149 }}
+              onClick={() => setPopupRestaurant(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              style={{
+                position: 'absolute',
+                bottom: trayHeight + 60 + 16,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 'min(280px, calc(100vw - 32px))',
+                background: '#1f2937',
+                borderRadius: 18,
+                boxShadow: '0 12px 40px rgba(0,0,0,0.7)',
+                border: '1px solid rgba(255,255,255,0.14)',
+                overflow: 'hidden',
+                zIndex: 150,
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Image */}
+              <div style={{ position: 'relative', height: 130 }}>
+                <img
+                  src={popupRestaurant.image_url}
+                  alt={popupRestaurant.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(31,41,55,0.95) 0%, transparent 60%)' }} />
+                <button
+                  onClick={() => setPopupRestaurant(null)}
+                  style={{ position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                </button>
+                {PLATEPOST_IDS.has(popupRestaurant.id) && (
+                  <div style={{ position: 'absolute', top: 10, left: 10, background: '#0048f9', borderRadius: 6, padding: '3px 8px' }}>
+                    <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 9, fontWeight: 700 }}>VIDEOMENU</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Info */}
+              <div style={{ padding: '12px 14px 14px' }}>
+                <p style={{ fontFamily: 'Open Sans', fontWeight: 800, fontSize: 15, color: '#fff', margin: '0 0 3px' }}>
+                  {popupRestaurant.name}
+                </p>
+                <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: 'rgba(255,255,255,0.5)', margin: '0 0 4px' }}>
+                  {popupRestaurant.cuisine} · {popupRestaurant.city}
+                </p>
+                {popupRestaurant.address && (
+                  <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: 'rgba(255,255,255,0.35)', margin: '0 0 6px' }}>
+                    📍 {popupRestaurant.address}
+                  </p>
+                )}
+                {popupRestaurant.rating && (
+                  <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#fbbf24', margin: '0 0 12px', fontWeight: 600 }}>
+                    ★ {popupRestaurant.rating.toFixed(1)}{popupRestaurant.review_count ? ` · ${popupRestaurant.review_count} reviews` : ''}
+                  </p>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => {
+                      const addr = encodeURIComponent(popupRestaurant.address ?? popupRestaurant.name)
+                      window.open(`https://www.google.com/maps/dir/?api=1&destination=${addr}`, '_blank')
+                    }}
+                    style={{ flex: 1, padding: '9px 0', borderRadius: 10, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontFamily: 'Open Sans', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
+                    </svg>
+                    Directions
+                  </button>
+                  <button
+                    onClick={() => { setShowDetail(true); setSelectedRestaurant(popupRestaurant); setPopupRestaurant(null) }}
+                    style={{ flex: 1, padding: '9px 0', borderRadius: 10, background: '#0048f9', border: 'none', color: '#fff', fontFamily: 'Open Sans', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                  >
+                    View Details →
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Zoom controls — fixed right side, always above tray */}
+      <div style={{ position: 'absolute', right: 16, bottom: trayHeight + 120, zIndex: 200, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button onClick={() => { if (map) map.setZoom((map.getZoom() ?? 11) + 1) }}
           style={{ width: 40, height: 40, borderRadius: 10, background: '#1f2937', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
           +
         </button>
-        {/* Zoom out */}
         <button onClick={() => { if (map) map.setZoom((map.getZoom() ?? 11) - 1) }}
           style={{ width: 40, height: 40, borderRadius: 10, background: '#1f2937', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 24, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
           −
         </button>
-        {/* Near Me */}
+      </div>
+
+      {/* Near Me — separate, always visible above tray, left side of zoom */}
+      <div style={{ position: 'absolute', right: 64, bottom: trayHeight + 136, zIndex: 200 }}>
         <button onClick={requestUserLocation}
-          style={{ width: 40, height: 40, borderRadius: 10, background: userLocation ? '#0048f9' : '#1f2937', border: `1px solid ${userLocation ? '#0048f9' : 'rgba(255,255,255,0.15)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
+          style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: userLocation ? '#0048f9' : '#1f2937',
+            border: `1px solid ${userLocation ? '#0048f9' : 'rgba(255,255,255,0.15)'}`,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+          }}>
           {locationLoading ? (
             <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', animation: 'spin 1s linear infinite' }} />
           ) : (
@@ -465,24 +492,45 @@ export default function MapViewScreen() {
         borderTop: '1px solid rgba(255,255,255,0.08)',
         height: trayHeight, transition: 'height 0.3s ease', overflow: 'hidden',
       }}>
-        {/* Tray header — always visible, tap to toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', cursor: 'pointer' }}
-          onClick={() => setTrayOpen(o => !o)}>
+        {/* Tray header — tap to toggle */}
+        <div
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 8px', cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => setTrayOpen(o => !o)}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 32, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.2)', margin: '0 auto' }} />
+            {/* Animated drag handle — bounces on first load to hint at collapse */}
+            <motion.div
+              animate={{ y: trayOpen ? [0, -3, 0] : 0 }}
+              transition={{ delay: 0.8, duration: 0.6, repeat: trayOpen ? 2 : 0, ease: 'easeInOut' }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}
+            >
+              <div style={{ width: 28, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.3)' }} />
+            </motion.div>
             <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: '#fff', margin: 0 }}>
               Nearby · {nearbyRestaurants.length} places
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={(e) => { e.stopPropagation(); navigate('/list') }}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#fff' }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate('/list') }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#fff' }}
+            >
               <svg width="8" height="8" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21" /></svg>
               Feed
             </button>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: trayOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
-              <path d="M6 9l6 6 6-6" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            {/* Chevron with label */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontFamily: 'Open Sans', fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                {trayOpen ? 'Hide' : 'Show'}
+              </span>
+              <motion.svg
+                width="16" height="16" viewBox="0 0 24 24" fill="none"
+                animate={{ rotate: trayOpen ? 180 : 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <path d="M6 9l6 6 6-6" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" />
+              </motion.svg>
+            </div>
           </div>
         </div>
 
@@ -534,6 +582,7 @@ export default function MapViewScreen() {
         )}
       </AnimatePresence>
 
+      <SurpriseOrb />
       <BottomNav />
     </div>
   )

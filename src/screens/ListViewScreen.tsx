@@ -8,6 +8,7 @@ import { searchEventbriteEvents } from '../lib/eventbrite'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
+import SurpriseOrb from '../components/SurpriseOrb'
 
 function loadFavorites(): Set<number> {
   try {
@@ -411,6 +412,7 @@ export default function ListViewScreen() {
           )}
         </AnimatePresence>
 
+        <SurpriseOrb />
         <BottomNav />
       </div>
     )
@@ -478,6 +480,7 @@ export default function ListViewScreen() {
         )}
       </AnimatePresence>
 
+      <SurpriseOrb />
       <BottomNav />
 
       <style>{`

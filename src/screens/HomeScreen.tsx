@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
+import SurpriseOrb from '../components/SurpriseOrb'
 
 function getSearchHistory(): string[] {
   try { return JSON.parse(localStorage.getItem('pp_search_history') ?? '[]') } catch { return [] }
@@ -400,6 +401,7 @@ export default function HomeScreen() {
         )}
       </AnimatePresence>
 
+      <SurpriseOrb />
       <BottomNav />
     </div>
   )
