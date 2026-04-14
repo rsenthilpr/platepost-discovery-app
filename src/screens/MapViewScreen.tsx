@@ -5,6 +5,7 @@ import { GoogleMap, useJsApiLoader, OverlayView } from '@react-google-maps/api'
 import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
+import BottomNav from '../components/BottomNav'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? import.meta.env.VITE_GOOGLE_PLACES_KEY
 const PLATEPOST_IDS = new Set([4, 5, 17, 18])
@@ -60,7 +61,7 @@ function clusterRestaurants(restaurants: Restaurant[], zoom: number) {
   return clusters
 }
 
-const FILTERS = ['All', 'Saved', 'Coffee', 'Music', 'Jazz', 'American', 'Italian', 'Japanese', 'Cafe', 'Korean', 'Mexican']
+const FILTERS = ['All', 'Saved', 'Coffee', 'American', 'Italian', 'Japanese', 'Cafe', 'Korean', 'Mexican']
 
 export default function MapViewScreen() {
   const navigate = useNavigate()
@@ -78,7 +79,7 @@ export default function MapViewScreen() {
   const [mapCenter, setMapCenter] = useState({ lat: 34.0522, lng: -118.2437 })
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [locationLoading, setLocationLoading] = useState(false)
-  const [trayOpen, setTrayOpen] = useState(false)
+  const [trayOpen, setTrayOpen] = useState(true)
   const topBarRef = useRef<HTMLDivElement>(null)
   const [topBarHeight, setTopBarHeight] = useState(160)
 
@@ -182,7 +183,7 @@ export default function MapViewScreen() {
     </div>
   )
 
-  const trayHeight = trayOpen ? 200 : 60
+  const trayHeight = trayOpen ? 260 : 60
 
   return (
     <div className="fixed inset-0" style={{ background: '#1a1a2e', fontFamily: 'Open Sans, sans-serif' }}>
@@ -203,7 +204,7 @@ export default function MapViewScreen() {
               <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          <img src="/pp-logo.png" alt="PlatePost" height={22} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+          <img src="/pp-logo.png" alt="PlatePost" style={{ height: 'clamp(22px, 5.5vw, 30px)', width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
           <div style={{ flex: 1 }} />
           <span style={{ fontFamily: 'Open Sans', fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>
             {filtered.length} places
@@ -279,7 +280,7 @@ export default function MapViewScreen() {
       </div>
 
       {/* Map */}
-      <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: trayHeight }}>
+      <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: trayHeight + 60 }}>
         {isLoaded ? (
           <GoogleMap
             mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -457,9 +458,9 @@ export default function MapViewScreen() {
         </button>
       </div>
 
-      {/* Collapsible restaurant tray */}
+      {/* Collapsible restaurant tray — sits above BottomNav */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 100,
+        position: 'absolute', bottom: 60, left: 0, right: 0, zIndex: 100,
         background: 'rgba(17,24,39,0.97)', backdropFilter: 'blur(16px)',
         borderTop: '1px solid rgba(255,255,255,0.08)',
         height: trayHeight, transition: 'height 0.3s ease', overflow: 'hidden',
@@ -532,6 +533,8 @@ export default function MapViewScreen() {
           </div>
         )}
       </AnimatePresence>
+
+      <BottomNav />
     </div>
   )
 }

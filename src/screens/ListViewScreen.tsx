@@ -7,8 +7,8 @@ import { fetchPlaceDetails } from '../lib/googlePlaces'
 import { searchEventbriteEvents } from '../lib/eventbrite'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
+import BottomNav from '../components/BottomNav'
 
-// ── Favorites helpers (shared with MapViewScreen via localStorage) ────────────
 function loadFavorites(): Set<number> {
   try {
     const raw = localStorage.getItem('pp_favorites')
@@ -37,23 +37,19 @@ const VIDEO_QUERY_POOLS: Record<string, string[]> = {
   American: ['burger grilling flames', 'bbq smoke grill meat', 'fried chicken crispy', 'cocktail bartender mixing', 'smash burger cooking'],
   Coffee: ['latte art pouring', 'coffee espresso machine', 'barista pour over', 'coffee roasting beans', 'cappuccino foam milk'],
   Cafe: ['brunch avocado toast', 'pastry bakery morning', 'cafe interior cozy', 'eggs benedict breakfast', 'french press coffee'],
-  Music: ['concert crowd lights', 'dj turntable nightclub', 'live band performance', 'music venue stage', 'nightclub dancing'],
-  Jazz: ['jazz band performance', 'saxophone jazz music', 'piano jazz bar', 'trumpet musician', 'jazz club atmosphere'],
   Mexican: ['tacos street food', 'guacamole fresh made', 'mexican grill cooking', 'tortilla making', 'margarita cocktail'],
 }
 
-// PlatePost customers with real video menus
 const PLATEPOST_MENU_URLS: Record<number, string> = {
-  4: 'https://platepost.io/kch',                    // Kei Coffee House
-  5: 'https://platepost.io/wywhcoffee',             // Wish You Were Here
-  17: 'https://platepost.io/apecoffeeorange',       // Ape Coffee - Orange
-  18: 'https://platepost.io/apecoffeeplacentia',    // Ape Coffee - Placentia
+  4: 'https://platepost.io/kch',
+  5: 'https://platepost.io/wywhcoffee',
+  17: 'https://platepost.io/apecoffeeorange',
+  18: 'https://platepost.io/apecoffeeplacentia',
 }
 
 function getVideoQuery(cuisine: string, restaurantName: string): string {
   const pool = VIDEO_QUERY_POOLS[cuisine]
   if (pool) {
-    // Use restaurant name hash to pick consistently but differently per restaurant
     const hash = restaurantName.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
     return pool[hash % pool.length]
   }
@@ -70,57 +66,13 @@ interface ReelSlide {
   loaded: boolean
 }
 
-// ── List view card (shown when coming from AI suggestion chips) ───────────────
-function ListCard({
-  restaurant: r,
-  onClick,
-}: {
-  restaurant: Restaurant
-  onClick: () => void
-}) {
-  return (
-    <motion.button
-      variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className="w-full flex items-center gap-3 rounded-2xl p-3 text-left"
-      style={{
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(255,255,255,0.08)',
-      }}
-    >
-      <img
-        src={r.image_url}
-        alt={r.name}
-        className="w-20 h-20 rounded-xl flex-shrink-0 object-cover"
-      />
-      <div className="flex-1 min-w-0">
-        <p className="font-bold text-sm leading-snug mb-0.5 truncate"
-          style={{ color: '#FAFBFF', fontFamily: 'Open Sans, sans-serif' }}>
-          {r.name}
-        </p>
-        <span className="text-xs px-2 py-0.5 rounded-full inline-block mb-1"
-          style={{ background: 'rgba(69,118,239,0.15)', color: '#6B9EFF', fontFamily: 'Open Sans' }}>
-          {r.cuisine}
-        </span>
-        <p className="text-xs opacity-50"
-          style={{ color: '#FAFBFF', fontFamily: 'Open Sans, sans-serif' }}>
-          {r.city}, {r.state}
-        </p>
-      </div>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0 opacity-30">
-        <path d="M9 18l6-6-6-6" stroke="#FAFBFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </motion.button>
-  )
-}
+const FILTERS = ['All', 'Coffee', 'Japanese', 'Italian', 'American', 'Cafe', 'Korean', 'Mexican', 'Thai', 'Vietnamese', 'Chinese', 'Indian', 'Mediterranean']
 
 export default function ListViewScreen() {
   const navigate = useNavigate()
   const location = useLocation()
   const state = (location.state ?? {}) as LocationState
 
-  // If coming from AI chip → show list view
   const isListView = !!state.listView
 
   const [slides, setSlides] = useState<ReelSlide[]>([])
@@ -131,12 +83,13 @@ export default function ListViewScreen() {
   const [activeFilter, setActiveFilter] = useState(state.filter ?? 'All')
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
   const [menuIframeUrl, setMenuIframeUrl] = useState<string | null>(null)
+  const [listSearch, setListSearch] = useState(state.searchQuery ?? '')
+  const [showSearchBar, setShowSearchBar] = useState(false)
+  const listSearchRef = useRef<HTMLInputElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-
   const scrollPositionRef = useRef<number>(0)
   const loadedIndices = useRef<Set<number>>(new Set())
-
 
   function restoreScroll() {
     requestAnimationFrame(() => {
@@ -155,130 +108,94 @@ export default function ListViewScreen() {
     })
   }
 
-  const FILTERS = ['All', 'Coffee', 'Jazz', 'Music', 'DJs', 'Japanese', 'Italian', 'American', 'Cafe', 'Korean', 'Mexican', 'Thai', 'Vietnamese', 'Chinese', 'Indian', 'Mediterranean']
-
   useEffect(() => {
     fetchRestaurants()
-    // If arriving with a searchQuery that matches a cuisine, auto-select that filter
     if (state.searchQuery) {
       const q = state.searchQuery.toLowerCase()
       const matchingFilter = FILTERS.find(f => f.toLowerCase() === q)
-      if (matchingFilter && matchingFilter !== 'All') {
-        setActiveFilter(matchingFilter)
-      }
+      if (matchingFilter && matchingFilter !== 'All') setActiveFilter(matchingFilter)
     }
   }, [])
 
   async function fetchRestaurants() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('restaurants')
-      .select('*')
-      .order('tier')
-      .order('name')
+    const { data, error } = await supabase.from('restaurants').select('*').order('tier').order('name')
     if (error) console.error(error)
     const list = data ?? []
     setAllRestaurants(list)
 
-    const PLATEPOST_CUSTOMER_IDS = new Set([4, 5, 17, 18])
     const baseFiltered = applyFilter(list, state.filter ?? 'All')
-    // Sort by rating naturally — no pinning
     const filtered = baseFiltered.sort((a, b) => {
       const scoreA = (a.rating ?? 0) * Math.log10((a.review_count ?? 1) + 1)
       const scoreB = (b.rating ?? 0) * Math.log10((b.review_count ?? 1) + 1)
       return scoreB - scoreA
     })
-    // Still mark pro customers but don't pin them
-    void PLATEPOST_CUSTOMER_IDS
     initSlides(filtered)
     setLoading(false)
   }
 
   function applyFilter(list: Restaurant[], filter: string): Restaurant[] {
     let result = list
-
-    // Search query filter — from home screen search
-    if (state.searchQuery) {
+    if (listSearch.trim()) {
+      const q = listSearch.toLowerCase()
+      result = result.filter(r =>
+        r.name.toLowerCase().includes(q) || r.cuisine.toLowerCase().includes(q) ||
+        r.city.toLowerCase().includes(q) || (r.neighborhood ?? '').toLowerCase().includes(q) ||
+        (r.description ?? '').toLowerCase().includes(q)
+      )
+      return result.length > 0 ? result : []
+    }
+    if (state.searchQuery && !listSearch) {
       const q = state.searchQuery.toLowerCase()
       result = result.filter(r =>
-        r.name.toLowerCase().includes(q) ||
-        r.cuisine.toLowerCase().includes(q) ||
-        r.city.toLowerCase().includes(q) ||
-        (r.neighborhood ?? '').toLowerCase().includes(q) ||
+        r.name.toLowerCase().includes(q) || r.cuisine.toLowerCase().includes(q) ||
+        r.city.toLowerCase().includes(q) || (r.neighborhood ?? '').toLowerCase().includes(q) ||
         (r.description ?? '').toLowerCase().includes(q)
       )
       return result.length > 0 ? result : list
     }
-
-    // Cuisine/type filter
     if (filter && filter !== 'All') {
-      result = result.filter((r) =>
-        filter === 'DJs'
-          ? r.cuisine === 'Music'
-          : r.cuisine.toLowerCase() === filter.toLowerCase()
-      )
+      result = result.filter(r => r.cuisine.toLowerCase() === filter.toLowerCase())
     }
-    // Neighborhood filter
     if (state.neighborhood) {
-      result = result.filter((r) =>
+      result = result.filter(r =>
         r.city?.toLowerCase().includes(state.neighborhood!.toLowerCase()) ||
-        r.description?.toLowerCase().includes(state.neighborhood!.toLowerCase()) ||
-        r.name?.toLowerCase().includes(state.neighborhood!.toLowerCase())
+        r.description?.toLowerCase().includes(state.neighborhood!.toLowerCase())
       )
       if (result.length === 0) result = list
     }
-    // Recently viewed filter
     if (state.recentIds && state.recentIds.length > 0) {
       const recentSet = new Set(state.recentIds)
-      result = result.filter((r) => recentSet.has(r.id))
+      result = result.filter(r => recentSet.has(r.id))
       if (result.length === 0) result = list
     }
     return result
   }
 
   function initSlides(filtered: Restaurant[]) {
-    const initial: ReelSlide[] = filtered.map((r) => ({
-      restaurant: r,
-      videoUrl: null,
-      rating: null,
-      reviewCount: null,
-      heroImage: r.image_url,
-      hasEvents: false,
-      loaded: false,
+    const initial: ReelSlide[] = filtered.map(r => ({
+      restaurant: r, videoUrl: null, rating: null, reviewCount: null,
+      heroImage: r.image_url, hasEvents: false, loaded: false,
     }))
     setSlides(initial)
-    // Load first 3 eagerly
     filtered.slice(0, 3).forEach((r, i) => loadSlideData(r, i, initial))
   }
 
   async function loadSlideData(r: Restaurant, index: number, _currentSlides?: ReelSlide[]) {
     if (loadedIndices.current.has(index)) return
     loadedIndices.current.add(index)
-
     const [videoResult, placeResult, events] = await Promise.all([
       fetchPexelsPortraitVideo(getVideoQuery(r.cuisine, r.name)),
       fetchPlaceDetails(r.name, r.city),
       searchEventbriteEvents(r.name, r.city, r.state),
     ])
-
-    // Fetch Yelp photos in parallel for better image quality
     let yelpPhotos: string[] = []
     try {
       const yelpRes = await fetch(`/api/yelp?name=${encodeURIComponent(r.name)}&city=${encodeURIComponent(r.city)}`)
-      if (yelpRes.ok) {
-        const yelpData = await yelpRes.json()
-        yelpPhotos = yelpData.photos || []
-      }
-    } catch {
-      // Yelp failure is non-fatal
-    }
-
-    // Pick best image: prefer Google HD photo (scored for venue shots),
-    // fall back to Yelp photos, then original image_url
-    const googlePhoto = placeResult?.photoUrl
-    const bestImage = googlePhoto || yelpPhotos[0] || r.image_url
-
-    setSlides((prev) => {
+      if (yelpRes.ok) { const d = await yelpRes.json(); yelpPhotos = d.photos || [] }
+    } catch {}
+    const bestImage = placeResult?.photoUrl || yelpPhotos[0] || r.image_url
+    setSlides(prev => {
       const next = [...prev]
       if (next[index]) {
         next[index] = {
@@ -295,124 +212,192 @@ export default function ListViewScreen() {
     })
   }
 
-  // Intersection observer for active tracking + lazy loading
   useEffect(() => {
     if (slides.length === 0 || isListView) return
-
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
+        entries.forEach(entry => {
           if (entry.isIntersecting) {
             const idx = parseInt(entry.target.getAttribute('data-index') ?? '0')
             setCurrentIndex(idx)
-            ;[idx, idx + 1, idx + 2].forEach((i) => {
-              if (slides[i] && !loadedIndices.current.has(i)) {
-                loadSlideData(slides[i].restaurant, i)
-              }
+            ;[idx, idx + 1, idx + 2].forEach(i => {
+              if (slides[i] && !loadedIndices.current.has(i)) loadSlideData(slides[i].restaurant, i)
             })
           }
         })
       },
       { threshold: 0.6 }
     )
-
-    slideRefs.current.forEach((el) => { if (el) observer.observe(el) })
+    slideRefs.current.forEach(el => { if (el) observer.observe(el) })
     return () => observer.disconnect()
   }, [slides.length, isListView])
 
-  // Filter change for list view
+  // Live search — refilter as user types
   const filteredList = applyFilter(allRestaurants, activeFilter)
 
   if (loading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#071126' }}>
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 rounded-full border-2 animate-spin"
-            style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: '#fff' }} />
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Open Sans, sans-serif', fontSize: 13 }}>
-            Loading…
-          </p>
+      <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#f8f9fa' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid #e5e7eb', borderTopColor: '#0048f9', animation: 'spin 1s linear infinite' }} />
+          <p style={{ color: '#9ca3af', fontFamily: 'Open Sans, sans-serif', fontSize: 13 }}>Loading…</p>
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       </div>
     )
   }
 
-  // ── LIST VIEW (from AI suggestion chips) ─────────────────────────────────────
+  // ── LIST VIEW ─────────────────────────────────────────────────────────────────
   if (isListView) {
     return (
-      <div className="fixed inset-0 flex flex-col" style={{ background: '#071126' }}>
-        {/* Header */}
-        <div className="flex-shrink-0 pt-12 px-4 pb-3" style={{ background: '#071126' }}>
-          <div className="flex items-center gap-3 mb-4">
-            <button onClick={() => navigate('/')} className="opacity-50 hover:opacity-100 transition-opacity">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="#FAFBFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <div className="fixed inset-0 flex flex-col" style={{ background: '#f8f9fa' }}>
+        {/* Header — light bg, Open Sans (Emilia fix: no Bungee/cursive) */}
+        <div style={{
+          flexShrink: 0,
+          background: '#fff',
+          borderBottom: '1px solid #f0f0f0',
+          paddingTop: 'env(safe-area-inset-top, 44px)',
+        }}>
+          <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={() => navigate(-1)}
+              style={{ width: 36, height: 36, borderRadius: '50%', background: '#f3f4f6', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="#071126" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-            <h1 style={{ fontFamily: 'Bungee, cursive', color: '#FAFBFF', fontSize: 20, letterSpacing: '0.04em' }}>
-              {activeFilter === 'All' ? 'Discover' : activeFilter}
+            <h1 style={{
+              fontFamily: 'Open Sans, sans-serif', fontWeight: 800, fontSize: 20,
+              color: '#071126', margin: 0, flex: 1,
+            }}>
+              {activeFilter === 'All'
+                ? (state.searchQuery ? `"${state.searchQuery}"` : 'Discover')
+                : activeFilter}
             </h1>
+            {/* Search toggle button */}
+            <button
+              onClick={() => { setShowSearchBar(s => !s); setTimeout(() => listSearchRef.current?.focus(), 100) }}
+              style={{ width: 36, height: 36, borderRadius: '50%', background: showSearchBar ? '#0048f9' : '#f3f4f6', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="8" stroke={showSearchBar ? '#fff' : '#071126'} strokeWidth="2" />
+                <path d="M21 21l-4.35-4.35" stroke={showSearchBar ? '#fff' : '#071126'} strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
 
-          {/* Filter chips */}
-          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => setActiveFilter(f)}
-                className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all"
-                style={{
-                  fontFamily: 'Open Sans, sans-serif',
-                  background: activeFilter === f ? '#4576EF' : 'rgba(255,255,255,0.07)',
-                  color: activeFilter === f ? '#fff' : 'rgba(250,251,255,0.55)',
-                  border: activeFilter === f ? '1px solid #4576EF' : '1px solid rgba(255,255,255,0.1)',
-                }}
+          {/* Inline search bar — shown when search icon tapped */}
+          <AnimatePresence>
+            {showSearchBar && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                style={{ overflow: 'hidden', padding: '8px 16px 0' }}
               >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', borderRadius: 12, padding: '9px 12px', border: '1.5px solid #e5e7eb' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
+                    <circle cx="11" cy="11" r="8" stroke="#071126" strokeWidth="2" />
+                    <path d="M21 21l-4.35-4.35" stroke="#071126" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  <input
+                    ref={listSearchRef}
+                    value={listSearch}
+                    onChange={e => setListSearch(e.target.value)}
+                    placeholder={`Search ${activeFilter === 'All' ? 'restaurants' : activeFilter + ' restaurants'}...`}
+                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'Open Sans', fontSize: 14, color: '#071126' }}
+                  />
+                  {listSearch && (
+                    <button onClick={() => setListSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, padding: 0 }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Filter chips */}
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '10px 16px 12px', scrollbarWidth: 'none' }}>
+            {FILTERS.map(f => (
+              <button key={f} onClick={() => { setActiveFilter(f); setListSearch('') }}
+                style={{
+                  flexShrink: 0, padding: '6px 14px', borderRadius: 999,
+                  fontFamily: 'Open Sans, sans-serif', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                  background: activeFilter === f ? '#0048f9' : '#fff',
+                  color: activeFilter === f ? '#fff' : '#6b7280',
+                  border: activeFilter === f ? '1.5px solid #0048f9' : '1.5px solid #e5e7eb',
+                }}>
                 {f}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="px-4 py-2 flex-shrink-0">
-          <p className="text-xs opacity-40" style={{ fontFamily: 'Open Sans', color: '#FAFBFF' }}>
+        {/* Result count */}
+        <div style={{ padding: '8px 20px 4px', flexShrink: 0 }}>
+          <p style={{ fontFamily: 'Open Sans', fontSize: 12, color: '#9ca3af', margin: 0 }}>
             {filteredList.length} place{filteredList.length !== 1 ? 's' : ''}
+            {listSearch ? ` for "${listSearch}"` : activeFilter !== 'All' ? ` in ${activeFilter}` : ''}
           </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-28" style={{ scrollbarWidth: 'none' }}>
-          <motion.div
-            className="flex flex-col gap-3 mt-2"
-            initial="hidden"
-            animate="visible"
-            variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
-          >
-            {filteredList.map((r) => (
-              <ListCard
-                key={r.id}
-                restaurant={r}
-                onClick={() => setSelectedRestaurant(r)}
-              />
-            ))}
-          </motion.div>
-        </div>
-
-        {/* Bottom bar */}
-        <div
-          className="absolute bottom-0 left-0 right-0 flex items-center justify-center pb-10 pt-4"
-          style={{ background: 'linear-gradient(to top, rgba(7,17,38,1) 60%, transparent)' }}
-        >
-          <button
-            onClick={() => navigate('/map')}
-            className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold"
-            style={{ background: '#FAFBFF', color: '#071126', fontFamily: 'Open Sans', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#071126" />
-              <circle cx="12" cy="9" r="2.5" fill="white" />
-            </svg>
-            Map View
-          </button>
+        {/* List */}
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pb-24" style={{ scrollbarWidth: 'none' }}>
+          {filteredList.length === 0 ? (
+            <div style={{ padding: '40px 0', textAlign: 'center' }}>
+              <span style={{ fontSize: 40 }}>🔍</span>
+              <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 16, color: '#071126', margin: '12px 0 6px' }}>No results</p>
+              <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#9ca3af', margin: 0 }}>Try a different search or filter</p>
+            </div>
+          ) : (
+            <motion.div
+              style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}
+              initial="hidden" animate="visible"
+              variants={{ visible: { transition: { staggerChildren: 0.04 } } }}
+            >
+              {filteredList.map(r => (
+                <motion.button
+                  key={r.id}
+                  variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => { scrollPositionRef.current = scrollContainerRef.current?.scrollTop ?? 0; setSelectedRestaurant(r) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    background: '#fff', borderRadius: 16, padding: 12,
+                    border: '1px solid #f0f0f0', boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <img src={r.image_url} alt={r.name}
+                    style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, color: '#071126', margin: '0 0 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.name}
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#0048f9', background: 'rgba(0,72,249,0.08)', padding: '2px 8px', borderRadius: 999 }}>
+                        {r.cuisine}
+                      </span>
+                      {PLATEPOST_MENU_URLS[r.id] && (
+                        <span style={{ fontFamily: 'Open Sans', fontSize: 10, fontWeight: 700, color: '#0048f9', background: 'rgba(0,72,249,0.08)', padding: '2px 8px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <img src="/pp-mark.png" alt="" width={9} height={9} style={{ objectFit: 'contain' }} />
+                          PlatePost
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#9ca3af', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      📍 {r.city}, {r.state}
+                      {r.rating ? ` · ★ ${r.rating.toFixed(1)}` : ''}
+                    </p>
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, opacity: 0.25 }}>
+                    <path d="M9 18l6-6-6-6" stroke="#071126" strokeWidth="2.2" strokeLinecap="round" />
+                  </svg>
+                </motion.button>
+              ))}
+            </motion.div>
+          )}
         </div>
 
         <AnimatePresence>
@@ -420,38 +405,24 @@ export default function ListViewScreen() {
             <RestaurantDetail
               restaurant={selectedRestaurant}
               onClose={() => { setSelectedRestaurant(null); restoreScroll() }}
+              isFavorite={favorites.has(selectedRestaurant.id)}
+              onToggleFavorite={() => toggleFavorite(selectedRestaurant.id)}
             />
           )}
         </AnimatePresence>
+
+        <BottomNav />
       </div>
     )
   }
 
-  // ── REELS VIEW (default feed) ─────────────────────────────────────────────────
+  // ── REELS VIEW ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0" style={{ background: '#000' }}>
-
-      {/* Back button — top left, goes to home */}
-      <button
-        onClick={() => navigate('/')}
-        className="absolute top-12 left-5 z-50 flex items-center gap-2 px-3 py-2 rounded-full"
-        style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span style={{ fontFamily: 'Open Sans, sans-serif', color: 'white', fontSize: 12, fontWeight: 600 }}>Home</span>
-      </button>
-
-      {/* Scrollable reel container */}
       <div
         ref={scrollContainerRef}
         className="w-full h-full overflow-y-scroll"
-        style={{
-          scrollSnapType: 'y mandatory',
-          scrollbarWidth: 'none',
-          WebkitOverflowScrolling: 'touch',
-        } as React.CSSProperties}
+        style={{ scrollSnapType: 'y mandatory', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
         onScroll={(e) => {
           const el = e.currentTarget
           const idx = Math.round(el.scrollTop / window.innerHeight)
@@ -460,7 +431,7 @@ export default function ListViewScreen() {
         }}
       >
         {slides.map((slide, index) => (
-          <ReelSlide
+          <ReelSlideCard
             key={slide.restaurant.id}
             slide={slide}
             index={index}
@@ -480,60 +451,16 @@ export default function ListViewScreen() {
         ))}
       </div>
 
-      {/* Bottom tab bar */}
-      <div
-        className="absolute bottom-0 left-0 right-0 flex items-center justify-center pb-8 pt-4 z-30 pointer-events-none"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)' }}
-      >
-        <div
-          className="flex items-center rounded-full overflow-hidden pointer-events-auto"
-          style={{
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255,255,255,0.15)',
-          }}
-        >
-          <button
-            onClick={() => navigate('/map')}
-            className="flex items-center gap-2 px-5 py-2.5"
-            style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600 }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="currentColor" />
-            </svg>
-            Map
-          </button>
-          <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.15)' }} />
-          <div
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full"
-            style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 13, fontWeight: 700, background: 'rgba(255,255,255,0.18)' }}
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="white">
-              <polygon points="5,3 19,12 5,21" />
-            </svg>
-            Feed
-          </div>
-        </div>
-      </div>
-
-      {/* PlatePost VideoMenu iframe */}
       {menuIframeUrl && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
-          <div
-            className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
-            style={{ background: '#0e1f42', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
-          >
-            <button
-              onClick={() => setMenuIframeUrl(null)}
-              className="w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.1)' }}
-            >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: '#0e1f42', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+            <button onClick={() => setMenuIframeUrl(null)}
+              style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
               </svg>
             </button>
-            <img src="/pp-mark.png" alt="" width={16} height={16}
-              style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+            <img src="/pp-mark.png" alt="" width={16} height={16} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
             <span style={{ color: '#fff', fontFamily: 'Open Sans', fontSize: 14, fontWeight: 600 }}>VideoMenu</span>
           </div>
           <iframe src={menuIframeUrl} className="flex-1 w-full border-0" title="VideoMenu" />
@@ -550,12 +477,21 @@ export default function ListViewScreen() {
           />
         )}
       </AnimatePresence>
+
+      <BottomNav />
+
+      <style>{`
+        @keyframes kenBurns {
+          from { transform: scale(1) translate(0, 0); }
+          to { transform: scale(1.08) translate(-1%, -1%); }
+        }
+      `}</style>
     </div>
   )
 }
 
-// ── Individual reel slide ─────────────────────────────────────────────────────
-interface ReelSlideProps {
+// ── Individual reel slide ──────────────────────────────────────────────────────
+interface ReelSlideCardProps {
   slide: ReelSlide
   index: number
   isActive: boolean
@@ -569,12 +505,11 @@ interface ReelSlideProps {
   onEvents: () => void
 }
 
-function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slideRef, onMoreInfo, onDirections, onMenu, onVideoMenu, onEvents }: ReelSlideProps) {
+function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, slideRef, onMoreInfo, onDirections, onMenu, onVideoMenu, onEvents }: ReelSlideCardProps) {
   const r = slide.restaurant
   const [showFavPopup, setShowFavPopup] = useState(false)
   const [kenBurnsKey, setKenBurnsKey] = useState(0)
 
-  // Reset Ken Burns animation when slide becomes active
   useEffect(() => {
     if (isActive) setKenBurnsKey(k => k + 1)
   }, [isActive])
@@ -593,154 +528,96 @@ function ReelSlide({ slide, index, isActive, isFavorite, onToggleFavorite, slide
     <div
       ref={slideRef}
       data-index={index}
-      className="relative w-full flex-shrink-0 overflow-hidden"
-      style={{ height: '100dvh', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
+      style={{ position: 'relative', width: '100%', flexShrink: 0, overflow: 'hidden', height: '100dvh', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
     >
-      {/* Background — real HD photo with Ken Burns animation */}
       <img
         key={kenBurnsKey}
         src={bgImage}
         alt={r.name}
-        className="absolute inset-0 w-full h-full object-cover"
-        style={{
-          animation: isActive ? 'kenBurns 8s ease-in-out infinite alternate' : 'none',
-          transformOrigin: 'center center',
-        }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: isActive ? 'kenBurns 8s ease-in-out infinite alternate' : 'none' }}
       />
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140, background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: 'linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.6) 50%, transparent 100%)', pointerEvents: 'none' }} />
 
-      {/* Gradients */}
-      <div className="absolute top-0 left-0 right-0 pointer-events-none"
-        style={{ height: 140, background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)' }} />
-      <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-        style={{ height: '65%', background: 'linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.6) 50%, transparent 100%)' }} />
-
-      {/* Favorites popup */}
       <AnimatePresence>
         {showFavPopup && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.9 }}
-            className="absolute top-1/2 left-1/2 z-20 flex items-center gap-2 px-4 py-2.5 rounded-full"
-            style={{ transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(16px)', border: '1px solid rgba(225,29,72,0.4)' }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10, scale: 0.9 }}
+            style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 20, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 999, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(16px)', border: '1px solid rgba(225,29,72,0.4)' }}>
             <span style={{ fontSize: 18 }}>❤️</span>
-            <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 13, fontWeight: 600 }}>
-              Added to Favorites
-            </span>
+            <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 13, fontWeight: 600 }}>Added to Favorites</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Top bar — heart */}
-      <div className="absolute top-0 left-0 right-0 z-10 pt-12 px-5 flex items-center justify-end">
-        <motion.button
-          whileTap={{ scale: 0.8 }}
-          onClick={handleFavorite}
-          className="w-9 h-9 flex items-center justify-center rounded-full"
-          style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)' }}
-        >
-          <motion.svg
-            width="18" height="18" viewBox="0 0 24 24"
-            fill={isFavorite ? '#E11D48' : 'none'}
-            stroke={isFavorite ? '#E11D48' : 'white'}
-            strokeWidth="2"
-            animate={isFavorite ? { scale: [1, 1.3, 1] } : { scale: 1 }}
-            transition={{ duration: 0.3 }}
-          >
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: 48, paddingLeft: 20, paddingRight: 20, display: 'flex', justifyContent: 'flex-end' }}>
+        <motion.button whileTap={{ scale: 0.8 }} onClick={handleFavorite}
+          style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer' }}>
+          <motion.svg width="18" height="18" viewBox="0 0 24 24" fill={isFavorite ? '#E11D48' : 'none'} stroke={isFavorite ? '#E11D48' : 'white'} strokeWidth="2"
+            animate={isFavorite ? { scale: [1, 1.3, 1] } : { scale: 1 }} transition={{ duration: 0.3 }}>
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </motion.svg>
         </motion.button>
       </div>
 
-      {/* Bottom content */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 px-5 pb-28">
-        {/* Tags row */}
-        <div className="mb-2.5 flex items-center gap-2">
-          <span className="text-xs font-bold px-3 py-1 rounded-full"
-            style={{ background: 'rgba(0,72,249,0.3)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,72,249,0.45)', color: '#fff', fontFamily: 'Open Sans, sans-serif' }}>
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10, padding: '0 20px 90px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 12, color: '#fff', background: 'rgba(0,72,249,0.35)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,72,249,0.45)', padding: '3px 12px', borderRadius: 999 }}>
             {r.cuisine}
           </span>
           {PLATEPOST_MENU_URLS[r.id] && (
-            <span className="font-bold px-2.5 py-1 rounded-full flex items-center gap-1"
-              style={{ background: 'rgba(0,72,249,0.85)', color: '#fff', fontFamily: 'Open Sans', fontSize: 10, fontWeight: 700 }}>
+            <span style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 10, color: '#fff', background: 'rgba(0,72,249,0.85)', padding: '3px 10px', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 4 }}>
               <img src="/pp-mark.png" alt="" width={10} height={10} style={{ filter: 'brightness(0) invert(1)', objectFit: 'contain' }} />
               PlatePost
             </span>
           )}
         </div>
-
-        {/* Name */}
-        <h1 className="mb-1.5 leading-tight"
-          style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, color: '#fff', fontSize: 'clamp(1.7rem, 7vw, 2.5rem)', textShadow: '0 2px 16px rgba(0,0,0,0.6)' }}>
+        <h1 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, color: '#fff', fontSize: 'clamp(1.7rem, 7vw, 2.5rem)', textShadow: '0 2px 16px rgba(0,0,0,0.6)', marginBottom: 6, lineHeight: 1.1 }}>
           {r.name}
         </h1>
-
-        {/* Location + rating */}
-        <div className="flex items-center gap-3 mb-5 flex-wrap">
-          <span style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
-            📍 {r.city}, {r.state}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>📍 {r.city}, {r.state}</span>
           {slide.rating && (
-            <div className="flex items-center gap-1.5">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="#FBBF24">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
-              <span style={{ fontFamily: 'Open Sans', color: '#FBBF24', fontSize: 13, fontWeight: 700 }}>
-                {slide.rating.toFixed(1)}
-              </span>
-              {slide.reviewCount && (
-                <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
-                  ({slide.reviewCount.toLocaleString()})
-                </span>
-              )}
+              <span style={{ fontFamily: 'Open Sans', color: '#FBBF24', fontSize: 13, fontWeight: 700 }}>{slide.rating.toFixed(1)}</span>
+              {slide.reviewCount && <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>({slide.reviewCount.toLocaleString()})</span>}
             </div>
           )}
         </div>
-
-        {/* Action buttons */}
-        <div className="flex gap-2.5 mb-3" style={{ alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
           {slide.hasEvents && (
             <motion.button whileTap={{ scale: 0.92 }} onClick={onEvents}
-              className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
-              style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)' }}>
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 0', borderRadius: 16, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)', cursor: 'pointer' }}>
               <span style={{ fontSize: 20 }}>🎟️</span>
               <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>Events</span>
             </motion.button>
           )}
-
           <motion.button whileTap={{ scale: 0.92 }} onClick={onDirections}
-            className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
-            style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)' }}>
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 0', borderRadius: 16, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)', cursor: 'pointer' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+              <polygon points="3 11 22 2 13 21 11 13 3 11" />
             </svg>
             <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>Directions</span>
           </motion.button>
-
           {PLATEPOST_MENU_URLS[r.id] ? (
-            <motion.button whileTap={{ scale: 0.92 }}
-              onClick={() => onVideoMenu(PLATEPOST_MENU_URLS[r.id])}
-              className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
-              style={{ background: 'rgba(0,72,249,0.25)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,72,249,0.5)' }}>
+            <motion.button whileTap={{ scale: 0.92 }} onClick={() => onVideoMenu(PLATEPOST_MENU_URLS[r.id])}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 0', borderRadius: 16, background: 'rgba(0,72,249,0.25)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,72,249,0.5)', cursor: 'pointer' }}>
               <img src="/pp-mark.png" alt="" width={18} height={18} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
               <span style={{ fontFamily: 'Open Sans', color: '#fff', fontSize: 11, fontWeight: 700 }}>VideoMenu</span>
             </motion.button>
           ) : (
             <motion.button whileTap={{ scale: 0.92 }} onClick={onMenu}
-              className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl"
-              style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)' }}>
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 0', borderRadius: 16, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)', cursor: 'pointer' }}>
               <span style={{ fontSize: 20 }}>🍽️</span>
               <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>Menu</span>
             </motion.button>
           )}
         </div>
-
-        {/* More Info */}
         <motion.button whileTap={{ scale: 0.98 }} onClick={onMoreInfo}
-          className="w-full py-3.5 rounded-2xl text-sm font-bold"
-          style={{ fontFamily: 'Open Sans', background: 'rgba(255,255,255,0.95)', color: '#071126' }}>
-          More Info
+          style={{ width: '100%', padding: '14px 0', borderRadius: 16, fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, background: 'rgba(255,255,255,0.95)', color: '#071126', border: 'none', cursor: 'pointer' }}>
+          Details
         </motion.button>
       </div>
     </div>

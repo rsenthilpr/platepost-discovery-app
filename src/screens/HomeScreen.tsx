@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { PlatePostLogo, PlatePostOrbMark } from '../components/PlatePostLogo'
+import { PlatePostLogo } from '../components/PlatePostLogo'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
+import BottomNav from '../components/BottomNav'
 
 function getSearchHistory(): string[] {
   try { return JSON.parse(localStorage.getItem('pp_search_history') ?? '[]') } catch { return [] }
@@ -25,24 +26,25 @@ function Top10Card({ restaurant, onClick }: { restaurant: Restaurant; onClick: (
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
       style={{
-        flexShrink: 0, width: 140, borderRadius: 16, overflow: 'hidden',
+        flexShrink: 0, width: 150, borderRadius: 18, overflow: 'hidden',
         background: '#fff', border: '1px solid #f0f0f0',
         boxShadow: '0 2px 12px rgba(0,0,0,0.08)', cursor: 'pointer', textAlign: 'left', padding: 0,
       }}
     >
-      <div style={{ position: 'relative', height: 100 }}>
+      <div style={{ position: 'relative', height: 110 }}>
         <img src={restaurant.image_url} alt={restaurant.name}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.35) 0%, transparent 60%)' }} />
       </div>
-      <div style={{ padding: '8px 10px 10px' }}>
-        <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 12, color: '#071126', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div style={{ padding: '8px 10px 12px' }}>
+        <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: '#071126', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {restaurant.name}
         </p>
-        <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: '#9ca3af', margin: '2px 0 0' }}>
+        <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
           {restaurant.cuisine} · {restaurant.city}
         </p>
         {restaurant.rating && (
-          <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: '#f59e0b', margin: '2px 0 0', fontWeight: 600 }}>
+          <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#f59e0b', margin: '3px 0 0', fontWeight: 700 }}>
             ★ {restaurant.rating.toFixed(1)}
           </p>
         )}
@@ -137,19 +139,24 @@ export default function HomeScreen() {
         <div className="pointer-events-auto">
           <PlatePostLogo size="md" white={true} />
         </div>
+        {/* Location pill — wider to fit text on one line (Emilia fix) */}
         <button onClick={() => navigate('/map')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full pointer-events-auto"
-          style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.25)' }}>
+          className="flex items-center gap-1.5 px-4 py-2 rounded-full pointer-events-auto"
+          style={{
+            background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            whiteSpace: 'nowrap',
+          }}>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
           </svg>
-          <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 11, fontWeight: 600 }}>Los Angeles</span>
+          <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 12, fontWeight: 600 }}>Los Angeles</span>
         </button>
       </div>
 
       {/* Scrollable content */}
       <div className="absolute inset-0 z-20 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-        <div style={{ height: '45vh' }} />
+        <div style={{ height: '42vh' }} />
 
         {/* Hero text + chips */}
         <div className="px-5 pb-4">
@@ -194,7 +201,7 @@ export default function HomeScreen() {
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.25 }} className="flex gap-3">
             <button onClick={() => navigate('/map')}
               className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-              style={{ fontFamily: 'Open Sans', background: '#0048f9', color: '#fff' }}>
+              style={{ fontFamily: 'Open Sans', background: '#0048f9', color: '#fff', border: 'none', cursor: 'pointer' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
               </svg>
@@ -202,7 +209,7 @@ export default function HomeScreen() {
             </button>
             <button onClick={() => navigate('/list')}
               className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-              style={{ fontFamily: 'Open Sans', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff' }}>
+              style={{ fontFamily: 'Open Sans', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', cursor: 'pointer' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                 <polygon points="5,3 19,12 5,21" fill="white" />
               </svg>
@@ -211,18 +218,18 @@ export default function HomeScreen() {
           </motion.div>
         </div>
 
-        {/* White content area below hero */}
+        {/* White content area */}
         <div style={{ background: '#f8f9fa', borderRadius: '24px 24px 0 0', minHeight: '55vh', paddingTop: 20 }}>
 
-          {/* Search bar in white area */}
+          {/* Search bar */}
           <div className="px-5 mb-4">
             <button
               onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 12,
-                padding: '11px 14px', cursor: 'pointer', textAlign: 'left',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 14,
+                padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
+                boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
               }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.35, flexShrink: 0 }}>
                 <circle cx="11" cy="11" r="8" stroke="#071126" strokeWidth="2" />
@@ -237,15 +244,15 @@ export default function HomeScreen() {
             <div className="pb-6">
               <div className="px-5 mb-3 flex items-center justify-between">
                 <div>
-                  <p style={{ fontFamily: 'Open Sans', color: '#9ca3af', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>Top Rated</p>
-                  <h2 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#071126', fontSize: 20 }}>Popular in LA</h2>
+                  <p style={{ fontFamily: 'Open Sans', color: '#9ca3af', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', margin: 0 }}>Top Rated</p>
+                  <h2 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#071126', fontSize: 20, margin: '2px 0 0' }}>Popular in LA</h2>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => { const el = document.getElementById('top10-carousel'); if (el) el.scrollBy({ left: -160, behavior: 'smooth' }) }}
+                  <button onClick={() => { const el = document.getElementById('top10-carousel'); if (el) el.scrollBy({ left: -170, behavior: 'smooth' }) }}
                     style={{ width: 28, height: 28, borderRadius: '50%', background: '#fff', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" /></svg>
                   </button>
-                  <button onClick={() => { const el = document.getElementById('top10-carousel'); if (el) el.scrollBy({ left: 160, behavior: 'smooth' }) }}
+                  <button onClick={() => { const el = document.getElementById('top10-carousel'); if (el) el.scrollBy({ left: 170, behavior: 'smooth' }) }}
                     style={{ width: 28, height: 28, borderRadius: '50%', background: '#fff', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" /></svg>
                   </button>
@@ -263,7 +270,7 @@ export default function HomeScreen() {
             </div>
           )}
 
-          {/* Quick navigation tiles */}
+          {/* Explore grid */}
           <div className="px-5 pb-8">
             <h2 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#071126', fontSize: 20, marginBottom: 12 }}>Explore</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -292,34 +299,8 @@ export default function HomeScreen() {
             </div>
           </div>
 
-          <div style={{ height: 100 }} />
-        </div>
-      </div>
-
-      {/* Fixed stationary orbs — always visible, high z-index */}
-      <div style={{ position: 'fixed', bottom: 90, right: 20, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-        {/* Surprise orb */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <motion.button
-            onClick={() => navigate('/surprise')}
-            animate={{ boxShadow: ['0 0 16px rgba(245,158,11,0.5)', '0 0 28px rgba(239,68,68,0.6)', '0 0 16px rgba(245,158,11,0.5)'] }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: '2px solid rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
-            <motion.span animate={{ rotate: [0, 15, -15, 0] }} transition={{ duration: 3, repeat: Infinity }} style={{ fontSize: 22 }}>🎲</motion.span>
-          </motion.button>
-          <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase', textShadow: '0 1px 6px rgba(0,0,0,0.8)', background: 'rgba(0,0,0,0.4)', padding: '1px 5px', borderRadius: 4 }}>Surprise</span>
-        </div>
-
-        {/* Crave orb */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <motion.button
-            onClick={() => navigate('/concierge')}
-            animate={{ boxShadow: ['0 0 16px rgba(0,72,249,0.6)', '0 0 32px rgba(0,72,249,0.8)', '0 0 16px rgba(0,72,249,0.6)'] }}
-            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #0048f9, #3b82f6)', border: '2px solid rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
-            <PlatePostOrbMark size={20} />
-          </motion.button>
-          <span style={{ color: '#fff', fontSize: 8, fontWeight: 700, fontFamily: 'Open Sans', letterSpacing: '0.1em', textTransform: 'uppercase', textShadow: '0 1px 6px rgba(0,0,0,0.8)', background: 'rgba(0,0,0,0.4)', padding: '1px 5px', borderRadius: 4 }}>Crave</span>
+          {/* Bottom spacer for nav */}
+          <div style={{ height: 80 }} />
         </div>
       </div>
 
@@ -362,7 +343,6 @@ export default function HomeScreen() {
                 </button>
               </div>
 
-              {/* Results */}
               {searchResults.length > 0 ? (
                 <div className="overflow-y-auto" style={{ maxHeight: '55vh' }}>
                   {searchResults.map(r => (
@@ -419,6 +399,8 @@ export default function HomeScreen() {
           />
         )}
       </AnimatePresence>
+
+      <BottomNav />
     </div>
   )
 }

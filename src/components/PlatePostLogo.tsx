@@ -1,28 +1,27 @@
-// PlatePost Logo Component
+// src/components/PlatePostLogo.tsx
 // pp-logo.png  = full logo (icon + "PlatePost" text) — dark colored, works on light bg
 // pp-mark.png  = icon only — dark colored, works on light bg
-//
-// For DARK backgrounds: add filter to force white
-// For LIGHT backgrounds: use as-is
 
 export function PlatePostLogo({ size = 'md', white = false }: {
   size?: 'sm' | 'md' | 'lg'
   white?: boolean
 }) {
-  // Responsive: scales with screen width, clamped between min and max
-  const heights = {
-    sm: 'clamp(16px, 4vw, 20px)',
-    md: 'clamp(20px, 5vw, 26px)',
-    lg: 'clamp(26px, 7vw, 36px)',
+  // More aggressive responsive sizing — clearly readable on all devices
+  const styles: Record<string, React.CSSProperties> = {
+    sm: { height: 'clamp(18px, 5vw, 22px)', maxHeight: 22 },
+    md: { height: 'clamp(24px, 6.5vw, 32px)', maxHeight: 32 },
+    lg: { height: 'clamp(32px, 8vw, 44px)', maxHeight: 44 },
   }
   return (
     <img
       src="/pp-logo.png"
       alt="PlatePost"
       style={{
-        height: heights[size],
+        ...styles[size],
         width: 'auto',
+        maxWidth: '160px',
         objectFit: 'contain',
+        objectPosition: 'left center',
         display: 'block',
         filter: white ? 'brightness(0) invert(1)' : 'none',
       }}

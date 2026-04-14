@@ -6,7 +6,7 @@ import ListViewScreen from './screens/ListViewScreen'
 import MenuPage from './screens/MenuPage'
 import VibeMatchScreen from './screens/VibeMatchScreen'
 import ConciergeScreen from './screens/ConciergeScreen'
-import TonightScreen from './screens/TonightScreen'
+import EventsScreen from './screens/EventsScreen'
 import SurpriseMeScreen from './screens/SurpriseMeScreen'
 import SeedPage from './screens/SeedPage'
 
@@ -21,7 +21,8 @@ function App() {
         <Route path="/menu/:id" element={<MenuPage />} />
         <Route path="/vibe" element={<VibeMatchScreen />} />
         <Route path="/concierge" element={<ConciergeScreen />} />
-        <Route path="/tonight" element={<TonightScreen />} />
+        <Route path="/events" element={<EventsScreen />} />
+        <Route path="/tonight" element={<EventsScreen />} />
         <Route path="/surprise" element={<SurpriseMeScreen />} />
         <Route path="/seed" element={<SeedPage />} />
       </Routes>
