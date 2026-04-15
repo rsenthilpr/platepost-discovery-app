@@ -10,7 +10,6 @@ import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
 import { useCityStore } from '../lib/cityStore'
 import SurpriseOrb from '../components/SurpriseOrb'
-import VideoBackground from '../components/VideoBackground'
 
 function loadFavorites(): Set<number> {
   try {
@@ -549,7 +548,7 @@ interface ReelSlideCardProps {
 function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, slideRef, onMoreInfo, onDirections, onMenu, onVideoMenu, onEvents }: ReelSlideCardProps) {
   const r = slide.restaurant
   const [showFavPopup, setShowFavPopup] = useState(false)
-  const [_kenBurnsKey, setKenBurnsKey] = useState(0)
+  const [kenBurnsKey, setKenBurnsKey] = useState(0)
 
   useEffect(() => {
     if (isActive) setKenBurnsKey(k => k + 1)
@@ -571,12 +570,24 @@ function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, s
       data-index={index}
       style={{ position: 'relative', width: '100%', flexShrink: 0, overflow: 'hidden', height: '100dvh', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
     >
-      <VideoBackground
-        cuisine={r.cuisine}
-        fallbackImage={bgImage}
-        isActive={isActive}
-        directVideoUrl={slide.videoUrl}
-      />
+      {/* Background — video if loaded, photo fallback with kenBurns */}
+      {slide.videoUrl ? (
+        <video
+          src={slide.videoUrl}
+          autoPlay
+          muted
+          loop
+          playsInline
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+      ) : (
+        <img
+          key={kenBurnsKey}
+          src={bgImage}
+          alt={r.name}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: isActive ? 'kenBurns 8s ease-in-out infinite alternate' : 'none' }}
+        />
+      )}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140, background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: 'linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.6) 50%, transparent 100%)', pointerEvents: 'none' }} />
 
