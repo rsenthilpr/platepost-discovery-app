@@ -75,7 +75,7 @@ export default function ListViewScreen() {
   const location = useLocation()
   const { city } = useCityStore()
   const state = (location.state ?? {}) as LocationState
-
+  const isListView = !!state.listView
   const [slides, setSlides] = useState<ReelSlide[]>([])
   const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -86,7 +86,6 @@ export default function ListViewScreen() {
   const [menuIframeUrl, setMenuIframeUrl] = useState<string | null>(null)
   const [listSearch, setListSearch] = useState(state.searchQuery ?? '')
   const [showSearchBar, setShowSearchBar] = useState(false)
-  const [isListView, _setIsListView] = useState(false)
   const listSearchRef = useRef<HTMLInputElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -422,6 +421,43 @@ export default function ListViewScreen() {
   // ── REELS VIEW ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0" style={{ background: '#000' }}>
+      {/* Back button — always visible top left */}
+      <button
+        onClick={() => navigate(-1)}
+        style={{
+          position: 'fixed', top: 52, left: 16, zIndex: 60,
+          width: 36, height: 36, borderRadius: '50%',
+          background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+        }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {/* Swipe hint — shows briefly on first load */}
+      {currentIndex === 0 && slides.length > 1 && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          style={{
+            position: 'fixed', bottom: 160, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            pointerEvents: 'none',
+          }}
+        >
+          <motion.div
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 1.2, repeat: 3, ease: 'easeInOut' }}
+            style={{ fontSize: 24 }}>
+            ↑
+          </motion.div>
+          <span style={{ fontFamily: 'Open Sans', fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)', background: 'rgba(0,0,0,0.4)', padding: '4px 12px', borderRadius: 999 }}>
+            Swipe up to explore
+          </span>
+        </motion.div>
+      )}
+
       <div
         ref={scrollContainerRef}
         className="w-full h-full overflow-y-scroll"

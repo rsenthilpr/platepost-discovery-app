@@ -84,6 +84,7 @@ export default function HomeScreen() {
   const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([])
   const [searchHistory, setSearchHistory] = useState<string[]>(getSearchHistory)
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
+  const [selectedGooglePlace, setSelectedGooglePlace] = useState<PlaceRestaurant | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Load Supabase restaurants for search + hero images
@@ -186,8 +187,8 @@ export default function HomeScreen() {
         style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.0) 35%, rgba(0,0,0,0.6) 68%, rgba(0,0,0,0.97) 100%)' }}
       />
 
-      {/* Top bar — logo + city picker */}
-      <div className="absolute top-0 left-0 right-0 z-40 pt-14 px-5 flex items-center justify-between pointer-events-none">
+      {/* Top bar — higher z-index to stay above scrollable content */}
+      <div className="absolute top-0 left-0 right-0 z-50 pt-14 px-5 flex items-center justify-between pointer-events-none">
         <div className="pointer-events-auto">
           <PlatePostLogo size="md" white={true} />
         </div>
@@ -307,10 +308,7 @@ export default function HomeScreen() {
                 style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
                 {featuredPlaces.map((r) => (
                   <div key={r.id} style={{ scrollSnapAlign: 'start' }}>
-                    <RestaurantCard restaurant={r as any} onClick={() => {
-                      // For Google Places results, navigate to list view filtered to that name
-                      navigate('/list', { state: { searchQuery: r.name, listView: true } })
-                    }} />
+                    <RestaurantCard restaurant={r as any} onClick={() => setSelectedGooglePlace(r)} />
                   </div>
                 ))}
               </div>
@@ -456,6 +454,69 @@ export default function HomeScreen() {
             isFavorite={false}
             onToggleFavorite={() => {}}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Google Places result detail sheet */}
+      <AnimatePresence>
+        {selectedGooglePlace && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', zIndex: 30 }}
+              onClick={() => setSelectedGooglePlace(null)} />
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+              style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40, background: '#0e1f42', borderRadius: '24px 24px 0 0', maxHeight: '85vh', overflowY: 'auto', scrollbarWidth: 'none' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 8px' }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.2)' }} />
+              </div>
+              {selectedGooglePlace.image_url && (
+                <div style={{ height: 200, margin: '0 16px 16px', borderRadius: 16, overflow: 'hidden', position: 'relative' }}>
+                  <img src={selectedGooglePlace.image_url} alt={selectedGooglePlace.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(14,31,66,0.85), transparent 50%)' }} />
+                  <button onClick={() => setSelectedGooglePlace(null)}
+                    style={{ position: 'absolute', top: 10, right: 10, width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M18 6L6 18M6 6l12 12" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              <div style={{ padding: '0 20px 32px' }}>
+                <h2 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, fontSize: 20, color: '#FAFBFF', margin: '0 0 6px' }}>
+                  {selectedGooglePlace.name}
+                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <span style={{ fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#6B9EFF', background: 'rgba(69,118,239,0.18)', padding: '3px 10px', borderRadius: 999 }}>
+                    {selectedGooglePlace.cuisine}
+                  </span>
+                  {selectedGooglePlace.rating && (
+                    <span style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#FBBF24', fontWeight: 700 }}>
+                      ★ {selectedGooglePlace.rating}
+                    </span>
+                  )}
+                </div>
+                {selectedGooglePlace.address && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20 }}>
+                    <span style={{ fontSize: 14 }}>📍</span>
+                    <p style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.6)', fontSize: 13, margin: 0 }}>
+                      {selectedGooglePlace.address}
+                    </p>
+                  </div>
+                )}
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedGooglePlace.name + ' ' + selectedGooglePlace.city)}`}
+                  target="_blank" rel="noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 0', borderRadius: 14, textDecoration: 'none', background: '#0048f9', color: '#fff', fontFamily: 'Open Sans, sans-serif', fontWeight: 700, fontSize: 14, marginBottom: 10 }}>
+                  📍 Get Directions
+                </a>
+                <div style={{ height: 80 }} />
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 

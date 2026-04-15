@@ -473,7 +473,7 @@ export default function EventsScreen() {
                 </div>
               )}
 
-              <div style={{ padding: '0 20px 32px' }}>
+              <div style={{ padding: '0 20px 96px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
                   <div style={{ flex: 1 }}>
                     <span style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 10, color: '#0048f9', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -495,9 +495,14 @@ export default function EventsScreen() {
                     <span style={{ fontSize: 16 }}>📅</span>
                     <span style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#374151' }}>{openEvent.date} · {openEvent.time}</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                     <span style={{ fontSize: 16 }}>📍</span>
-                    <span style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#374151' }}>{openEvent.venueName}{openEvent.venueCity ? `, ${openEvent.venueCity}` : ''}</span>
+                    <div>
+                      <span style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#374151', fontWeight: 600 }}>{openEvent.venueName}</span>
+                      {openEvent.venueCity && (
+                        <span style={{ fontFamily: 'Open Sans', fontSize: 12, color: '#6b7280' }}>{', '}{openEvent.venueCity}</span>
+                      )}
+                    </div>
                   </div>
                   {openEvent.price && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

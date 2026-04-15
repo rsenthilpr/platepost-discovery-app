@@ -108,7 +108,14 @@ export default function BottomNav() {
           return (
             <motion.button
               key={tab.id}
-              onClick={() => navigate(tab.path)}
+              onClick={() => {
+                // Feed tab always opens light list view, not dark reels
+                if (tab.id === 'feed') {
+                  navigate('/list', { state: { listView: true } })
+                } else {
+                  navigate(tab.path)
+                }
+              }}
               whileTap={{ scale: 0.85 }}
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',

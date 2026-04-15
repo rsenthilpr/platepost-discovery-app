@@ -52,7 +52,7 @@ export default function MapViewScreen() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestions, setSuggestions] = useState<Restaurant[]>([])
   const [map, setMap] = useState<google.maps.Map | null>(null)
-  const [currentZoom, setCurrentZoom] = useState(12)
+  const [currentZoom, setCurrentZoom] = useState(11)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [locationLoading, setLocationLoading] = useState(false)
   const [trayOpen, setTrayOpen] = useState(true)
@@ -134,9 +134,10 @@ export default function MapViewScreen() {
       return da - db
     }).slice(0, 20)
 
-  const pinsToShow = currentZoom >= 13 ? filtered
-    : currentZoom >= 11 ? [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 40)
-    : [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 15)
+  // Strict density control — fewer pins at city level
+  const pinsToShow = currentZoom >= 14 ? filtered
+    : currentZoom >= 12 ? [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 12)
+    : [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 8)
 
   useEffect(() => {
     if (!mapSearch.trim() || mapSearch.length < 2) { setSuggestions([]); setShowSuggestions(false); return }
@@ -234,7 +235,7 @@ export default function MapViewScreen() {
       {/* Map */}
       <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: trayHeight + 64 }}>
         {isLoaded ? (
-          <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={{ lat: city.lat, lng: city.lng }} zoom={12} onLoad={onMapLoad}
+          <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={{ lat: city.lat, lng: city.lng }} zoom={11} onLoad={onMapLoad}
             options={{ styles: MAP_STYLES, disableDefaultUI: true, zoomControl: false, scrollwheel: true, gestureHandling: 'greedy', clickableIcons: false }}>
             {pinsToShow.map((r) => {
               const isPro = PLATEPOST_IDS.has(r.id)
@@ -242,37 +243,44 @@ export default function MapViewScreen() {
               const emoji = CUISINE_EMOJI[r.cuisine] ?? '🍽️'
               return (
                 <OverlayView key={r.id} position={{ lat: r.latitude, lng: r.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                  {/* Wrapper div handles centering — motion.div handles click */}
-                  <div style={{ position: 'absolute', transform: 'translate(-50%, -50%)', cursor: 'pointer' }}
-                    onClick={() => { setSelectedRestaurant(isSelected ? null : r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}>
-                    <div
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 4,
-                        padding: '4px 8px', borderRadius: 999,
-                        background: isSelected ? '#0048f9' : isPro ? '#0048f9' : '#fff',
-                        border: `2px solid ${isSelected ? '#60a5fa' : isPro ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.15)'}`,
-                        boxShadow: isSelected
-                          ? '0 0 0 3px rgba(0,72,249,0.4), 0 4px 12px rgba(0,0,0,0.5)'
-                          : '0 2px 8px rgba(0,0,0,0.35)',
-                        zIndex: isSelected ? 20 : isPro ? 10 : 1,
-                        maxWidth: currentZoom >= 13 ? 140 : 36,
-                        overflow: 'hidden', whiteSpace: 'nowrap',
-                        transition: 'all 0.15s ease',
-                        transform: isSelected ? 'scale(1.1)' : 'scale(1)',
-                      }}>
+                  {/* Wrapper div handles centering */}
+                  <div
+                    style={{ position: 'absolute', transform: 'translate(-50%, -50%)', cursor: 'pointer' }}
+                    onClick={() => { setSelectedRestaurant(isSelected ? null : r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
+                  >
+                    <div style={{
+                      width: isSelected ? 42 : isPro ? 38 : 32,
+                      height: isSelected ? 42 : isPro ? 38 : 32,
+                      borderRadius: '50%',
+                      background: isSelected ? '#0048f9' : isPro ? '#0048f9' : '#fff',
+                      border: `2px solid ${isSelected ? '#93c5fd' : isPro ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)'}`,
+                      boxShadow: isSelected
+                        ? '0 0 0 4px rgba(0,72,249,0.35), 0 4px 16px rgba(0,0,0,0.5)'
+                        : '0 2px 6px rgba(0,0,0,0.3)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.15s ease',
+                      zIndex: isSelected ? 20 : isPro ? 10 : 1,
+                    }}>
                       {isPro
-                        ? <img src="/pp-mark.png" alt="" width={12} height={12} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', flexShrink: 0 }} />
-                        : <span style={{ fontSize: 13, flexShrink: 0, lineHeight: 1 }}>{emoji}</span>}
-                      {currentZoom >= 13 && (
-                        <span style={{
-                          fontFamily: 'Open Sans', fontSize: 10, fontWeight: 700,
-                          color: isSelected || isPro ? '#fff' : '#071126',
-                          overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100,
-                        }}>
-                          {r.name.length > 14 ? r.name.slice(0, 13) + '…' : r.name}
-                        </span>
-                      )}
+                        ? <img src="/pp-mark.png" alt="" width={14} height={14}
+                            style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+                        : <span style={{ fontSize: isSelected ? 16 : 14, lineHeight: 1 }}>{emoji}</span>
+                      }
                     </div>
+                    {/* Name tooltip only when selected */}
+                    {isSelected && (
+                      <div style={{
+                        position: 'absolute', bottom: '110%', left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: '#0048f9', color: '#fff',
+                        fontFamily: 'Open Sans', fontWeight: 700, fontSize: 11,
+                        padding: '4px 10px', borderRadius: 8,
+                        whiteSpace: 'nowrap', pointerEvents: 'none',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                      }}>
+                        {r.name.length > 20 ? r.name.slice(0, 19) + '…' : r.name}
+                      </div>
+                    )}
                   </div>
                 </OverlayView>
               )
