@@ -9,6 +9,7 @@ import BottomNav from '../components/BottomNav'
 import SurpriseOrb from '../components/SurpriseOrb'
 import CityPicker from '../components/CityPicker'
 import { useCityStore } from '../lib/cityStore'
+import VideoBackground from '../components/VideoBackground'
 
 function getSearchHistory(): string[] {
   try { return JSON.parse(localStorage.getItem('pp_search_history') ?? '[]') } catch { return [] }
@@ -36,22 +37,42 @@ interface PlaceRestaurant {
 
 function RestaurantCard({ restaurant, onClick }: { restaurant: Restaurant | PlaceRestaurant; onClick: () => void }) {
   const r = restaurant as any
+  const [hovered, setHovered] = useState(false)
+
   return (
     <motion.button
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onTouchStart={() => setHovered(true)}
+      onTouchEnd={() => setTimeout(() => setHovered(false), 1500)}
       style={{
         flexShrink: 0, width: 155, borderRadius: 18, overflow: 'hidden',
         background: '#fff', border: '1px solid #f0f0f0',
         boxShadow: '0 2px 12px rgba(0,0,0,0.08)', cursor: 'pointer', textAlign: 'left', padding: 0,
       }}
     >
-      <div style={{ position: 'relative', height: 110, background: '#e5e7eb' }}>
-        {r.image_url && (
-          <img src={r.image_url} alt={r.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      {/* Video thumbnail — plays on hover/focus */}
+      <div style={{ position: 'relative', height: 110, background: '#e5e7eb', overflow: 'hidden' }}>
+        <VideoBackground
+          cuisine={r.cuisine ?? 'Restaurant'}
+          fallbackImage={r.image_url ?? ''}
+          isActive={hovered}
+        />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.3) 0%, transparent 60%)', zIndex: 1 }} />
+        {/* Play indicator */}
+        {!hovered && (
+          <div style={{
+            position: 'absolute', bottom: 6, right: 6, zIndex: 2,
+            width: 20, height: 20, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="white">
+              <polygon points="5,3 19,12 5,21" />
+            </svg>
+          </div>
         )}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.3) 0%, transparent 60%)' }} />
       </div>
       <div style={{ padding: '8px 10px 12px' }}>
         <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: '#071126', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -75,7 +96,6 @@ export default function HomeScreen() {
   const { city } = useCityStore()
   const [showCityPicker, setShowCityPicker] = useState(false)
   const [heroImages, setHeroImages] = useState<string[]>([])
-  const [imageIndex, setImageIndex] = useState(0)
   const [featuredPlaces, setFeaturedPlaces] = useState<PlaceRestaurant[]>([])
   const [loadingPlaces, setLoadingPlaces] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -139,12 +159,6 @@ export default function HomeScreen() {
     }
   }
 
-  useEffect(() => {
-    if (heroImages.length < 2) return
-    const interval = setInterval(() => setImageIndex(i => (i + 1) % heroImages.length), 5000)
-    return () => clearInterval(interval)
-  }, [heroImages.length])
-
   function handleSearch(query: string) {
     setSearchQuery(query)
     if (!query.trim()) { setSearchResults([]); return }
@@ -171,12 +185,15 @@ export default function HomeScreen() {
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#fff' }}>
 
-      {/* Hero background */}
+      {/* Hero — full-bleed autoplay video */}
       <div className="absolute inset-0">
-        {heroImages.map((img, i) => (
-          <img key={img} src={img} alt="" className="absolute inset-0 w-full h-full object-cover"
-            style={{ opacity: i === imageIndex ? 1 : 0, transition: 'opacity 1.5s ease', zIndex: i === imageIndex ? 1 : 0 }} />
-        ))}
+        <VideoBackground
+          cuisine="Restaurant"
+          fallbackImage={heroImages[0] ?? ''}
+          isActive={true}
+          orientation="landscape"
+          style={{ position: 'absolute', inset: 0 }}
+        />
         {heroImages.length === 0 && (
           <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #0a1628, #1a2f5e)' }} />
         )}

@@ -1,51 +1,47 @@
 // src/components/VideoBackground.tsx
-// Fetches a real HD food video from Pexels API via serverless proxy
-// Falls back silently to restaurant photo if video fails
-
 import { useRef, useEffect, useState } from 'react'
 
 interface Props {
   cuisine: string
   fallbackImage: string
   isActive: boolean
+  orientation?: 'portrait' | 'landscape'
   style?: React.CSSProperties
 }
 
-// Module-level cache so we don't refetch the same cuisine twice per session
+// Module-level cache keyed by cuisine:orientation
 const videoUrlCache: Record<string, string | null> = {}
 
-export default function VideoBackground({ cuisine, fallbackImage, isActive, style }: Props) {
+export default function VideoBackground({ cuisine, fallbackImage, isActive, orientation = 'portrait', style }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [videoUrl, setVideoUrl] = useState<string | null>(videoUrlCache[cuisine] ?? null)
+  const cacheKey = `${cuisine}:${orientation}`
+  const [videoUrl, setVideoUrl] = useState<string | null>(
+    cacheKey in videoUrlCache ? videoUrlCache[cacheKey] : null
+  )
   const [videoFailed, setVideoFailed] = useState(false)
   const [videoLoaded, setVideoLoaded] = useState(false)
 
-  // Fetch video URL from Pexels proxy
   useEffect(() => {
-    if (videoUrlCache[cuisine] !== undefined) {
-      // Already fetched (may be null if failed)
-      setVideoUrl(videoUrlCache[cuisine])
+    if (cacheKey in videoUrlCache) {
+      setVideoUrl(videoUrlCache[cacheKey])
       return
     }
-
-    fetch(`/api/pexels-video?cuisine=${encodeURIComponent(cuisine)}`)
+    fetch(`/api/pexels-video?cuisine=${encodeURIComponent(cuisine)}&orientation=${orientation}`)
       .then(r => r.json())
       .then(data => {
         const url = data.url ?? null
-        videoUrlCache[cuisine] = url
+        videoUrlCache[cacheKey] = url
         setVideoUrl(url)
       })
       .catch(() => {
-        videoUrlCache[cuisine] = null
+        videoUrlCache[cacheKey] = null
         setVideoUrl(null)
       })
-  }, [cuisine])
+  }, [cacheKey])
 
-  // Play/pause based on active state
   useEffect(() => {
     const video = videoRef.current
     if (!video || !videoUrl || videoFailed) return
-
     if (isActive && videoLoaded) {
       video.play().catch(() => setVideoFailed(true))
     } else {
@@ -53,21 +49,17 @@ export default function VideoBackground({ cuisine, fallbackImage, isActive, styl
     }
   }, [isActive, videoUrl, videoFailed, videoLoaded])
 
-  // Always show fallback image underneath for instant load
   return (
     <div style={{ position: 'absolute', inset: 0, ...style }}>
-      {/* Fallback photo — always visible instantly */}
-      <img
-        src={fallbackImage}
-        alt=""
-        style={{
-          position: 'absolute', inset: 0,
-          width: '100%', height: '100%',
-          objectFit: 'cover',
-        }}
-      />
-
-      {/* Video overlay — loads on top when ready */}
+      {/* Fallback photo always visible instantly */}
+      {fallbackImage && (
+        <img
+          src={fallbackImage}
+          alt=""
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+      )}
+      {/* Video fades in on top when ready */}
       {videoUrl && !videoFailed && (
         <video
           ref={videoRef}
@@ -77,16 +69,13 @@ export default function VideoBackground({ cuisine, fallbackImage, isActive, styl
           playsInline
           preload={isActive ? 'auto' : 'none'}
           onCanPlay={() => setVideoLoaded(true)}
-          onError={() => {
-            setVideoFailed(true)
-            videoUrlCache[cuisine] = null
-          }}
+          onError={() => { setVideoFailed(true); videoUrlCache[cacheKey] = null }}
           style={{
             position: 'absolute', inset: 0,
             width: '100%', height: '100%',
             objectFit: 'cover',
             opacity: videoLoaded && isActive ? 1 : 0,
-            transition: 'opacity 0.5s ease',
+            transition: 'opacity 0.6s ease',
           }}
         />
       )}

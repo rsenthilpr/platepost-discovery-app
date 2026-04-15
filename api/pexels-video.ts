@@ -1,28 +1,27 @@
-// api/pexels-video.ts — Serverless proxy for Pexels video API
+// api/pexels-video.ts
 export const config = { runtime: 'nodejs' }
 
 const PEXELS_KEY = process.env.VITE_PEXELS_KEY
+const BASE = 'https://api.pexels.com/videos/search'
 
-// Search terms per cuisine — optimized for food/restaurant content
 const CUISINE_QUERIES: Record<string, string> = {
-  Coffee: 'latte art coffee barista pouring',
-  Cafe: 'coffee cafe morning breakfast',
-  Japanese: 'sushi japanese food ramen',
-  Italian: 'pasta italian food pizza',
-  American: 'burger grill american food',
-  Mexican: 'tacos mexican food street food',
-  Korean: 'korean bbq grill meat',
-  Thai: 'thai food noodles cooking',
-  Vietnamese: 'pho vietnamese noodle soup',
-  Chinese: 'chinese food dim sum wok',
-  Indian: 'indian food curry spices',
-  Mediterranean: 'mediterranean food grilling fresh',
-  Restaurant: 'restaurant food dining cooking',
+  Coffee:        'latte art coffee barista pouring',
+  Cafe:          'coffee shop morning cafe',
+  Japanese:      'sushi chef japanese food plating',
+  Italian:       'pasta italian kitchen chef cooking',
+  American:      'burger grill smash burger fries',
+  Mexican:       'tacos mexican street food',
+  Korean:        'korean bbq grill meat',
+  Thai:          'thai food noodles wok cooking',
+  Vietnamese:    'pho vietnamese noodle soup broth',
+  Chinese:       'chinese dim sum wok stir fry',
+  Indian:        'indian curry spices cooking',
+  Mediterranean: 'mediterranean food grilling fresh herbs',
+  Restaurant:    'restaurant dining food plating chef kitchen',
 }
+const FALLBACK = 'restaurant food cooking chef plating'
 
-const FALLBACK_QUERY = 'restaurant food cooking chef'
-
-// Cache results in memory to avoid hitting API repeatedly
+// In-memory cache (per serverless instance lifetime)
 const cache: Record<string, string> = {}
 
 export default async function handler(req: any, res: any) {
@@ -35,65 +34,61 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ url: null, error: 'Pexels key not configured' })
   }
 
-  const { cuisine = 'Restaurant' } = req.query as Record<string, string>
+  const { cuisine = 'Restaurant', orientation = 'portrait' } = req.query as Record<string, string>
+  const cacheKey = `${cuisine}:${orientation}`
 
-  // Return cached result if available
-  if (cache[cuisine]) {
-    return res.status(200).json({ url: cache[cuisine] })
+  if (cache[cacheKey]) {
+    return res.status(200).json({ url: cache[cacheKey] })
   }
 
-  const query = CUISINE_QUERIES[cuisine] ?? FALLBACK_QUERY
+  const query = CUISINE_QUERIES[cuisine] ?? FALLBACK
 
   try {
-    const response = await fetch(
-      `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=10&orientation=portrait&size=medium`,
-      {
-        headers: {
-          Authorization: PEXELS_KEY,
-        },
-      }
-    )
+    const url = `${BASE}?query=${encodeURIComponent(query)}&per_page=15&orientation=${orientation}&size=large`
+    const response = await fetch(url, {
+      headers: { Authorization: PEXELS_KEY },
+    })
 
     if (!response.ok) {
-      console.error('Pexels API error:', response.status)
+      console.error(`Pexels ${response.status} for ${cuisine}`)
       return res.status(200).json({ url: null, error: `Pexels error ${response.status}` })
     }
 
     const data: any = await response.json()
-    const videos = data.videos ?? []
+    const videos: any[] = data.videos ?? []
 
     if (videos.length === 0) {
       return res.status(200).json({ url: null })
     }
 
-    // Pick a random video from results for variety
-    const randomVideo = videos[Math.floor(Math.random() * Math.min(videos.length, 5))]
+    // Pick random from top 5 results for variety
+    const pick = videos[Math.floor(Math.random() * Math.min(videos.length, 5))]
+    const files: any[] = pick.video_files ?? []
 
-    // Get the HD or SD file — prefer portrait/vertical for mobile
-    const files: any[] = randomVideo.video_files ?? []
+    // For landscape (hero): prefer wide HD files
+    // For portrait (cards/feed): prefer vertical HD files
+    const isPortrait = orientation === 'portrait'
 
-    // Sort by quality — prefer HD portrait
     const sorted = files
       .filter((f: any) => f.link && (f.quality === 'hd' || f.quality === 'sd'))
       .sort((a: any, b: any) => {
-        // Prefer portrait (height > width)
-        const aPortrait = a.height > a.width ? 1 : 0
-        const bPortrait = b.height > b.width ? 1 : 0
-        if (bPortrait !== aPortrait) return bPortrait - aPortrait
-        // Then prefer higher resolution
+        const aMatch = isPortrait ? (a.height > a.width ? 1 : 0) : (a.width > a.height ? 1 : 0)
+        const bMatch = isPortrait ? (b.height > b.width ? 1 : 0) : (b.width > b.height ? 1 : 0)
+        if (bMatch !== aMatch) return bMatch - aMatch
+        // Higher resolution wins
         return (b.width * b.height) - (a.width * a.height)
       })
 
     const best = sorted[0]?.link ?? files[0]?.link ?? null
 
-    if (best) {
-      cache[cuisine] = best
-    }
+    if (best) cache[cacheKey] = best
 
+    console.log(`Pexels [${cuisine}:${orientation}]: ${best ? 'got video' : 'no video'}`)
     return res.status(200).json({ url: best })
+
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    console.error('Pexels video error:', message)
-    return res.status(200).json({ url: null, error: message })
+    const msg = err instanceof Error ? err.message : 'Unknown'
+    console.error('Pexels error:', msg)
+    return res.status(200).json({ url: null, error: msg })
   }
 }
