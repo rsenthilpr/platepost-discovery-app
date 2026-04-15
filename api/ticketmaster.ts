@@ -16,12 +16,14 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ events: [], error: 'API key not configured' })
   }
 
-  const { category, size = '50' } = req.query as Record<string, string>
+  const { category, size = '50', city = 'Los Angeles', stateCode = 'CA' } = req.query as Record<string, string>
 
   const params = new URLSearchParams({
     apikey: TM_KEY,
     size,
     sort: 'date,asc',
+    city,
+    stateCode,
     countryCode: 'US',
   })
 

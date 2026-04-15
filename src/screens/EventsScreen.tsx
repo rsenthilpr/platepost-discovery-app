@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import BottomNav from '../components/BottomNav'
+import { useCityStore } from '../lib/cityStore'
 
 interface TMEvent {
   id: string
@@ -86,8 +87,8 @@ const CATEGORY_FILTERS = ['All', 'Music', 'Arts', 'Comedy', 'Sports', 'Food', 'F
 
 export default function EventsScreen() {
   const navigate = useNavigate()
+  const { city } = useCityStore()
   const today = new Date()
-  // Use local date string to avoid UTC offset issues
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
   const [events, setEvents] = useState<EventItem[]>([])
@@ -99,21 +100,26 @@ export default function EventsScreen() {
   const [calYear, setCalYear] = useState(today.getFullYear())
   const [selectedDate, setSelectedDate] = useState<string>(todayStr)
 
+  // Reload events when city changes
   useEffect(() => {
     loadEvents()
-  }, [])
+  }, [city.name])
 
   async function loadEvents() {
     setLoading(true)
     setError(null)
 
     try {
-      // Call our serverless proxy — avoids CORS and keeps API key server-side
+      // Pass city and stateCode so events are filtered by selected city
+      const cityParam = encodeURIComponent(city.name)
+      const stateParam = encodeURIComponent(city.state || 'CA')
+      const cityQuery = `&city=${cityParam}&stateCode=${stateParam}`
+
       const [r1, r2, r3, r4] = await Promise.all([
-        fetch('/api/ticketmaster?category=music&size=50'),
-        fetch('/api/ticketmaster?category=food&size=30'),
-        fetch('/api/ticketmaster?category=arts&size=25'),
-        fetch('/api/ticketmaster?category=comedy&size=20'),
+        fetch(`/api/ticketmaster?category=music&size=50${cityQuery}`),
+        fetch(`/api/ticketmaster?category=food&size=30${cityQuery}`),
+        fetch(`/api/ticketmaster?category=arts&size=25${cityQuery}`),
+        fetch(`/api/ticketmaster?category=comedy&size=20${cityQuery}`),
       ])
 
       const [d1, d2, d3, d4] = await Promise.all([r1.json(), r2.json(), r3.json(), r4.json()])
@@ -215,7 +221,7 @@ export default function EventsScreen() {
               Events
             </h1>
             <p style={{ fontFamily: 'Open Sans, sans-serif', fontSize: 12, color: '#9ca3af', margin: '2px 0 0' }}>
-              Discover what's happening
+              {city.name} · Discover what's happening
             </p>
           </div>
         </div>

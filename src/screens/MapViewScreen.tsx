@@ -53,8 +53,7 @@ export default function MapViewScreen() {
   const [suggestions, setSuggestions] = useState<Restaurant[]>([])
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [currentZoom, setCurrentZoom] = useState(11)
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
-  const [locationLoading, setLocationLoading] = useState(false)
+  const [userLocation, _setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [trayOpen, setTrayOpen] = useState(true)
   const [loadingPlaces, setLoadingPlaces] = useState(false)
   const topBarRef = useRef<HTMLDivElement>(null)
@@ -146,19 +145,6 @@ export default function MapViewScreen() {
     setSuggestions(matches); setShowSuggestions(matches.length > 0)
   }, [mapSearch, allRestaurants.length])
 
-  function requestUserLocation() {
-    if (!navigator.geolocation) return
-    setLocationLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        setUserLocation(loc)
-        if (map) { map.setCenter(loc); map.setZoom(14) }
-        setLocationLoading(false)
-      },
-      () => setLocationLoading(false), { timeout: 8000 }
-    )
-  }
 
   function toggleFavorite(id: number) {
     setFavorites(prev => {
@@ -243,10 +229,11 @@ export default function MapViewScreen() {
               const emoji = CUISINE_EMOJI[r.cuisine] ?? '🍽️'
               return (
                 <OverlayView key={r.id} position={{ lat: r.latitude, lng: r.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                  {/* Wrapper div handles centering */}
+                  {/* Wrapper: handles both click (desktop) and touch (mobile) */}
                   <div
                     style={{ position: 'absolute', transform: 'translate(-50%, -50%)', cursor: 'pointer' }}
                     onClick={() => { setSelectedRestaurant(isSelected ? null : r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
+                    onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedRestaurant(isSelected ? null : r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
                   >
                     <div style={{
                       width: isSelected ? 42 : isPro ? 38 : 32,
@@ -298,13 +285,33 @@ export default function MapViewScreen() {
         )}
       </div>
 
-      {/* Zoom + Near Me */}
+      {/* Zoom + Recenter */}
       <div style={{ position: 'absolute', right: 16, bottom: trayHeight + 80, zIndex: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <button onClick={() => { if (map) map.setZoom((map.getZoom() ?? 12) + 1) }} style={{ width: 40, height: 40, borderRadius: 10, background: '#1f2937', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>+</button>
-        <button onClick={requestUserLocation} style={{ width: 40, height: 40, borderRadius: 10, background: userLocation ? '#0048f9' : '#1f2937', border: `1px solid ${userLocation ? '#0048f9' : 'rgba(255,255,255,0.15)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
-          {locationLoading ? <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', animation: 'spin 1s linear infinite' }} /> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="white" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="12" r="7" stroke="white" strokeWidth="1.5" opacity="0.5" /></svg>}
+        <button
+          onClick={() => { if (map) map.setZoom((map.getZoom() ?? 12) + 1) }}
+          style={{ width: 40, height: 40, borderRadius: 10, background: '#1f2937', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
+          +
         </button>
-        <button onClick={() => { if (map) map.setZoom((map.getZoom() ?? 12) - 1) }} style={{ width: 40, height: 40, borderRadius: 10, background: '#1f2937', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 24, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>−</button>
+        {/* Recenter button — returns to city default view */}
+        <button
+          onClick={() => {
+            if (map) {
+              map.setCenter({ lat: city.lat, lng: city.lng })
+              map.setZoom(11)
+            }
+          }}
+          title="Recenter map"
+          style={{ width: 40, height: 40, borderRadius: 10, background: '#1f2937', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M12 8a4 4 0 100 8 4 4 0 000-8z" fill="white" opacity="0.9"/>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+        <button
+          onClick={() => { if (map) map.setZoom((map.getZoom() ?? 12) - 1) }}
+          style={{ width: 40, height: 40, borderRadius: 10, background: '#1f2937', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 24, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
+          −
+        </button>
       </div>
 
       {/* Tray */}
