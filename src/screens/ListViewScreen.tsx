@@ -34,12 +34,91 @@ interface LocationState {
 }
 
 const VIDEO_QUERY_POOLS: Record<string, string[]> = {
-  Japanese: ['sushi chef knife skills', 'ramen noodles cooking', 'japanese food plating', 'sashimi fresh fish', 'tempura frying'],
-  Italian: ['pasta dough kneading', 'pizza wood fired oven', 'italian cooking sauce', 'risotto stirring', 'tiramisu dessert'],
-  American: ['burger grilling flames', 'bbq smoke grill meat', 'fried chicken crispy', 'cocktail bartender mixing', 'smash burger cooking'],
-  Coffee: ['latte art pouring', 'coffee espresso machine', 'barista pour over', 'coffee roasting beans', 'cappuccino foam milk'],
-  Cafe: ['brunch avocado toast', 'pastry bakery morning', 'cafe interior cozy', 'eggs benedict breakfast', 'french press coffee'],
-  Mexican: ['tacos street food', 'guacamole fresh made', 'mexican grill cooking', 'tortilla making', 'margarita cocktail'],
+  // US restaurant-focused queries — avoid street food / overseas content
+  Indian: [
+    'indian restaurant butter chicken plating',
+    'naan bread oven fresh baked',
+    'indian curry restaurant dining',
+    'tikka masala restaurant cooking',
+    'indian restaurant fine dining interior',
+  ],
+  Japanese: [
+    'sushi chef plating restaurant',
+    'ramen bowl restaurant',
+    'japanese restaurant dining experience',
+    'sashimi plating fresh',
+    'japanese food restaurant interior',
+  ],
+  Italian: [
+    'pasta restaurant plating',
+    'pizza restaurant wood fired',
+    'italian restaurant dining',
+    'risotto restaurant cooking',
+    'italian fine dining interior',
+  ],
+  American: [
+    'burger restaurant gourmet plating',
+    'bbq restaurant smoke meat',
+    'american restaurant dining',
+    'cocktail bar restaurant mixing',
+    'upscale american restaurant interior',
+  ],
+  Coffee: [
+    'latte art coffee shop',
+    'espresso machine barista',
+    'coffee shop pour over',
+    'specialty coffee shop interior',
+    'cappuccino barista craft',
+  ],
+  Cafe: [
+    'cafe brunch restaurant',
+    'bakery cafe morning',
+    'cozy cafe interior dining',
+    'cafe breakfast plating',
+    'coffee shop cafe ambiance',
+  ],
+  Mexican: [
+    'mexican restaurant tacos plating',
+    'mexican restaurant interior dining',
+    'guacamole fresh restaurant',
+    'margarita restaurant bar',
+    'mexican food restaurant upscale',
+  ],
+  Korean: [
+    'korean bbq restaurant dining',
+    'korean restaurant grill table',
+    'korean food restaurant plating',
+    'korean fried chicken restaurant',
+    'korean restaurant interior',
+  ],
+  Thai: [
+    'thai restaurant food plating',
+    'thai restaurant dining interior',
+    'pad thai restaurant cooking',
+    'thai cuisine restaurant',
+    'thai food noodles restaurant',
+  ],
+  Vietnamese: [
+    'vietnamese restaurant pho bowl',
+    'vietnamese restaurant dining',
+    'pho restaurant noodles',
+    'vietnamese food restaurant plating',
+    'vietnamese restaurant interior',
+  ],
+  Chinese: [
+    'chinese restaurant dim sum',
+    'chinese restaurant dining interior',
+    'chinese food restaurant wok',
+    'dim sum restaurant service',
+    'chinese cuisine restaurant plating',
+  ],
+  Mediterranean: [
+    'mediterranean restaurant grilled food',
+    'mediterranean dining interior',
+    'mediterranean food restaurant plating',
+    'greek restaurant food',
+    'mediterranean cuisine restaurant',
+  ],
 }
 
 const PLATEPOST_MENU_URLS: Record<number, string> = {
@@ -55,7 +134,8 @@ function getVideoQuery(cuisine: string, restaurantName: string): string {
     const hash = restaurantName.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
     return pool[hash % pool.length]
   }
-  return `${cuisine} restaurant food cooking`
+  // Generic fallback — always restaurant-focused, never street food
+  return `${cuisine} restaurant food plating dining`
 }
 
 interface ReelSlide {
