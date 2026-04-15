@@ -87,7 +87,8 @@ const CATEGORY_FILTERS = ['All', 'Music', 'Arts', 'Comedy', 'Sports', 'Food', 'F
 export default function EventsScreen() {
   const navigate = useNavigate()
   const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
+  // Use local date string to avoid UTC offset issues
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
   const [events, setEvents] = useState<EventItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -351,8 +352,17 @@ export default function EventsScreen() {
           <span style={{ fontSize: 40 }}>🎟️</span>
           <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 16, color: '#071126', margin: '12px 0 6px' }}>Events coming soon</p>
           <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#9ca3af', margin: 0 }}>
-            Add your Ticketmaster API key to see live events in LA.
+            Add <code>VITE_TICKETMASTER_KEY</code> in Vercel environment variables.
           </p>
+        </div>
+      ) : error ? (
+        <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+          <span style={{ fontSize: 40 }}>⚠️</span>
+          <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 15, color: '#071126', margin: '12px 0 6px' }}>Couldn't load events</p>
+          <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#9ca3af', margin: '0 0 16px' }}>{error}</p>
+          <button onClick={loadEvents} style={{ background: '#0048f9', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 24px', fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+            Try Again
+          </button>
         </div>
       ) : filteredEvents.length === 0 ? (
         <div style={{ padding: '32px 20px', textAlign: 'center' }}>

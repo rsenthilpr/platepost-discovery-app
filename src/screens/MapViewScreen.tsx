@@ -242,28 +242,38 @@ export default function MapViewScreen() {
               const emoji = CUISINE_EMOJI[r.cuisine] ?? '🍽️'
               return (
                 <OverlayView key={r.id} position={{ lat: r.latitude, lng: r.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                  <motion.div
-                    initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                    onClick={() => { setSelectedRestaurant(isSelected ? null : r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
-                    style={{
-                      transform: 'translate(-50%, -50%)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
-                      padding: '4px 8px', borderRadius: 999,
-                      background: isSelected ? '#0048f9' : isPro ? '#0048f9' : '#fff',
-                      border: `2px solid ${isSelected ? '#60a5fa' : isPro ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.9)'}`,
-                      boxShadow: isSelected ? '0 0 0 3px rgba(0,72,249,0.4), 0 4px 12px rgba(0,0,0,0.5)' : '0 2px 8px rgba(0,0,0,0.4)',
-                      zIndex: isSelected ? 20 : isPro ? 10 : 1,
-                      maxWidth: currentZoom >= 13 ? 140 : 36, overflow: 'hidden', whiteSpace: 'nowrap',
-                    }}>
-                    {isPro
-                      ? <img src="/pp-mark.png" alt="" width={12} height={12} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', flexShrink: 0 }} />
-                      : <span style={{ fontSize: 13, flexShrink: 0 }}>{emoji}</span>}
-                    {currentZoom >= 13 && (
-                      <span style={{ fontFamily: 'Open Sans', fontSize: 10, fontWeight: 700, color: isSelected || isPro ? '#fff' : '#071126', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>
-                        {r.name.length > 14 ? r.name.slice(0, 13) + '…' : r.name}
-                      </span>
-                    )}
-                  </motion.div>
+                  {/* Wrapper div handles centering — motion.div handles click */}
+                  <div style={{ position: 'absolute', transform: 'translate(-50%, -50%)', cursor: 'pointer' }}
+                    onClick={() => { setSelectedRestaurant(isSelected ? null : r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}>
+                    <div
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '4px 8px', borderRadius: 999,
+                        background: isSelected ? '#0048f9' : isPro ? '#0048f9' : '#fff',
+                        border: `2px solid ${isSelected ? '#60a5fa' : isPro ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.15)'}`,
+                        boxShadow: isSelected
+                          ? '0 0 0 3px rgba(0,72,249,0.4), 0 4px 12px rgba(0,0,0,0.5)'
+                          : '0 2px 8px rgba(0,0,0,0.35)',
+                        zIndex: isSelected ? 20 : isPro ? 10 : 1,
+                        maxWidth: currentZoom >= 13 ? 140 : 36,
+                        overflow: 'hidden', whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease',
+                        transform: isSelected ? 'scale(1.1)' : 'scale(1)',
+                      }}>
+                      {isPro
+                        ? <img src="/pp-mark.png" alt="" width={12} height={12} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', flexShrink: 0 }} />
+                        : <span style={{ fontSize: 13, flexShrink: 0, lineHeight: 1 }}>{emoji}</span>}
+                      {currentZoom >= 13 && (
+                        <span style={{
+                          fontFamily: 'Open Sans', fontSize: 10, fontWeight: 700,
+                          color: isSelected || isPro ? '#fff' : '#071126',
+                          overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100,
+                        }}>
+                          {r.name.length > 14 ? r.name.slice(0, 13) + '…' : r.name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </OverlayView>
               )
             })}
@@ -309,11 +319,21 @@ export default function MapViewScreen() {
           </div>
         </div>
         {trayOpen && (
-          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingLeft: 16, paddingRight: 16, paddingBottom: 12, scrollbarWidth: 'none', height: 150 }}>
+          <div style={{
+            display: 'flex', gap: 10, overflowX: 'auto',
+            paddingLeft: 16, paddingRight: 16, paddingBottom: 12,
+            scrollbarWidth: 'none', msOverflowStyle: 'none', height: 150,
+            WebkitOverflowScrolling: 'touch',
+          } as React.CSSProperties}>
             {nearbyRestaurants.map(r => (
-              <motion.button key={r.id} whileTap={{ scale: 0.96 }}
+              <button key={r.id}
                 onClick={() => { setSelectedRestaurant(r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
-                style={{ flexShrink: 0, width: 120, borderRadius: 12, overflow: 'hidden', background: '#1f2937', border: `1.5px solid ${selectedRestaurant?.id === r.id ? '#0048f9' : 'rgba(255,255,255,0.08)'}`, cursor: 'pointer', textAlign: 'left', padding: 0, boxShadow: selectedRestaurant?.id === r.id ? '0 4px 16px rgba(0,72,249,0.3)' : 'none' }}>
+                style={{
+                  flexShrink: 0, width: 120, borderRadius: 12, overflow: 'hidden', background: '#1f2937',
+                  border: `1.5px solid ${selectedRestaurant?.id === r.id ? '#0048f9' : 'rgba(255,255,255,0.08)'}`,
+                  cursor: 'pointer', textAlign: 'left', padding: 0,
+                  boxShadow: selectedRestaurant?.id === r.id ? '0 4px 16px rgba(0,72,249,0.3)' : 'none',
+                }}>
                 <div style={{ height: 72, background: '#374151' }}>
                   {r.image_url && <img src={r.image_url} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                 </div>
@@ -322,7 +342,7 @@ export default function MapViewScreen() {
                   <p style={{ fontFamily: 'Open Sans', fontSize: 9, color: 'rgba(255,255,255,0.4)', margin: '1px 0 0' }}>{CUISINE_EMOJI[r.cuisine] ?? '🍽️'} {r.cuisine}</p>
                   {r.rating && <p style={{ fontFamily: 'Open Sans', fontSize: 9, color: '#fbbf24', margin: '1px 0 0', fontWeight: 600 }}>★ {r.rating.toFixed(1)}</p>}
                 </div>
-              </motion.button>
+              </button>
             ))}
           </div>
         )}

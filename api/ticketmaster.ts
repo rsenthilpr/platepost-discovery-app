@@ -12,14 +12,15 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   if (!TM_KEY) {
+    console.error('VITE_TICKETMASTER_KEY not set in environment')
     return res.status(200).json({ events: [], error: 'API key not configured' })
   }
 
-  const { category, size = '50' } = req.query
+  const { category, size = '50' } = req.query as Record<string, string>
 
-  const commonParams = new URLSearchParams({
-    apikey: TM_KEY as string,
-    size: String(size),
+  const params = new URLSearchParams({
+    apikey: TM_KEY,
+    size,
     sort: 'date,asc',
     countryCode: 'US',
   })
@@ -28,42 +29,50 @@ export default async function handler(req: any, res: any) {
     let urls: string[] = []
 
     if (category === 'food') {
+      // Ticketmaster doesn't have a food segment — use keyword searches
       urls = [
-        `${BASE}?${commonParams}&keyword=food+festival`,
-        `${BASE}?${commonParams}&keyword=restaurant+popup`,
-        `${BASE}?${commonParams}&keyword=food+drink`,
-        `${BASE}?${commonParams}&keyword=wine+tasting`,
+        `${BASE}?${params}&keyword=food+festival`,
+        `${BASE}?${params}&keyword=restaurant+popup+dinner`,
+        `${BASE}?${params}&keyword=wine+tasting+dining`,
       ]
     } else if (category === 'music') {
-      urls = [`${BASE}?${commonParams}&classificationName=music`]
+      urls = [`${BASE}?${params}&classificationName=music`]
     } else if (category === 'arts') {
-      urls = [`${BASE}?${commonParams}&classificationName=arts%26theatre`]
+      urls = [`${BASE}?${params}&classificationName=arts%26theatre`]
     } else if (category === 'comedy') {
-      urls = [`${BASE}?${commonParams}&keyword=comedy`]
+      urls = [`${BASE}?${params}&keyword=comedy+show`]
     } else if (category === 'sports') {
-      urls = [`${BASE}?${commonParams}&classificationName=sports`]
+      urls = [`${BASE}?${params}&classificationName=sports`]
     } else {
       urls = [
-        `${BASE}?${commonParams}&classificationName=music`,
-        `${BASE}?${commonParams}&keyword=food+festival`,
-        `${BASE}?${commonParams}&classificationName=arts%26theatre&size=30`,
+        `${BASE}?${params}&classificationName=music`,
+        `${BASE}?${params}&classificationName=arts%26theatre`,
+        `${BASE}?${params}&keyword=food+festival`,
       ]
     }
 
-    const responses = await Promise.all(
-      urls.map(url =>
-        fetch(url, { headers: { Accept: 'application/json' } })
-          .then(r => r.json() as Promise<any>)
-          .catch(() => ({ _embedded: { events: [] } }))
-      )
+    const results = await Promise.all(
+      urls.map(async (url) => {
+        try {
+          const r = await fetch(url, { headers: { Accept: 'application/json' } })
+          if (!r.ok) {
+            console.error(`TM API error ${r.status} for ${url}`)
+            return []
+          }
+          const data: any = await r.json()
+          return (data?._embedded?.events as any[]) ?? []
+        } catch (e) {
+          console.error('TM fetch error:', e)
+          return []
+        }
+      })
     )
 
     const seen = new Set<string>()
     const allEvents: any[] = []
 
-    for (const data of responses) {
-      const events: any[] = data?._embedded?.events ?? []
-      for (const ev of events) {
+    for (const batch of results) {
+      for (const ev of batch) {
         if (ev?.id && !seen.has(ev.id)) {
           seen.add(ev.id)
           allEvents.push(ev)
@@ -71,13 +80,16 @@ export default async function handler(req: any, res: any) {
       }
     }
 
+    // Sort by date ascending
     allEvents.sort((a: any, b: any) => {
-      const da = new Date(a.dates?.start?.localDate ?? '').getTime()
-      const db = new Date(b.dates?.start?.localDate ?? '').getTime()
+      const da = new Date(a.dates?.start?.localDate ?? '9999-01-01').getTime()
+      const db = new Date(b.dates?.start?.localDate ?? '9999-01-01').getTime()
       return da - db
     })
 
+    console.log(`Ticketmaster [${category}]: returned ${allEvents.length} events`)
     return res.status(200).json({ events: allEvents, count: allEvents.length })
+
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('Ticketmaster proxy error:', message)

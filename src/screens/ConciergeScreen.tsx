@@ -400,7 +400,11 @@ RULES:
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col" style={{ background: '#070d1f', fontFamily: 'Open Sans, sans-serif' }}>
+    <div style={{
+      position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
+      background: '#070d1f', fontFamily: 'Open Sans, sans-serif',
+      paddingBottom: 64, // BottomNav height
+    }}>
 
       {/* Header */}
       <div className="flex-shrink-0 pt-12 px-5 pb-4 flex items-center gap-3"
