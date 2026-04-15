@@ -109,9 +109,10 @@ export default function BottomNav() {
             <motion.button
               key={tab.id}
               onClick={() => {
-                // Feed tab always opens light list view, not dark reels
+                // Feed tab opens video reels (dark mode) by default
+                // Light list is only for search/filter navigation
                 if (tab.id === 'feed') {
-                  navigate('/list', { state: { listView: true } })
+                  navigate('/list', { state: { listView: false } })
                 } else {
                   navigate(tab.path)
                 }
