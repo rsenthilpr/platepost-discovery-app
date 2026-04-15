@@ -41,14 +41,31 @@ const PIGGY_QUIPS = [
   "I've eaten there. 10/10. 🐷",
 ]
 
-// Full-body Kawaii Piggy — Duolingo-style with arms, legs, tail
+// PNG map — Emilia's illustrated piggies
+const PIGGY_IMAGES = {
+  // Core states
+  idle:     '/piggy/hi piggy.png',
+  thinking: '/piggy/hmm piggy.png',
+  happy:    '/piggy/yayy piggy.png',
+  squished: '/piggy/awesome piggy.png',
+  // Extra personality piggies — used on tap
+  extras: [
+    '/piggy/coffee bliss piggy.png',
+    '/piggy/cafe togo piggy.png',
+    '/piggy/pour over piggy.png',
+    '/piggy/iced coffee piggy.png',
+    '/piggy/milk foamer piggy.png',
+    '/piggy/shot master piggy.png',
+    '/piggy/greetings piggy.png',
+    '/piggy/bye bye piggy.png',
+  ]
+}
+
 function KawaiiPiggy({
-  eyeTarget,
   state: pigState,
   onTap,
   quip,
   size = 52,
-  showTapHint: _showTapHint = false,
 }: {
   eyeTarget: { x: number; y: number } | null
   state: 'idle' | 'thinking' | 'happy' | 'squished'
@@ -57,33 +74,32 @@ function KawaiiPiggy({
   size?: number
   showTapHint?: boolean
 }) {
-  const pigRef = useRef<SVGSVGElement>(null)
-  const [eyeOffset, setEyeOffset] = useState({ lx: 0, ly: 0, rx: 0, ry: 0 })
+  const [_tapCount, setTapCount] = useState(0)
 
-  useEffect(() => {
-    if (!eyeTarget || !pigRef.current) { setEyeOffset({ lx: 0, ly: 0, rx: 0, ry: 0 }); return }
-    const rect = pigRef.current.getBoundingClientRect()
-    const scale = rect.width / 120
-    const calcOff = (ex: number, ey: number) => {
-      const dx = eyeTarget.x - (rect.left + ex * scale)
-      const dy = eyeTarget.y - (rect.top + ey * scale)
-      const dist = Math.sqrt(dx * dx + dy * dy)
-      if (dist === 0) return { x: 0, y: 0 }
-      const m = Math.min(3, dist * 0.1)
-      return { x: (dx / dist) * m, y: (dy / dist) * m }
-    }
-    const l = calcOff(44, 52); const r = calcOff(76, 52)
-    setEyeOffset({ lx: l.x, ly: l.y, rx: r.x, ry: r.y })
-  }, [eyeTarget])
+  // Pick image based on state
+  const imgSrc = PIGGY_IMAGES[pigState] ?? PIGGY_IMAGES.idle
 
-  const isThinking = pigState === 'thinking'
-  const isHappy = pigState === 'happy'
-  const isSquished = pigState === 'squished'
-  const leftArmAngle = isHappy ? -40 : isThinking ? 20 : isSquished ? -60 : 10
-  const rightArmAngle = isHappy ? 40 : isThinking ? -10 : isSquished ? 60 : -10
+  // Animation per state
+  const animateProps =
+    pigState === 'thinking' ? { rotate: [-3, 3, -3] } :
+    pigState === 'happy'    ? { y: [0, -12, 0], rotate: [0, -5, 5, 0] } :
+    pigState === 'squished' ? { scaleX: 1.15, scaleY: 0.85 } :
+    { y: [0, -6, 0] } // idle bob
+
+  const transitionProps =
+    pigState === 'thinking' ? { duration: 0.6, repeat: Infinity, ease: 'easeInOut' as const } :
+    pigState === 'happy'    ? { duration: 0.5, ease: 'easeOut' as const } :
+    pigState === 'squished' ? { duration: 0.15, type: 'spring' as const, stiffness: 500 } :
+    { duration: 2.8, repeat: Infinity, ease: [0.45, 0, 0.55, 1] as any, repeatType: 'mirror' as const }
+
+  function handleTap() {
+    setTapCount(c => c + 1)
+    onTap()
+  }
 
   return (
-    <div className="relative flex-shrink-0 flex flex-col items-center">
+    <div style={{ position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* Speech bubble quip */}
       <AnimatePresence>
         {quip && (
           <motion.div
@@ -92,129 +108,53 @@ function KawaiiPiggy({
             exit={{ opacity: 0, scale: 0.8, y: 8 }}
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
             style={{
-              position: 'absolute',
-              bottom: '108%',
-              left: '60%',
-              background: '#fff',
-              color: '#222',
-              fontFamily: 'Open Sans',
-              fontWeight: 600,
-              fontSize: 12,
-              borderRadius: 14,
-              padding: '8px 12px',
-              whiteSpace: 'normal',
-              wordBreak: 'break-word',
-              zIndex: 10,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-              border: '1px solid rgba(0,0,0,0.06)',
-              width: 160,
-              lineHeight: 1.4,
+              position: 'absolute', bottom: '108%', left: '60%',
+              background: '#fff', color: '#222',
+              fontFamily: 'Open Sans', fontWeight: 600, fontSize: 12,
+              borderRadius: 14, padding: '8px 12px',
+              whiteSpace: 'normal', wordBreak: 'break-word',
+              zIndex: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              border: '1px solid rgba(0,0,0,0.06)', width: 160, lineHeight: 1.4,
             }}
           >
             {quip}
             <div style={{
               position: 'absolute', top: '100%', left: 14,
               width: 0, height: 0,
-              borderLeft: '7px solid transparent',
-              borderRight: '7px solid transparent',
+              borderLeft: '7px solid transparent', borderRight: '7px solid transparent',
               borderTop: '7px solid #fff',
             }} />
           </motion.div>
         )}
       </AnimatePresence>
 
-      <motion.svg
-        ref={pigRef}
-        width={size} height={size * 1.17}
-        viewBox="0 0 120 140"
-        fill="none"
-        onClick={onTap}
-        style={{ cursor: 'pointer', display: 'block', filter: 'drop-shadow(0 4px 8px rgba(255,100,150,0.25))', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        animate={
-          isSquished ? { scaleX: 1.25, scaleY: 0.75 } :
-          isHappy ? { y: [0, -10, 0], rotate: [0, -4, 4, 0] } :
-          isThinking ? { rotate: [-2, 2, -2] } :
-          { y: [0, -5, 0] }
-        }
-        transition={
-          isSquished ? { duration: 0.1, type: 'spring', stiffness: 500 } :
-          isHappy ? { duration: 0.5, ease: 'easeOut' } :
-          isThinking ? { duration: 0.6, repeat: Infinity, ease: 'easeInOut' } :
-          { duration: 3, repeat: Infinity, ease: [0.45, 0, 0.55, 1], repeatType: 'mirror' }
-        }
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.9 }}
-      >
-        <ellipse cx="60" cy="136" rx="28" ry="5" fill="rgba(0,0,0,0.1)" />
-        <ellipse cx="38" cy="116" rx="13" ry="10" fill="#FFB3C6" />
-        <ellipse cx="38" cy="116" rx="10" ry="7" fill="#F48FB1" />
-        <ellipse cx="82" cy="116" rx="13" ry="10" fill="#FFB3C6" />
-        <ellipse cx="82" cy="116" rx="10" ry="7" fill="#F48FB1" />
-        <ellipse cx="60" cy="90" rx="36" ry="32" fill="#FFB3C6" />
-        <ellipse cx="60" cy="88" rx="28" ry="24" fill="#FFDDE7" />
-        <ellipse cx="60" cy="92" rx="16" ry="12" fill="rgba(255,255,255,0.4)" />
-        <motion.g animate={{ rotate: leftArmAngle }} style={{ transformOrigin: '26px 80px' }} transition={{ duration: 0.3 }}>
-          <ellipse cx="16" cy="85" rx="12" ry="9" fill="#FFB3C6" transform="rotate(-20 16 85)" />
-          <ellipse cx="10" cy="90" rx="7" ry="6" fill="#F48FB1" />
-        </motion.g>
-        <motion.g animate={{ rotate: rightArmAngle }} style={{ transformOrigin: '94px 80px' }} transition={{ duration: 0.3 }}>
-          <ellipse cx="104" cy="85" rx="12" ry="9" fill="#FFB3C6" transform="rotate(20 104 85)" />
-          <ellipse cx="110" cy="90" rx="7" ry="6" fill="#F48FB1" />
-        </motion.g>
-        <ellipse cx="30" cy="38" rx="14" ry="17" fill="#FFB3C6" />
-        <ellipse cx="90" cy="38" rx="14" ry="17" fill="#FFB3C6" />
-        <ellipse cx="30" cy="39" rx="8" ry="11" fill="#FF85A1" />
-        <ellipse cx="90" cy="39" rx="8" ry="11" fill="#FF85A1" />
-        <circle cx="60" cy="58" r="38" fill="#FFB3C6" />
-        <circle cx="60" cy="56" r="36" fill="#FFDDE7" />
-        <ellipse cx="34" cy="68" rx="10" ry="6" fill="#FF85A1" opacity="0.5" />
-        <ellipse cx="86" cy="68" rx="10" ry="6" fill="#FF85A1" opacity="0.5" />
-        {isThinking ? (
-          <>
-            <circle cx="44" cy="52" r="9" fill="white" />
-            <circle cx="76" cy="52" r="9" fill="white" />
-            <motion.circle cx="44" cy="52" r="5" fill="#1a0a2e"
-              animate={{ cx: [40,44,48,44,40], cy: [52,47,52,57,52] }}
-              transition={{ duration: 0.9, repeat: Infinity }} />
-            <motion.circle cx="76" cy="52" r="5" fill="#1a0a2e"
-              animate={{ cx: [72,76,80,76,72], cy: [52,47,52,57,52] }}
-              transition={{ duration: 0.9, repeat: Infinity, delay: 0.1 }} />
-            <motion.g animate={{ y: [0, 3, 0] }} transition={{ duration: 0.4, repeat: Infinity }}>
-              <ellipse cx="96" cy="32" rx="4" ry="6" fill="#93c5fd" opacity="0.9" />
-              <path d="M96 26 L99 20" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" />
-            </motion.g>
-          </>
-        ) : isHappy ? (
-          <>
-            <path d="M34 52 Q44 42 54 52" stroke="#1a0a2e" strokeWidth="4" fill="none" strokeLinecap="round" />
-            <path d="M66 52 Q76 42 86 52" stroke="#1a0a2e" strokeWidth="4" fill="none" strokeLinecap="round" />
-            <motion.text fontSize="16" textAnchor="middle" x="98" y="34"
-              animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8 }}>✨</motion.text>
-            <motion.text fontSize="13" textAnchor="middle" x="18" y="36"
-              animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, delay: 0.2 }}>⭐</motion.text>
-          </>
-        ) : (
-          <>
-            <circle cx="44" cy="52" r="9" fill="white" />
-            <circle cx="76" cy="52" r="9" fill="white" />
-            <circle cx={44 + eyeOffset.lx} cy={52 + eyeOffset.ly} r="5" fill="#1a0a2e" />
-            <circle cx={76 + eyeOffset.rx} cy={52 + eyeOffset.ry} r="5" fill="#1a0a2e" />
-            <circle cx={46.5 + eyeOffset.lx * 0.5} cy={49.5 + eyeOffset.ly * 0.5} r="2" fill="white" />
-            <circle cx={78.5 + eyeOffset.rx * 0.5} cy={49.5 + eyeOffset.ry * 0.5} r="2" fill="white" />
-          </>
-        )}
-        <ellipse cx="60" cy="66" rx="13" ry="9" fill="#FF85A1" />
-        <circle cx="55" cy="65" r="3" fill="#d44a72" />
-        <circle cx="65" cy="65" r="3" fill="#d44a72" />
-        {isHappy ? (
-          <path d="M48 75 Q60 85 72 75" stroke="#d44a72" strokeWidth="3" fill="none" strokeLinecap="round" />
-        ) : (
-          <path d="M51 74 Q60 80 69 74" stroke="#d44a72" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-        )}
-      </motion.svg>
+      {/* Piggy image */}
+      <motion.img
+        key={pigState} // re-triggers animation on state change
+        src={imgSrc}
+        alt={`PlatePost Crave pig — ${pigState}`}
+        onClick={handleTap}
+        animate={animateProps}
+        transition={transitionProps}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.88 }}
+        style={{
+          width: size,
+          height: size,
+          objectFit: 'contain',
+          cursor: 'pointer',
+          display: 'block',
+          filter: 'drop-shadow(0 4px 12px rgba(255,100,150,0.3))',
+          outline: 'none',
+          WebkitTapHighlightColor: 'transparent',
+          userSelect: 'none',
+        }}
+        draggable={false}
+      />
     </div>
   )
 }
+
 
 
 export default function CraveScreen() {
@@ -233,7 +173,6 @@ export default function CraveScreen() {
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
   const [piggyState, setPiggyState] = useState<'idle' | 'thinking' | 'happy' | 'squished'>('idle')
   const [piggyQuip, setPiggyQuip] = useState<string | null>("Oink! I know all the best spots 🐷")
-  const [eyeTarget, setEyeTarget] = useState<{ x: number; y: number } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const conversationHistory = useRef<{ role: string; content: string }[]>([])
@@ -262,20 +201,6 @@ export default function CraveScreen() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
-
-  // Track cursor/touch for eye following
-  useEffect(() => {
-    const handleMove = (e: MouseEvent | TouchEvent) => {
-      const point = 'touches' in e ? e.touches[0] : e
-      if (point) setEyeTarget({ x: point.clientX, y: point.clientY })
-    }
-    window.addEventListener('mousemove', handleMove)
-    window.addEventListener('touchmove', handleMove)
-    return () => {
-      window.removeEventListener('mousemove', handleMove)
-      window.removeEventListener('touchmove', handleMove)
-    }
-  }, [])
 
   function handlePiggyTap() {
     // Squish animation
@@ -418,7 +343,7 @@ RULES:
 
         {/* Piggy in header — small */}
         <KawaiiPiggy
-          eyeTarget={eyeTarget}
+          eyeTarget={null}
           state={piggyState}
           onTap={handlePiggyTap}
           quip={null}
@@ -545,7 +470,7 @@ RULES:
           {/* Floating piggy buddy — bigger, with tap hint */}
           <div className="relative flex-shrink-0 mb-1">
             <KawaiiPiggy
-              eyeTarget={eyeTarget}
+              eyeTarget={null}
               state={piggyState}
               onTap={handlePiggyTap}
               quip={piggyQuip}
