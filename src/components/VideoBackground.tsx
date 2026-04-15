@@ -6,22 +6,37 @@ interface Props {
   fallbackImage: string
   isActive: boolean
   orientation?: 'portrait' | 'landscape'
+  directVideoUrl?: string | null  // Pass pre-fetched URL to skip API call
   style?: React.CSSProperties
 }
 
 // Module-level cache keyed by cuisine:orientation
 const videoUrlCache: Record<string, string | null> = {}
 
-export default function VideoBackground({ cuisine, fallbackImage, isActive, orientation = 'portrait', style }: Props) {
+export default function VideoBackground({
+  cuisine, fallbackImage, isActive,
+  orientation = 'portrait',
+  directVideoUrl,
+  style,
+}: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const cacheKey = `${cuisine}:${orientation}`
+
+  // If directVideoUrl provided, use it — skip API fetch entirely
   const [videoUrl, setVideoUrl] = useState<string | null>(
+    directVideoUrl !== undefined ? directVideoUrl :
     cacheKey in videoUrlCache ? videoUrlCache[cacheKey] : null
   )
   const [videoFailed, setVideoFailed] = useState(false)
   const [videoLoaded, setVideoLoaded] = useState(false)
 
+  // Sync if directVideoUrl changes
   useEffect(() => {
+    if (directVideoUrl !== undefined) {
+      setVideoUrl(directVideoUrl)
+      setVideoFailed(false)
+      return
+    }
     if (cacheKey in videoUrlCache) {
       setVideoUrl(videoUrlCache[cacheKey])
       return
@@ -37,7 +52,7 @@ export default function VideoBackground({ cuisine, fallbackImage, isActive, orie
         videoUrlCache[cacheKey] = null
         setVideoUrl(null)
       })
-  }, [cacheKey])
+  }, [cacheKey, directVideoUrl])
 
   useEffect(() => {
     const video = videoRef.current
@@ -49,7 +64,7 @@ export default function VideoBackground({ cuisine, fallbackImage, isActive, orie
     }
   }, [isActive, videoUrl, videoFailed, videoLoaded])
 
-  // Mobile Safari fix — resume video when page becomes visible again
+  // Mobile Safari — resume on visibility change
   useEffect(() => {
     if (!isActive) return
     function handleVisibility() {
@@ -63,33 +78,25 @@ export default function VideoBackground({ cuisine, fallbackImage, isActive, orie
 
   return (
     <div style={{ position: 'absolute', inset: 0, ...style }}>
-      {/* Fallback photo always visible instantly */}
       {fallbackImage && (
-        <img
-          src={fallbackImage}
-          alt=""
+        <img src={fallbackImage} alt=""
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         />
       )}
-      {/* Video fades in on top when ready */}
       {videoUrl && !videoFailed && (
         <video
           ref={videoRef}
           src={videoUrl}
-          muted
-          loop
-          playsInline
+          muted loop playsInline
           autoPlay={isActive}
           preload="auto"
           onCanPlay={() => {
             setVideoLoaded(true)
-            // Play immediately when ready — fixes first-load delay
             if (isActive) videoRef.current?.play().catch(() => {})
           }}
-          onError={() => { setVideoFailed(true); videoUrlCache[cacheKey] = null }}
+          onError={() => { setVideoFailed(true); if (directVideoUrl === undefined) videoUrlCache[cacheKey] = null }}
           style={{
-            position: 'absolute', inset: 0,
-            width: '100%', height: '100%',
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
             objectFit: 'cover',
             opacity: videoLoaded && isActive ? 1 : 0,
             transition: 'opacity 0.6s ease',

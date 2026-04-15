@@ -82,9 +82,18 @@ function RestaurantCard({ restaurant, onClick }: { restaurant: Restaurant | Plac
           {r.cuisine} · {r.city}
         </p>
         {r.rating && (
-          <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#f59e0b', margin: '3px 0 0', fontWeight: 700 }}>
-            ★ {typeof r.rating === 'number' ? r.rating.toFixed(1) : r.rating}
-          </p>
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ' ' + r.city)}`}
+            target="_blank"
+            rel="noreferrer"
+            onClick={e => e.stopPropagation()}
+            style={{ display: 'block', textDecoration: 'none', marginTop: 3 }}
+          >
+            <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#f59e0b', margin: 0, fontWeight: 700 }}>
+              ★ {typeof r.rating === 'number' ? r.rating.toFixed(1) : r.rating}
+              <span style={{ color: '#93c5fd', fontSize: 10, fontWeight: 600 }}> reviews ↗</span>
+            </p>
+          </a>
         )}
       </div>
     </motion.button>

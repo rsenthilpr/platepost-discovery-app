@@ -575,6 +575,7 @@ function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, s
         cuisine={r.cuisine}
         fallbackImage={bgImage}
         isActive={isActive}
+        directVideoUrl={slide.videoUrl}
       />
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140, background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', background: 'linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.6) 50%, transparent 100%)', pointerEvents: 'none' }} />
