@@ -206,9 +206,9 @@ export default function HomeScreen() {
 
       {/* Top bar — higher z-index to stay above scrollable content */}
       <div className="absolute top-0 left-0 right-0 z-50 pt-14 px-5 flex items-center justify-between pointer-events-none">
-        <div className="pointer-events-auto">
+        <a href="https://platepost.io" target="_blank" rel="noreferrer" className="pointer-events-auto" style={{ textDecoration: 'none' }}>
           <PlatePostLogo size="md" white={true} />
-        </div>
+        </a>
         <button onClick={() => setShowCityPicker(true)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-full pointer-events-auto"
           style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.25)', whiteSpace: 'nowrap' }}>
