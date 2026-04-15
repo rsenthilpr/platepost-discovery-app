@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fetchPlaceDetails } from '../lib/googlePlaces'
 import { fetchPexelsPhoto } from '../lib/pexels'
@@ -66,7 +65,6 @@ async function shareRestaurant(name: string, city: string) {
 
 export default function RestaurantDetail({ restaurant: r, onClose, initialSection, isFavorite = false, onToggleFavorite }: Props) {
   const [iframeUrl, setIframeUrl] = useState<string | null>(null)
-  const navigate = useNavigate()
   const [events, setEvents] = useState<DisplayEvent[]>([])
   const [placeInfo, setPlaceInfo] = useState<PlaceInfo>({})
   const [heroImage, setHeroImage] = useState(r.image_url)
@@ -227,21 +225,27 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
             </span>
           </div>
 
-          {/* Rating */}
+          {/* Rating — tappable, opens Google Maps reviews */}
           {loadingPlace ? (
             <div className="h-4 w-36 rounded" style={{ background: 'rgba(255,255,255,0.08)' }} />
           ) : placeInfo.rating ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ' ' + r.city)}`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`${placeInfo.rating} stars — read reviews for ${r.name}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, textDecoration: 'none' }}
+            >
               <Stars rating={placeInfo.rating} />
               <span style={{ color: '#FBBF24', fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13 }}>
                 {placeInfo.rating.toFixed(1)}
               </span>
               {placeInfo.userRatingsTotal && (
-                <span style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Open Sans', fontSize: 11 }}>
-                  ({placeInfo.userRatingsTotal.toLocaleString()})
+                <span style={{ color: 'rgba(100,160,255,0.8)', fontFamily: 'Open Sans', fontSize: 11, textDecoration: 'underline' }}>
+                  ({placeInfo.userRatingsTotal.toLocaleString()} reviews ↗)
                 </span>
               )}
-            </div>
+            </a>
           ) : null}
 
           {/* Description */}
@@ -269,66 +273,101 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
               <p style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.6)', fontSize: 13, margin: 0 }}>{r.phone}</p>
             </a>
           )}
-          {r.hours && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>🕐</span>
-              <p style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.6)', fontSize: 13, margin: 0 }}>{r.hours}</p>
-            </div>
-          )}
+          {r.hours && (() => {
+            // Parse hours — could be JSON array string or plain string
+            let hoursLines: string[] = []
+            try {
+              const parsed = JSON.parse(r.hours)
+              hoursLines = Array.isArray(parsed) ? parsed : [r.hours]
+            } catch {
+              hoursLines = [r.hours]
+            }
+            const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+            const todayName = days[new Date().getDay()]
+            const todayLine = hoursLines.find(h => h.startsWith(todayName))
+            const todayHours = todayLine ? todayLine.replace(`${todayName}: `, '') : null
+            return (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>🕐</span>
+                <div>
+                  {todayHours && (
+                    <p style={{ fontFamily: 'Open Sans, sans-serif', color: todayHours === 'Closed' ? '#f87171' : '#4ade80', fontSize: 13, fontWeight: 700, margin: '0 0 2px' }}>
+                      Today: {todayHours}
+                    </p>
+                  )}
+                  {hoursLines.filter(h => !h.startsWith(todayName)).map((line, i) => (
+                    <p key={i} style={{ fontFamily: 'Open Sans, sans-serif', color: 'rgba(255,255,255,0.45)', fontSize: 11, margin: '1px 0 0' }}>
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
         </div>
 
-        {/* Action buttons — Directions + Website */}
+        {/* Action buttons — Directions + Website/Reviews */}
         <div className="px-4 mb-4" style={{ display: 'flex', gap: 10 }}>
           <a
             href={getDirectionsUrl()}
             target="_blank"
             rel="noreferrer"
+            aria-label={`Get directions to ${r.name}`}
             style={{
-              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '11px 0', borderRadius: 14, textDecoration: 'none',
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              padding: '12px 0', borderRadius: 14, textDecoration: 'none',
               background: 'rgba(255,255,255,0.07)', color: '#FAFBFF',
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.15)',
               fontFamily: 'Open Sans, sans-serif', fontWeight: 600, fontSize: 13,
+              outline: 'none',
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="currentColor" opacity={0.7} />
+            {/* Proper navigation/directions arrow icon */}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 11l19-9-9 19-2-8-8-2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
             </svg>
             Directions
           </a>
           {r.website_url ? (
             <button
               onClick={() => setIframeUrl(r.website_url)}
+              aria-label={`Visit ${r.name} website`}
               style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '11px 0', borderRadius: 14,
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                padding: '12px 0', borderRadius: 14,
                 background: 'rgba(255,255,255,0.07)', color: '#FAFBFF',
-                border: '1px solid rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.15)',
                 fontFamily: 'Open Sans, sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                outline: 'none',
               }}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity={0.7} />
-                <path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" stroke="currentColor" strokeWidth="2" opacity={0.7} />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" opacity={0.8} />
+                <path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" stroke="currentColor" strokeWidth="1.5" opacity={0.8} />
               </svg>
               Website
             </button>
           ) : (
-            <button
-              onClick={() => navigate(`/menu/${r.id}`)}
+            // Reviews — opens Google Maps reviews when no website
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ' ' + r.city)}`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Read reviews for ${r.name}`}
               style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '11px 0', borderRadius: 14,
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                padding: '12px 0', borderRadius: 14, textDecoration: 'none',
                 background: 'rgba(255,255,255,0.07)', color: '#FAFBFF',
-                border: '1px solid rgba(255,255,255,0.1)',
-                fontFamily: 'Open Sans, sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                border: '1px solid rgba(255,255,255,0.15)',
+                fontFamily: 'Open Sans, sans-serif', fontWeight: 600, fontSize: 13,
+                outline: 'none',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <polygon points="5,3 19,12 5,21" fill="currentColor" opacity={0.7} />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
               </svg>
-              Details
-            </button>
+              Reviews
+            </a>
           )}
         </div>
 

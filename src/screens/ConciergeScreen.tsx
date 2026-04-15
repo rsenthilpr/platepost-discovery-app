@@ -5,7 +5,6 @@ import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
-import SurpriseOrb from '../components/SurpriseOrb'
 import { useCityStore } from '../lib/cityStore'
 
 function loadFavorites(): Set<number> {
@@ -594,7 +593,7 @@ RULES:
           />
         )}
       </AnimatePresence>
-      <SurpriseOrb />
+      {/* SurpriseOrb hidden on Crave screen — would overlap send button */}
       <BottomNav />
     </div>
   )

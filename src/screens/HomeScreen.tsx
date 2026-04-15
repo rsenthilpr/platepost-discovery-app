@@ -105,7 +105,18 @@ export default function HomeScreen() {
   const [searchHistory, setSearchHistory] = useState<string[]>(getSearchHistory)
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [selectedGooglePlace, setSelectedGooglePlace] = useState<PlaceRestaurant | null>(null)
+  // Hero video cycling — rotates through different cuisine videos
+  const HERO_CUISINES = ['Restaurant', 'Italian', 'Japanese', 'American', 'Coffee']
+  const [heroCuisineIndex, setHeroCuisineIndex] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Cycle hero video every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHeroCuisineIndex(i => (i + 1) % HERO_CUISINES.length)
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Load Supabase restaurants for search + hero images
   useEffect(() => {
@@ -185,15 +196,24 @@ export default function HomeScreen() {
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#fff' }}>
 
-      {/* Hero — full-bleed autoplay video */}
+      {/* Hero — full-bleed autoplay video, cycles every 10s */}
       <div className="absolute inset-0">
-        <VideoBackground
-          cuisine="Restaurant"
-          fallbackImage={heroImages[0] ?? ''}
-          isActive={true}
-          orientation="landscape"
-          style={{ position: 'absolute', inset: 0 }}
-        />
+        {HERO_CUISINES.map((cuisine, i) => (
+          <div key={cuisine} style={{
+            position: 'absolute', inset: 0,
+            opacity: i === heroCuisineIndex ? 1 : 0,
+            transition: 'opacity 1.5s ease',
+            zIndex: i === heroCuisineIndex ? 1 : 0,
+          }}>
+            <VideoBackground
+              cuisine={cuisine}
+              fallbackImage={heroImages[i] ?? heroImages[0] ?? ''}
+              isActive={i === heroCuisineIndex}
+              orientation="landscape"
+              style={{ position: 'absolute', inset: 0 }}
+            />
+          </div>
+        ))}
         {heroImages.length === 0 && (
           <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #0a1628, #1a2f5e)' }} />
         )}
