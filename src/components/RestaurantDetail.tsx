@@ -157,8 +157,14 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
         ref={sheetRef}
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.4 }}
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 120 || info.velocity.y > 500) onClose()
+        }}
         className="fixed bottom-0 left-0 right-0 z-40 rounded-t-3xl overflow-hidden"
-        style={{ background: '#0e1f42', maxHeight: '90vh', overflowY: 'auto', scrollbarWidth: 'none' }}
+        style={{ background: '#0e1f42', maxHeight: '90vh', overflowY: 'auto', scrollbarWidth: 'none', cursor: 'grab' }}
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1">

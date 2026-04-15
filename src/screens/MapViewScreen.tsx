@@ -229,11 +229,20 @@ export default function MapViewScreen() {
               const emoji = CUISINE_EMOJI[r.cuisine] ?? '🍽️'
               return (
                 <OverlayView key={r.id} position={{ lat: r.latitude, lng: r.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                  {/* Single unified pointer handler — works on both mouse and touch */}
+                  {/* iPhone-compatible tap — native event listener bypasses Google Maps touch blocking */}
                   <div
-                    style={{ position: 'absolute', transform: 'translate(-50%, -50%)', cursor: 'pointer' }}
-                    onPointerUp={(e) => {
+                    style={{ position: 'absolute', transform: 'translate(-50%, -50%)', cursor: 'pointer', touchAction: 'manipulation' }}
+                    onClick={(e) => {
                       e.stopPropagation()
+                      setSelectedRestaurant(isSelected ? null : r)
+                      if (map) map.panTo({ lat: r.latitude, lng: r.longitude })
+                    }}
+                    onTouchStart={(e) => {
+                      e.stopPropagation()
+                    }}
+                    onTouchEnd={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
                       setSelectedRestaurant(isSelected ? null : r)
                       if (map) map.panTo({ lat: r.latitude, lng: r.longitude })
                     }}

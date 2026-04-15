@@ -124,17 +124,14 @@ export default function BottomNav() {
                 background: 'none', border: 'none', cursor: 'pointer', padding: 0, position: 'relative',
               }}
             >
-              {/* Active indicator bar at top */}
+              {/* Active indicator — simple dot, no layoutId animation glitch */}
               {active && (
-                <motion.div
-                  layoutId="navBar"
-                  style={{
-                    position: 'absolute', top: 0, left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 32, height: 2.5, borderRadius: '0 0 3px 3px',
-                    background: '#0048f9',
-                  }}
-                />
+                <div style={{
+                  position: 'absolute', top: 0, left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 20, height: 3, borderRadius: '0 0 3px 3px',
+                  background: '#0048f9',
+                }} />
               )}
               {(tab as any).icon(active)}
               <span style={{

@@ -43,14 +43,23 @@ export default function VideoBackground({ cuisine, fallbackImage, isActive, orie
     const video = videoRef.current
     if (!video || !videoUrl || videoFailed) return
     if (isActive) {
-      // Always try to play — works instantly if cached, onCanPlay handles first load
-      video.play().catch(() => {
-        // Not ready yet — will play via onCanPlay when loaded
-      })
+      video.play().catch(() => {})
     } else {
       video.pause()
     }
   }, [isActive, videoUrl, videoFailed, videoLoaded])
+
+  // Mobile Safari fix — resume video when page becomes visible again
+  useEffect(() => {
+    if (!isActive) return
+    function handleVisibility() {
+      if (document.visibilityState === 'visible' && videoRef.current && isActive) {
+        videoRef.current.play().catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [isActive])
 
   return (
     <div style={{ position: 'absolute', inset: 0, ...style }}>
