@@ -23,32 +23,46 @@ function removeFromSearchHistory(term: string) {
   try { localStorage.setItem('pp_search_history', JSON.stringify(getSearchHistory().filter(s => s !== term))) } catch {}
 }
 
-function Top10Card({ restaurant, onClick }: { restaurant: Restaurant; onClick: () => void }) {
+interface PlaceRestaurant {
+  id: string
+  name: string
+  cuisine: string
+  city: string
+  rating: number | null
+  image_url: string | null
+  address: string
+  place_id: string
+}
+
+function RestaurantCard({ restaurant, onClick }: { restaurant: Restaurant | PlaceRestaurant; onClick: () => void }) {
+  const r = restaurant as any
   return (
     <motion.button
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
       style={{
-        flexShrink: 0, width: 150, borderRadius: 18, overflow: 'hidden',
+        flexShrink: 0, width: 155, borderRadius: 18, overflow: 'hidden',
         background: '#fff', border: '1px solid #f0f0f0',
         boxShadow: '0 2px 12px rgba(0,0,0,0.08)', cursor: 'pointer', textAlign: 'left', padding: 0,
       }}
     >
-      <div style={{ position: 'relative', height: 110 }}>
-        <img src={restaurant.image_url} alt={restaurant.name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.35) 0%, transparent 60%)' }} />
+      <div style={{ position: 'relative', height: 110, background: '#e5e7eb' }}>
+        {r.image_url && (
+          <img src={r.image_url} alt={r.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        )}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.3) 0%, transparent 60%)' }} />
       </div>
       <div style={{ padding: '8px 10px 12px' }}>
         <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: '#071126', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {restaurant.name}
+          {r.name}
         </p>
-        <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
-          {restaurant.cuisine} · {restaurant.city}
+        <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#9ca3af', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {r.cuisine} · {r.city}
         </p>
-        {restaurant.rating && (
+        {r.rating && (
           <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#f59e0b', margin: '3px 0 0', fontWeight: 700 }}>
-            ★ {restaurant.rating.toFixed(1)}
+            ★ {typeof r.rating === 'number' ? r.rating.toFixed(1) : r.rating}
           </p>
         )}
       </div>
@@ -62,7 +76,8 @@ export default function HomeScreen() {
   const [showCityPicker, setShowCityPicker] = useState(false)
   const [heroImages, setHeroImages] = useState<string[]>([])
   const [imageIndex, setImageIndex] = useState(0)
-  const [top10, setTop10] = useState<Restaurant[]>([])
+  const [featuredPlaces, setFeaturedPlaces] = useState<PlaceRestaurant[]>([])
+  const [loadingPlaces, setLoadingPlaces] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Restaurant[]>([])
@@ -71,25 +86,57 @@ export default function HomeScreen() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
+  // Load Supabase restaurants for search + hero images
   useEffect(() => {
     async function load() {
       const { data } = await supabase.from('restaurants').select('*')
       const list = data ?? []
       setAllRestaurants(list)
-      const scored = [...list]
-        .filter(r => r.rating && r.review_count)
-        .sort((a, b) => {
-          const scoreA = (a.rating ?? 0) * Math.log10((a.review_count ?? 1) + 1)
-          const scoreB = (b.rating ?? 0) * Math.log10((b.review_count ?? 1) + 1)
-          return scoreB - scoreA
-        })
-        .slice(0, 10)
-      setTop10(scored)
-      const images = scored.slice(0, 6).map(r => r.image_url).filter(Boolean)
+      const images = list
+        .filter(r => r.image_url)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 6)
+        .map(r => r.image_url)
       setHeroImages(images)
     }
     load()
   }, [])
+
+  // Load Google Places for selected city carousel
+  useEffect(() => {
+    loadCityPlaces()
+  }, [city.name])
+
+  async function loadCityPlaces() {
+    setLoadingPlaces(true)
+    try {
+      const res = await fetch(
+        `/api/places-search?city=${encodeURIComponent(city.name)}&lat=${city.lat}&lng=${city.lng}`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        const places: PlaceRestaurant[] = (data.places ?? [])
+          .filter((p: any) => p.rating && p.image_url)
+          .sort((a: any, b: any) => (b.rating ?? 0) - (a.rating ?? 0))
+          .slice(0, 12)
+          .map((p: any) => ({
+            id: p.place_id,
+            name: p.name,
+            cuisine: p.cuisine ?? 'Restaurant',
+            city: city.name,
+            rating: p.rating,
+            image_url: p.image_url,
+            address: p.address,
+            place_id: p.place_id,
+          }))
+        setFeaturedPlaces(places)
+      }
+    } catch (e) {
+      console.error('Places load error:', e)
+    } finally {
+      setLoadingPlaces(false)
+    }
+  }
 
   useEffect(() => {
     if (heroImages.length < 2) return
@@ -136,15 +183,14 @@ export default function HomeScreen() {
 
       {/* Gradient overlay */}
       <div className="absolute inset-0 z-10 pointer-events-none"
-        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.0) 30%, rgba(0,0,0,0.55) 65%, rgba(0,0,0,0.96) 100%)' }}
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.0) 35%, rgba(0,0,0,0.6) 68%, rgba(0,0,0,0.97) 100%)' }}
       />
 
-      {/* Top bar */}
+      {/* Top bar — logo + city picker */}
       <div className="absolute top-0 left-0 right-0 z-40 pt-14 px-5 flex items-center justify-between pointer-events-none">
         <div className="pointer-events-auto">
           <PlatePostLogo size="md" white={true} />
         </div>
-        {/* Location pill — opens city picker */}
         <button onClick={() => setShowCityPicker(true)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-full pointer-events-auto"
           style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.25)', whiteSpace: 'nowrap' }}>
@@ -160,39 +206,35 @@ export default function HomeScreen() {
 
       {/* Scrollable content */}
       <div className="absolute inset-0 z-20 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-        <div style={{ height: '42vh' }} />
+        <div style={{ height: '48vh' }} />
 
-        {/* Hero text + chips */}
-        <div className="px-5 pb-4">
+        {/* Hero text + 3 action chips — ONLY these, no duplicate buttons */}
+        <div className="px-5 pb-5">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="mb-4">
-            <p style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
+            <p style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 6 }}>
               Discover
             </p>
             <h1 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#fff', fontSize: 'clamp(2rem, 9vw, 3.2rem)', lineHeight: 1.05, textShadow: '0 2px 20px rgba(0,0,0,0.4)' }}>
-              Discover<br />Restaurants
+              {city.name}<br />Restaurants
             </h1>
           </motion.div>
 
-          {/* Chips */}
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }} className="flex gap-2 mb-4">
+          {/* 3 quick action chips */}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }} className="flex gap-2">
             <motion.button whileTap={{ scale: 0.93 }}
               onClick={() => navigate('/list', { state: { filter: 'All', openNow: true, listView: true } })}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
-              style={{ background: 'rgba(16,185,129,0.85)', border: '1px solid rgba(16,185,129,0.4)', color: '#fff', fontFamily: 'Open Sans', backdropFilter: 'blur(12px)' }}>
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#fff' }} />
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 999, background: 'rgba(16,185,129,0.9)', border: 'none', color: '#fff', fontFamily: 'Open Sans', fontWeight: 600, fontSize: 12, cursor: 'pointer', backdropFilter: 'blur(12px)' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
               Open Now
             </motion.button>
             <motion.button whileTap={{ scale: 0.93 }}
               onClick={() => navigate('/events')}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
-              style={{ background: 'rgba(245,158,11,0.85)', border: '1px solid rgba(245,158,11,0.4)', color: '#fff', fontFamily: 'Open Sans', backdropFilter: 'blur(12px)' }}>
-              <span style={{ fontSize: 12 }}>🎟️</span>
-              Events
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 999, background: 'rgba(245,158,11,0.9)', border: 'none', color: '#fff', fontFamily: 'Open Sans', fontWeight: 600, fontSize: 12, cursor: 'pointer', backdropFilter: 'blur(12px)' }}>
+              🎟️ Events
             </motion.button>
             <motion.button whileTap={{ scale: 0.93 }}
               onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold"
-              style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)', color: '#fff', fontFamily: 'Open Sans', backdropFilter: 'blur(12px)' }}>
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 999, background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', fontFamily: 'Open Sans', fontWeight: 600, fontSize: 12, cursor: 'pointer', backdropFilter: 'blur(12px)' }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
                 <circle cx="11" cy="11" r="8" stroke="white" strokeWidth="2.5" />
                 <path d="M21 21l-4.35-4.35" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
@@ -200,39 +242,19 @@ export default function HomeScreen() {
               Search
             </motion.button>
           </motion.div>
-
-          {/* CTA buttons */}
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.25 }} className="flex gap-3">
-            <button onClick={() => navigate('/map')}
-              className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-              style={{ fontFamily: 'Open Sans', background: '#0048f9', color: '#fff', border: 'none', cursor: 'pointer' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
-              </svg>
-              View Map
-            </button>
-            <button onClick={() => navigate('/list')}
-              className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-              style={{ fontFamily: 'Open Sans', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', cursor: 'pointer' }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <polygon points="5,3 19,12 5,21" fill="white" />
-              </svg>
-              Explore Feed
-            </button>
-          </motion.div>
         </div>
 
-        {/* White content area */}
+        {/* White content area — search + carousel + explore */}
         <div style={{ background: '#f8f9fa', borderRadius: '24px 24px 0 0', minHeight: '55vh', paddingTop: 20 }}>
 
-          {/* Search bar */}
-          <div className="px-5 mb-4">
+          {/* Single search bar */}
+          <div className="px-5 mb-5">
             <button
               onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                 background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 14,
-                padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
+                padding: '13px 16px', cursor: 'pointer', textAlign: 'left',
                 boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
               }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.35, flexShrink: 0 }}>
@@ -243,38 +265,73 @@ export default function HomeScreen() {
             </button>
           </div>
 
-          {/* Popular in LA carousel */}
-          {top10.length > 0 && (
-            <div className="pb-6">
-              <div className="px-5 mb-3 flex items-center justify-between">
-                <div>
-                  <p style={{ fontFamily: 'Open Sans', color: '#9ca3af', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', margin: 0 }}>Top Rated</p>
-                  <h2 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#071126', fontSize: 20, margin: '2px 0 0' }}>Popular in {city.name}</h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => { const el = document.getElementById('top10-carousel'); if (el) el.scrollBy({ left: -170, behavior: 'smooth' }) }}
-                    style={{ width: 28, height: 28, borderRadius: '50%', background: '#fff', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" /></svg>
-                  </button>
-                  <button onClick={() => { const el = document.getElementById('top10-carousel'); if (el) el.scrollBy({ left: 170, behavior: 'smooth' }) }}
-                    style={{ width: 28, height: 28, borderRadius: '50%', background: '#fff', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" /></svg>
-                  </button>
-                </div>
+          {/* City restaurants carousel — Google Places real data */}
+          <div className="pb-6">
+            <div className="px-5 mb-3 flex items-center justify-between">
+              <div>
+                <p style={{ fontFamily: 'Open Sans', color: '#9ca3af', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', margin: 0 }}>
+                  {loadingPlaces ? 'Loading...' : 'Top Rated'}
+                </p>
+                <h2 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#071126', fontSize: 20, margin: '2px 0 0' }}>
+                  Popular in {city.name}
+                </h2>
               </div>
-              <div id="top10-carousel" className="flex gap-3 overflow-x-auto pl-5 pr-5 pb-1"
-                style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}
-                onWheel={e => { const el = document.getElementById('top10-carousel'); if (el) { e.preventDefault(); el.scrollBy({ left: e.deltaY * 2, behavior: 'smooth' }) } }}>
-                {top10.map((r) => (
+              <div className="flex items-center gap-2">
+                <button onClick={() => { const el = document.getElementById('city-carousel'); if (el) el.scrollBy({ left: -170, behavior: 'smooth' }) }}
+                  style={{ width: 28, height: 28, borderRadius: '50%', background: '#fff', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" /></svg>
+                </button>
+                <button onClick={() => { const el = document.getElementById('city-carousel'); if (el) el.scrollBy({ left: 170, behavior: 'smooth' }) }}
+                  style={{ width: 28, height: 28, borderRadius: '50%', background: '#fff', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" /></svg>
+                </button>
+              </div>
+            </div>
+
+            {loadingPlaces ? (
+              // Skeleton loader
+              <div className="flex gap-3 pl-5 pr-5 overflow-hidden">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} style={{ flexShrink: 0, width: 155, borderRadius: 18, overflow: 'hidden', background: '#fff', border: '1px solid #f0f0f0' }}>
+                    <div style={{ height: 110, background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+                    <div style={{ padding: '8px 10px 12px' }}>
+                      <div style={{ height: 12, borderRadius: 6, background: '#f0f0f0', marginBottom: 6, width: '75%' }} />
+                      <div style={{ height: 10, borderRadius: 6, background: '#f0f0f0', width: '50%' }} />
+                    </div>
+                  </div>
+                ))}
+                <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+              </div>
+            ) : featuredPlaces.length > 0 ? (
+              <div id="city-carousel" className="flex gap-3 overflow-x-auto pl-5 pr-5 pb-1"
+                style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+                {featuredPlaces.map((r) => (
                   <div key={r.id} style={{ scrollSnapAlign: 'start' }}>
-                    <Top10Card restaurant={r} onClick={() => setSelectedRestaurant(r)} />
+                    <RestaurantCard restaurant={r as any} onClick={() => {
+                      // For Google Places results, navigate to list view filtered to that name
+                      navigate('/list', { state: { searchQuery: r.name, listView: true } })
+                    }} />
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              // Fallback to Supabase restaurants if Google Places fails
+              <div id="city-carousel" className="flex gap-3 overflow-x-auto pl-5 pr-5 pb-1"
+                style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+                {allRestaurants
+                  .filter(r => r.rating && r.image_url)
+                  .sort((a, b) => ((b.rating ?? 0) * Math.log10((b.review_count ?? 1) + 1)) - ((a.rating ?? 0) * Math.log10((a.review_count ?? 1) + 1)))
+                  .slice(0, 10)
+                  .map((r) => (
+                    <div key={r.id} style={{ scrollSnapAlign: 'start' }}>
+                      <RestaurantCard restaurant={r} onClick={() => setSelectedRestaurant(r)} />
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
 
-          {/* Explore grid */}
+          {/* Explore grid — cuisine categories */}
           <div className="px-5 pb-8">
             <h2 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#071126', fontSize: 20, marginBottom: 12 }}>Explore</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -303,7 +360,6 @@ export default function HomeScreen() {
             </div>
           </div>
 
-          {/* Bottom spacer for nav */}
           <div style={{ height: 80 }} />
         </div>
       </div>
@@ -392,7 +448,6 @@ export default function HomeScreen() {
         )}
       </AnimatePresence>
 
-      {/* Restaurant detail */}
       <AnimatePresence>
         {selectedRestaurant && (
           <RestaurantDetail

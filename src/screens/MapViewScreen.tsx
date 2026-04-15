@@ -232,7 +232,7 @@ export default function MapViewScreen() {
       </div>
 
       {/* Map */}
-      <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: trayHeight + 124 }}>
+      <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: trayHeight + 64 }}>
         {isLoaded ? (
           <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={{ lat: city.lat, lng: city.lng }} zoom={12} onLoad={onMapLoad}
             options={{ styles: MAP_STYLES, disableDefaultUI: true, zoomControl: false, scrollwheel: true, gestureHandling: 'greedy', clickableIcons: false }}>
@@ -291,7 +291,7 @@ export default function MapViewScreen() {
       </div>
 
       {/* Zoom + Near Me */}
-      <div style={{ position: 'absolute', right: 16, bottom: trayHeight + 140, zIndex: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ position: 'absolute', right: 16, bottom: trayHeight + 80, zIndex: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <button onClick={() => { if (map) map.setZoom((map.getZoom() ?? 12) + 1) }} style={{ width: 40, height: 40, borderRadius: 10, background: '#1f2937', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>+</button>
         <button onClick={requestUserLocation} style={{ width: 40, height: 40, borderRadius: 10, background: userLocation ? '#0048f9' : '#1f2937', border: `1px solid ${userLocation ? '#0048f9' : 'rgba(255,255,255,0.15)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
           {locationLoading ? <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', animation: 'spin 1s linear infinite' }} /> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="white" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="12" r="7" stroke="white" strokeWidth="1.5" opacity="0.5" /></svg>}
@@ -306,16 +306,11 @@ export default function MapViewScreen() {
             <motion.div animate={{ y: trayOpen ? [0, -3, 0] : 0 }} transition={{ delay: 0.8, duration: 0.6, repeat: trayOpen ? 2 : 0 }} style={{ width: 28, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.3)' }} />
             <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: '#fff', margin: 0 }}>Nearby · {nearbyRestaurants.length} places</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={(e) => { e.stopPropagation(); navigate('/list') }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#fff' }}>
-              <svg width="8" height="8" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21" /></svg>Feed
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontFamily: 'Open Sans', fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{trayOpen ? 'Hide' : 'Show'}</span>
-              <motion.svg width="16" height="16" viewBox="0 0 24 24" fill="none" animate={{ rotate: trayOpen ? 180 : 0 }} transition={{ duration: 0.3 }}>
-                <path d="M6 9l6 6 6-6" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" />
-              </motion.svg>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontFamily: 'Open Sans', fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{trayOpen ? 'Hide' : 'Show'}</span>
+            <motion.svg width="16" height="16" viewBox="0 0 24 24" fill="none" animate={{ rotate: trayOpen ? 180 : 0 }} transition={{ duration: 0.3 }}>
+              <path d="M6 9l6 6 6-6" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" />
+            </motion.svg>
           </div>
         </div>
         {trayOpen && (
