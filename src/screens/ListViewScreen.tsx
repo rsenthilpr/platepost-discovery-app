@@ -134,8 +134,14 @@ function getVideoQuery(cuisine: string, restaurantName: string): string {
     const hash = restaurantName.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
     return pool[hash % pool.length]
   }
-  // Generic fallback — always restaurant-focused, never street food
   return `${cuisine} restaurant food plating dining`
+}
+
+// Each restaurant gets a unique page offset so Pexels returns different results
+// even when two restaurants share the same cuisine query
+function getVideoPage(restaurantName: string): number {
+  const hash = restaurantName.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  return (hash % 4) + 1 // pages 1-4, giving up to 60 different results (15 per page)
 }
 
 interface ReelSlide {
@@ -266,7 +272,7 @@ export default function ListViewScreen() {
     if (loadedIndices.current.has(index)) return
     loadedIndices.current.add(index)
     const [videoResult, placeResult, events] = await Promise.all([
-      fetchPexelsPortraitVideo(getVideoQuery(r.cuisine, r.name)),
+      fetchPexelsPortraitVideo(getVideoQuery(r.cuisine, r.name), getVideoPage(r.name)),
       fetchPlaceDetails(r.name, r.city),
       searchEventbriteEvents(r.name, r.city, r.state),
     ])

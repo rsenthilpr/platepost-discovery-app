@@ -1,76 +1,100 @@
-const PEXELS_KEY = import.meta.env.VITE_PEXELS_KEY
+// src/lib/pexels.ts
+// Fetches HD portrait videos from Pexels API
+// Uses page offset to ensure different restaurants get different videos
 
-export interface PexelsPhoto {
+const PEXELS_KEY = import.meta.env.VITE_PEXELS_KEY as string
+
+interface PexelsVideoResult {
   url: string
-  photographer: string
+  width: number
+  height: number
+  quality: string
 }
 
-export interface PexelsVideo {
-  url: string
-}
+// Module-level cache: query:page → video URL
+const videoCache: Record<string, string | null> = {}
 
-export async function fetchPexelsPhoto(query: string): Promise<PexelsPhoto | null> {
+export async function fetchPexelsPortraitVideo(
+  query: string,
+  page = 1
+): Promise<PexelsVideoResult | null> {
+  if (!PEXELS_KEY) return null
+
+  const cacheKey = `${query}:${page}`
+  if (cacheKey in videoCache) {
+    const url = videoCache[cacheKey]
+    return url ? { url, width: 1080, height: 1920, quality: 'hd' } : null
+  }
+
   try {
     const res = await fetch(
-      `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`,
+      `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&orientation=portrait&size=large&per_page=15&page=${page}`,
       { headers: { Authorization: PEXELS_KEY } }
     )
-    if (!res.ok) return null
-    const data = await res.json()
-    const photo = data?.photos?.[0]
-    if (!photo) return null
-    return {
-      url: photo.src.large,
-      photographer: photo.photographer,
+
+    if (!res.ok) {
+      console.warn(`Pexels ${res.status} for "${query}" page ${page}`)
+      videoCache[cacheKey] = null
+      return null
     }
-  } catch {
+
+    const data = await res.json()
+    const videos: any[] = data.videos ?? []
+
+    if (videos.length === 0) {
+      videoCache[cacheKey] = null
+      return null
+    }
+
+    // Use restaurant name hash to pick a consistent but varied result
+    const hash = query.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+    const pick = videos[hash % videos.length]
+    const files: any[] = pick.video_files ?? []
+
+    // Sort: prefer portrait HD files first
+    const sorted = files
+      .filter((f: any) => f.link && (f.quality === 'hd' || f.quality === 'sd'))
+      .sort((a: any, b: any) => {
+        // Portrait first
+        const aPortrait = a.height > a.width ? 1 : 0
+        const bPortrait = b.height > b.width ? 1 : 0
+        if (bPortrait !== aPortrait) return bPortrait - aPortrait
+        // Then highest resolution
+        return (b.width * b.height) - (a.width * a.height)
+      })
+
+    const best = sorted[0]
+    if (!best?.link) {
+      videoCache[cacheKey] = null
+      return null
+    }
+
+    videoCache[cacheKey] = best.link
+    return { url: best.link, width: best.width, height: best.height, quality: best.quality }
+
+  } catch (err) {
+    console.error('Pexels fetch error:', err)
+    videoCache[cacheKey] = null
     return null
   }
 }
 
-// Used for hero videos (MenuPage, HomeScreen) — landscape orientation
-export async function fetchPexelsVideo(query: string): Promise<PexelsVideo | null> {
-  try {
-    const res = await fetch(
-      `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=5&orientation=landscape`,
-      { headers: { Authorization: PEXELS_KEY } }
-    )
-    if (!res.ok) return null
-    const data = await res.json()
-    const video = data?.videos?.[0]
-    if (!video) return null
-    const file =
-      video.video_files?.find((f: { quality: string }) => f.quality === 'hd') ??
-      video.video_files?.[0]
-    if (!file?.link) return null
-    return { url: file.link }
-  } catch {
-    return null
-  }
-}
+// Photo fetching (used by RestaurantDetail)
+export async function fetchPexelsPhoto(query: string): Promise<string | null> {
+  if (!PEXELS_KEY) return null
 
-// Used for reels feed (ListViewScreen) — any orientation, CSS handles cropping
-export async function fetchPexelsPortraitVideo(query: string): Promise<PexelsVideo | null> {
+  if (query in videoCache) return videoCache[query]
+
   try {
-    // Try landscape first (more results), CSS object-cover handles vertical cropping
     const res = await fetch(
-      `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=5`,
+      `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&orientation=landscape&size=large&per_page=5`,
       { headers: { Authorization: PEXELS_KEY } }
     )
     if (!res.ok) return null
     const data = await res.json()
-    const videos = data?.videos ?? []
-    for (const video of videos) {
-      // Prefer SD/HD files under 10MB for fast mobile loading
-      const file =
-        video.video_files?.find((f: { quality: string; height: number }) =>
-          f.quality === 'sd' && f.height >= 480
-        ) ??
-        video.video_files?.find((f: { quality: string }) => f.quality === 'hd') ??
-        video.video_files?.[0]
-      if (file?.link) return { url: file.link }
-    }
-    return null
+    const photo = data.photos?.[0]?.src?.large2x ?? null
+    videoCache[query] = photo
+    return photo
   } catch {
     return null
   }

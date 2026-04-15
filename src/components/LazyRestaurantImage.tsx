@@ -31,12 +31,12 @@ export default function LazyRestaurantImage({ fallbackUrl, query, alt, className
           fetchedRef.current = true
           observer.disconnect()
           fetchPexelsPhoto(query).then((photo) => {
-            if (photo?.url) {
+            if (photo) {
               // Preload before swapping so there's no flicker
               const img = new Image()
-              img.src = photo.url
+              img.src = photo
               img.onload = () => {
-                setSrc(photo.url)
+                setSrc(photo)
                 setUpgraded(true)
               }
             }

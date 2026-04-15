@@ -119,7 +119,7 @@ export default function RestaurantDetail({ restaurant: r, onClose, initialSectio
     ])
     setPlaceInfo(placeData)
     if (placeData.photoUrl) setHeroImage(placeData.photoUrl)
-    else if (pexelsPhoto?.url) setHeroImage(pexelsPhoto.url)
+    else if (pexelsPhoto) setHeroImage(pexelsPhoto)
     setLoadingPlace(false)
   }
 

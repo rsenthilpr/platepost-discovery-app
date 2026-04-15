@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
-import { fetchPexelsPhoto, fetchPexelsVideo } from '../lib/pexels'
+import { fetchPexelsPhoto, fetchPexelsPortraitVideo } from '../lib/pexels'
 import { getMenuData, getHeroVideoQuery } from '../lib/menuData'
 import type { Restaurant } from '../types'
 import type { MenuItem } from '../lib/menuData'
@@ -125,7 +125,7 @@ export default function MenuPage() {
 
   async function loadHeroVideo(cuisine: string) {
     const query = getHeroVideoQuery(cuisine)
-    const video = await fetchPexelsVideo(query)
+    const video = await fetchPexelsPortraitVideo(query)
     if (video?.url) setHeroVideoUrl(video.url)
   }
 
@@ -137,7 +137,7 @@ export default function MenuPage() {
     const results = await Promise.all(
       items.map(async (item) => {
         const photo = await fetchPexelsPhoto(item.pexelsQuery)
-        return { id: item.id, url: photo?.url ?? fallback }
+        return { id: item.id, url: photo ?? fallback }
       })
     )
 
@@ -454,7 +454,7 @@ function MenuItemPopup({
   }, [item.id])
 
   async function loadVideo() {
-    const video = await fetchPexelsVideo(`${item.pexelsQuery} food preparation`)
+    const video = await fetchPexelsPortraitVideo(`${item.pexelsQuery} food preparation`)
     if (video?.url) setVideoUrl(video.url)
   }
 
