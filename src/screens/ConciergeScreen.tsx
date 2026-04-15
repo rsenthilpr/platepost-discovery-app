@@ -75,31 +75,61 @@ function KawaiiPiggy({
   showTapHint?: boolean
 }) {
   const [_tapCount, setTapCount] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [tilt, setTilt] = useState({ x: 0, y: 0 })
 
-  // Pick image based on state
+  // 3D tilt — follows cursor/touch position
+  useEffect(() => {
+    function handleMove(e: MouseEvent | TouchEvent) {
+      const container = containerRef.current
+      if (!container) return
+      const rect = container.getBoundingClientRect()
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      const clientX = 'touches' in e ? e.touches[0]?.clientX ?? cx : e.clientX
+      const clientY = 'touches' in e ? e.touches[0]?.clientY ?? cy : e.clientY
+      // Normalize to -1..1 based on distance from center of screen
+      const dx = (clientX - cx) / (window.innerWidth / 2)
+      const dy = (clientY - cy) / (window.innerHeight / 2)
+      // Clamp tilt to max ±18 degrees
+      setTilt({
+        x: Math.max(-18, Math.min(18, dy * -18)),  // tilt up when cursor above
+        y: Math.max(-18, Math.min(18, dx * 18)),   // tilt right when cursor right
+      })
+    }
+    function handleLeave() { setTilt({ x: 0, y: 0 }) }
+
+    window.addEventListener('mousemove', handleMove, { passive: true })
+    window.addEventListener('touchmove', handleMove, { passive: true })
+    window.addEventListener('mouseleave', handleLeave)
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('touchmove', handleMove)
+      window.removeEventListener('mouseleave', handleLeave)
+    }
+  }, [])
+
   const imgSrc = PIGGY_IMAGES[pigState] ?? PIGGY_IMAGES.idle
 
-  // Animation per state
-  const animateProps =
-    pigState === 'thinking' ? { rotate: [-3, 3, -3] } :
-    pigState === 'happy'    ? { y: [0, -12, 0], rotate: [0, -5, 5, 0] } :
-    pigState === 'squished' ? { scaleX: 1.15, scaleY: 0.85 } :
-    { y: [0, -6, 0] } // idle bob
+  // State animations — combined with 3D tilt
+  const stateAnimate =
+    pigState === 'thinking' ? { rotateZ: [-3, 3, -3] } :
+    pigState === 'happy'    ? { y: [0, -14, 0], rotateZ: [0, -6, 6, 0] } :
+    pigState === 'squished' ? { scaleX: 1.2, scaleY: 0.82 } :
+    { y: [0, -7, 0] } // idle float
 
-  const transitionProps =
-    pigState === 'thinking' ? { duration: 0.6, repeat: Infinity, ease: 'easeInOut' as const } :
-    pigState === 'happy'    ? { duration: 0.5, ease: 'easeOut' as const } :
-    pigState === 'squished' ? { duration: 0.15, type: 'spring' as const, stiffness: 500 } :
-    { duration: 2.8, repeat: Infinity, ease: [0.45, 0, 0.55, 1] as any, repeatType: 'mirror' as const }
-
-  function handleTap() {
-    setTapCount(c => c + 1)
-    onTap()
-  }
+  const stateTransition =
+    pigState === 'thinking' ? { duration: 0.55, repeat: Infinity, ease: 'easeInOut' as const } :
+    pigState === 'happy'    ? { duration: 0.45, ease: 'easeOut' as const } :
+    pigState === 'squished' ? { duration: 0.12, type: 'spring' as const, stiffness: 600 } :
+    { duration: 3.2, repeat: Infinity, ease: [0.45, 0, 0.55, 1] as any, repeatType: 'mirror' as const }
 
   return (
-    <div style={{ position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      {/* Speech bubble quip */}
+    <div
+      ref={containerRef}
+      style={{ position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+    >
+      {/* Speech bubble */}
       <AnimatePresence>
         {quip && (
           <motion.div
@@ -128,29 +158,39 @@ function KawaiiPiggy({
         )}
       </AnimatePresence>
 
-      {/* Piggy image */}
-      <motion.img
-        key={pigState} // re-triggers animation on state change
-        src={imgSrc}
-        alt={`PlatePost Crave pig — ${pigState}`}
-        onClick={handleTap}
-        animate={animateProps}
-        transition={transitionProps}
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.88 }}
-        style={{
-          width: size,
-          height: size,
-          objectFit: 'contain',
-          cursor: 'pointer',
-          display: 'block',
-          filter: 'drop-shadow(0 4px 12px rgba(255,100,150,0.3))',
-          outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
-          userSelect: 'none',
+      {/* 3D wrapper — handles cursor tilt with smooth spring */}
+      <motion.div
+        animate={{
+          rotateX: tilt.x,
+          rotateY: tilt.y,
         }}
-        draggable={false}
-      />
+        transition={{ type: 'spring', stiffness: 180, damping: 22 }}
+        style={{ perspective: 400, transformStyle: 'preserve-3d' }}
+      >
+        {/* Piggy image with state animation */}
+        <motion.img
+          key={pigState}
+          src={imgSrc}
+          alt={`PlatePost Crave — ${pigState}`}
+          onClick={() => { setTapCount(c => c + 1); onTap() }}
+          animate={stateAnimate}
+          transition={stateTransition}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.85 }}
+          style={{
+            width: size,
+            height: size,
+            objectFit: 'contain',
+            cursor: 'pointer',
+            display: 'block',
+            filter: 'drop-shadow(0 6px 16px rgba(255,100,150,0.35))',
+            outline: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
+          }}
+          draggable={false}
+        />
+      </motion.div>
     </div>
   )
 }

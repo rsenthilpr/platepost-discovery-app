@@ -42,8 +42,11 @@ export default function VideoBackground({ cuisine, fallbackImage, isActive, orie
   useEffect(() => {
     const video = videoRef.current
     if (!video || !videoUrl || videoFailed) return
-    if (isActive && videoLoaded) {
-      video.play().catch(() => setVideoFailed(true))
+    if (isActive) {
+      // Always try to play — works instantly if cached, onCanPlay handles first load
+      video.play().catch(() => {
+        // Not ready yet — will play via onCanPlay when loaded
+      })
     } else {
       video.pause()
     }
@@ -67,8 +70,13 @@ export default function VideoBackground({ cuisine, fallbackImage, isActive, orie
           muted
           loop
           playsInline
-          preload={isActive ? 'auto' : 'none'}
-          onCanPlay={() => setVideoLoaded(true)}
+          autoPlay={isActive}
+          preload="auto"
+          onCanPlay={() => {
+            setVideoLoaded(true)
+            // Play immediately when ready — fixes first-load delay
+            if (isActive) videoRef.current?.play().catch(() => {})
+          }}
           onError={() => { setVideoFailed(true); videoUrlCache[cacheKey] = null }}
           style={{
             position: 'absolute', inset: 0,

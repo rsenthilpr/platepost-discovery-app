@@ -229,11 +229,14 @@ export default function MapViewScreen() {
               const emoji = CUISINE_EMOJI[r.cuisine] ?? '🍽️'
               return (
                 <OverlayView key={r.id} position={{ lat: r.latitude, lng: r.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                  {/* Wrapper: handles both click (desktop) and touch (mobile) */}
+                  {/* Single unified pointer handler — works on both mouse and touch */}
                   <div
                     style={{ position: 'absolute', transform: 'translate(-50%, -50%)', cursor: 'pointer' }}
-                    onClick={() => { setSelectedRestaurant(isSelected ? null : r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
-                    onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedRestaurant(isSelected ? null : r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
+                    onPointerUp={(e) => {
+                      e.stopPropagation()
+                      setSelectedRestaurant(isSelected ? null : r)
+                      if (map) map.panTo({ lat: r.latitude, lng: r.longitude })
+                    }}
                   >
                     <div style={{
                       width: isSelected ? 42 : isPro ? 38 : 32,
