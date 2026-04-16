@@ -171,7 +171,7 @@ function KawaiiPiggy({
         <motion.img
           key={pigState}
           src={imgSrc}
-          alt={`PlatePost Crave — ${pigState}`}
+          alt={`PlatePost Piggy — ${pigState}`}
           onClick={() => { setTapCount(c => c + 1); onTap() }}
           animate={stateAnimate}
           transition={stateTransition}
@@ -202,7 +202,7 @@ export default function CraveScreen() {
   const [messages, setMessages] = useState<Message[]>([{
     id: '0',
     role: 'assistant',
-    text: "Hi! I'm PlatePost Crave 🍽️\n\nTell me what you're craving tonight — the more detail the better. I'll find the perfect spot.",
+    text: "Hi! I'm your personal pig 🐷\n\nTell me what you're craving — the more detail the better. I'll find the perfect spot.",
   }])
   const { city } = useCityStore()
   const [input, setInput] = useState('')
@@ -293,7 +293,7 @@ export default function CraveScreen() {
         ),
       ].join('\n')
 
-      const systemPrompt = `You are PlatePost Crave, a warm, fun, and slightly cheeky AI food guide for ${city.name}. You're powered by PlatePost — the video-first restaurant discovery platform.
+      const systemPrompt = `You are PlatePost Piggy, a warm, fun, and slightly cheeky AI food guide for ${city.name}. You're powered by PlatePost — the video-first restaurant discovery platform.
 
 Your personality:
 - Warm, genuine, conversational — like a local friend texting you a recommendation
@@ -301,11 +301,11 @@ Your personality:
 - Give specific, confident picks with personality and local knowledge
 - Know neighborhoods and food culture in ${city.name}
 
-CRITICAL FORMATTING RULES — follow these exactly:
-1. NEVER use markdown: no **bold**, no *italic*, no bullet points with asterisks, no headers
-2. NEVER show restaurant IDs, database IDs, or any internal codes to the user
-3. Write in plain conversational sentences only
-4. Keep it short — 1-2 sentences per restaurant, max 3 restaurants total
+CRITICAL FORMATTING RULES — follow these exactly or the app will break:
+1. NEVER use markdown — no **bold**, no *italic*, no # headers, no bullet points with asterisks, no dashes as bullets
+2. NEVER show restaurant IDs, database IDs, or any internal codes like [RESTAURANTS:...] in your visible response
+3. Write ONLY in plain conversational sentences — no special characters for formatting
+4. Keep it short — 1-2 sentences per restaurant, max 3 restaurants
 5. Sound like a friend texting, not a review website
 
 Available restaurants:
@@ -338,10 +338,24 @@ RULES:
 
       const data = await response.json()
       const rawText = data.content?.[0]?.text ?? "I couldn't find a match. Try describing what you're craving differently!"
-      const idMatch = rawText.match(/\[RESTAURANTS:([\d,]+)\]/)
-      const recommendedIds = idMatch ? idMatch[1].split(',').map(Number) : []
-      const cleanText = rawText.replace(/\[RESTAURANTS:[\d,]+\]/, '').trim()
-      const recommendedRestaurants = restaurants.filter(r => recommendedIds.includes(r.id))
+
+      // Strip [RESTAURANTS:...] tag — handles both numeric IDs and alphanumeric Google Place IDs
+      const idMatch = rawText.match(/\[RESTAURANTS:([^\]]+)\]/)
+      const recommendedIds = idMatch
+        ? idMatch[1].split(',').map((s: string) => s.trim()).filter(Boolean)
+        : []
+
+      // Strip [RESTAURANTS:...] tag and clean markdown formatting
+      let cleanText = rawText
+        .replace(/\[RESTAURANTS:[^\]]+\]/g, '')  // remove tag
+        .replace(/\*\*([^*]+)\*\*/g, '$1')        // remove **bold**
+        .replace(/\*([^*]+)\*/g, '$1')            // remove *italic*
+        .replace(/^#+\s*/gm, '')                  // remove headers
+        .trim()
+
+      // Match IDs: numeric IDs match Supabase, strings match Google Places
+      const numericIds = recommendedIds.map(Number).filter((n: number) => !isNaN(n))
+      const recommendedRestaurants = restaurants.filter(r => numericIds.includes(r.id))
 
       conversationHistory.current.push({ role: 'assistant', content: cleanText })
       setMessages(prev => [...prev.filter(m => m.id !== 'loading'), {
@@ -398,7 +412,7 @@ RULES:
             AI Powered
           </p>
           <h1 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, color: '#fff', fontSize: 16, lineHeight: 1.1 }}>
-            PlatePost Crave
+            PlatePost Piggy
           </h1>
         </div>
 

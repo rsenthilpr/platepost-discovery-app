@@ -201,13 +201,50 @@ export default function ListViewScreen() {
       const matchingFilter = FILTERS.find(f => f.toLowerCase() === q)
       if (matchingFilter && matchingFilter !== 'All') setActiveFilter(matchingFilter)
     }
-  }, [])
+  }, [city.name]) // reload when city changes
 
   async function fetchRestaurants() {
     setLoading(true)
-    const { data, error } = await supabase.from('restaurants').select('*').order('tier').order('name')
-    if (error) console.error(error)
-    const list = data ?? []
+
+    // Always load Supabase restaurants (LA/OC curated)
+    const { data: supabaseData } = await supabase.from('restaurants').select('*').order('tier').order('name')
+    let list: Restaurant[] = supabaseData ?? []
+
+    // For non-LA cities, also pull Google Places restaurants
+    const isLAArea = ['Los Angeles', 'Anaheim', 'Orange', 'Placentia', 'Westminster', 'Irvine'].includes(city.name)
+    if (!isLAArea) {
+      try {
+        const res = await fetch(`/api/places-search?city=${encodeURIComponent(city.name)}&lat=${city.lat}&lng=${city.lng}`)
+        if (res.ok) {
+          const data = await res.json()
+          const googlePlaces: Restaurant[] = (data.places ?? []).map((p: any, i: number) => ({
+            id: -(i + 2000),
+            name: p.name,
+            cuisine: p.cuisine ?? 'Restaurant',
+            city: city.name,
+            state: city.state,
+            latitude: p.latitude ?? 0,
+            longitude: p.longitude ?? 0,
+            rating: p.rating,
+            review_count: p.review_count,
+            image_url: p.image_url ?? '',
+            description: p.description ?? '',
+            address: p.address ?? '',
+            phone: p.phone ?? '',
+            website_url: p.website_url ?? '',
+            platepost_menu_url: null,
+            tier: 'standard',
+            neighborhood: null,
+            price_level: p.price_level,
+            hours: null,
+            place_id: p.place_id,
+          } as any))
+          // Use Google Places for non-LA cities instead of LA Supabase data
+          list = googlePlaces
+        }
+      } catch (e) { console.error('Google Places feed error:', e) }
+    }
+
     setAllRestaurants(list)
 
     const baseFiltered = applyFilter(list, state.filter ?? 'All')
