@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { PlatePostLogo } from '../components/PlatePostLogo'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
@@ -202,6 +201,15 @@ export default function HomeScreen() {
     setSearchHistory(getSearchHistory())
   }
 
+  const [scrolled, setScrolled] = useState(false)
+
+  // Hide logo when white content area scrolls up past the hero
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+    const scrollTop = e.currentTarget.scrollTop
+    const heroHeight = window.innerHeight * 0.48
+    setScrolled(scrollTop > heroHeight - 80)
+  }
+
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#fff' }}>
 
@@ -233,26 +241,59 @@ export default function HomeScreen() {
         style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.0) 35%, rgba(0,0,0,0.6) 68%, rgba(0,0,0,0.97) 100%)' }}
       />
 
-      {/* Top bar — higher z-index to stay above scrollable content */}
-      <div className="absolute top-0 left-0 right-0 z-50 pt-14 px-5 flex items-center justify-between pointer-events-none">
+      {/* Top bar — sticky, logo switches white→dark when scrolled into white area */}
+      <div className="absolute top-0 left-0 right-0 z-50 pt-14 px-5 flex items-center justify-between pointer-events-none"
+        style={{ transition: 'background 0.3s ease' }}>
         <a href="https://platepost.io" target="_blank" rel="noreferrer" className="pointer-events-auto" style={{ textDecoration: 'none' }}>
-          <PlatePostLogo size="md" white={true} />
+          {/* White logo over hero, dark blue logo over white content */}
+          <img
+            src="/pp-logo.png"
+            alt="PlatePost"
+            style={{
+              height: 'clamp(24px, 6.5vw, 32px)',
+              maxHeight: 32,
+              width: 'auto',
+              maxWidth: 160,
+              objectFit: 'contain',
+              objectPosition: 'left center',
+              display: 'block',
+              // White on dark hero, dark navy on white background
+              filter: scrolled
+                ? 'brightness(0) saturate(100%) invert(13%) sepia(84%) saturate(1800%) hue-rotate(214deg) brightness(90%)'
+                : 'brightness(0) invert(1)',
+              transition: 'filter 0.3s ease',
+            }}
+          />
         </a>
         <button onClick={() => setShowCityPicker(true)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-full pointer-events-auto"
-          style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.25)', whiteSpace: 'nowrap' }}>
+          style={{
+            background: scrolled ? 'rgba(0,72,249,0.08)' : 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(12px)',
+            border: scrolled ? '1px solid rgba(0,72,249,0.25)' : '1px solid rgba(255,255,255,0.25)',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.3s ease',
+          }}>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white" />
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
+              fill={scrolled ? '#0048f9' : 'white'} />
           </svg>
-          <span style={{ fontFamily: 'Open Sans, sans-serif', color: '#fff', fontSize: 12, fontWeight: 600 }}>{city.name}</span>
+          <span style={{
+            fontFamily: 'Open Sans, sans-serif',
+            color: scrolled ? '#0048f9' : '#fff',
+            fontSize: 12, fontWeight: 600,
+            transition: 'color 0.3s ease',
+          }}>{city.name}</span>
           <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
-            <path d="M6 9l6 6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M6 9l6 6 6-6"
+              stroke={scrolled ? '#0048f9' : 'white'}
+              strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         </button>
       </div>
 
       {/* Scrollable content */}
-      <div className="absolute inset-0 z-20 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+      <div className="absolute inset-0 z-20 overflow-y-auto" style={{ scrollbarWidth: 'none' }} onScroll={handleScroll}>
         <div style={{ height: '48vh' }} />
 
         {/* Hero text + 3 action chips — ONLY these, no duplicate buttons */}
