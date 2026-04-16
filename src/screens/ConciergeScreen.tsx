@@ -285,45 +285,48 @@ export default function CraveScreen() {
 
     try {
       const allRestaurantsList = [
-        ...restaurants.map(r =>
-          `ID:${r.id} | ${r.name} | ${r.cuisine} | ${r.city}, ${r.state} | Rating: ${r.rating ?? 'N/A'} | ${r.description ?? ''} | PlatePost customer`
-        ),
-        ...googleRestaurants.slice(0, 30).map((p: any) =>
+        ...restaurants
+          .filter(r => r.city?.toLowerCase().includes(city.name.toLowerCase()) ||
+            ['Los Angeles', 'Anaheim', 'Orange', 'Placentia', 'Westminster', 'Irvine'].includes(city.name))
+          .map(r =>
+            `ID:${r.id} | ${r.name} | ${r.cuisine} | ${r.city}, ${r.state} | Rating: ${r.rating ?? 'N/A'} | ${r.description ?? ''} | PlatePost customer`
+          ),
+        ...googleRestaurants.slice(0, 40).map((p: any) =>
           `GOOGLE:${p.place_id} | ${p.name} | ${p.cuisine ?? 'Restaurant'} | ${city.name} | Rating: ${p.rating ?? 'N/A'} | ${p.description ?? ''}`
         ),
       ].join('\n')
 
-      const systemPrompt = `You are PlatePost Piggy, a warm, fun, and slightly cheeky AI food guide for ${city.name}. You're powered by PlatePost — the video-first restaurant discovery platform.
+      const systemPrompt = `You are PlatePost Piggy, a warm and fun AI food guide for ${city.name}, ${city.state}. You're powered by PlatePost — the video-first restaurant discovery platform.
+
+The user is currently in ${city.name}, ${city.state}. Only recommend restaurants IN ${city.name} from the list below.
 
 Your personality:
-- Warm, genuine, conversational — like a local friend texting you a recommendation
+- Warm, genuine, conversational — like a local friend texting a recommendation
 - Never corporate, never stiff
-- Give specific, confident picks with personality and local knowledge
 - Know neighborhoods and food culture in ${city.name}
 
-CRITICAL FORMATTING RULES — follow these exactly or the app will break:
-1. NEVER use markdown — no **bold**, no *italic*, no # headers, no bullet points with asterisks, no dashes as bullets
-2. NEVER show restaurant IDs, database IDs, or any internal codes like [RESTAURANTS:...] in your visible response
-3. Write ONLY in plain conversational sentences — no special characters for formatting
+CRITICAL FORMATTING RULES — follow exactly or the app breaks:
+1. NEVER use markdown — no **bold**, no *italic*, no # headers, no asterisk bullets
+2. NEVER show IDs, database codes, or the [RESTAURANTS:...] tag in your visible text
+3. Write ONLY in plain conversational sentences
 4. Keep it short — 1-2 sentences per restaurant, max 3 restaurants
-5. Sound like a friend texting, not a review website
+5. Sound like a friend texting, not a review site
+6. ONLY recommend restaurants from the list below — never make up places
 
-Available restaurants:
-${allRestaurantsList}
+Available restaurants in ${city.name}:
+${allRestaurantsList || `No restaurants loaded yet for ${city.name}. Tell the user to try again in a moment.`}
 
-PlatePost pro customers (mention their VideoMenu when relevant):
+PlatePost pro customers (mention their VideoMenu when relevant, LA only):
 - Kei Coffee House — platepost.io/kch
-- Wish You Were Here Coffee — platepost.io/wywhcoffee  
+- Wish You Were Here Coffee — platepost.io/wywhcoffee
 - Ape Coffee Orange — platepost.io/apecoffeeorange
 - Ape Coffee Placentia — platepost.io/apecoffeeplacentia
 
 RULES:
-- Recommend 2-3 restaurants that match the request
-- End every response with [RESTAURANTS:id1,id2] using numeric IDs — this tag is invisible to the user, never mention it
-- Honor location requests — prioritize restaurants near the neighborhood mentioned
-- For "Plan my night": dinner spot then a venue, keep it fun
-- Never make up restaurants not in the list
-- If no restaurants match, say so honestly and suggest trying a different search`
+- Recommend 2-3 restaurants from the list that match the request
+- End every response with [RESTAURANTS:id1,id2] using the numeric IDs or GOOGLE place IDs — never show this tag to the user
+- If the user asks about a different city than ${city.name}, tell them to change their city in the app first
+- If no restaurants match, say so honestly`
 
       const response = await fetch('/api/claude', {
         method: 'POST',

@@ -116,6 +116,8 @@ export default function MapViewScreen() {
   ]
 
   const filtered = allRestaurants.filter(r => {
+    // Must have valid coordinates to appear on map
+    if (!r.latitude || !r.longitude || r.latitude === 0 || r.longitude === 0) return false
     if (activeFilter === 'Saved') return favorites.has(r.id)
     if (activeFilter !== 'All' && r.cuisine.toLowerCase() !== activeFilter.toLowerCase()) return false
     if (mapSearch.trim()) {
@@ -133,10 +135,10 @@ export default function MapViewScreen() {
       return da - db
     }).slice(0, 20)
 
-  // Strict density control — fewer pins at city level
-  const pinsToShow = currentZoom >= 14 ? filtered
-    : currentZoom >= 12 ? [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 12)
-    : [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 8)
+  // Show more pins — Google Places gives us more data for major cities
+  const pinsToShow = currentZoom >= 13 ? filtered
+    : currentZoom >= 11 ? [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 40)
+    : [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 20)
 
   useEffect(() => {
     if (!mapSearch.trim() || mapSearch.length < 2) { setSuggestions([]); setShowSuggestions(false); return }

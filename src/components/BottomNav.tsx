@@ -30,7 +30,7 @@ const TABS = [
       </svg>
     ),
   },
-  { id: 'crave', path: '/concierge', label: 'Crave', isCrave: true },
+  { id: 'crave', path: '/concierge', label: 'Piggy AI', isCrave: true },
   {
     id: 'feed', path: '/list', label: 'Feed',
     icon: (active: boolean) => (
@@ -101,7 +101,7 @@ export default function BottomNav() {
                   fontFamily: 'Open Sans, sans-serif', fontSize: 9, fontWeight: 600,
                   color: active ? '#4d8bff' : 'rgba(255,255,255,0.55)',
                   letterSpacing: '0.04em', textTransform: 'uppercase', marginTop: 3,
-                }}>Crave</span>
+                }}>Piggy AI</span>
               </div>
             )
           }
