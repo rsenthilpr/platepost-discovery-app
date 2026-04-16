@@ -601,12 +601,48 @@ export default function HomeScreen() {
                     </p>
                   </div>
                 )}
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedGooglePlace.name + ' ' + selectedGooglePlace.city)}`}
-                  target="_blank" rel="noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 0', borderRadius: 14, textDecoration: 'none', background: '#0048f9', color: '#fff', fontFamily: 'Open Sans, sans-serif', fontWeight: 700, fontSize: 14, marginBottom: 10 }}>
-                  📍 Get Directions
-                </a>
+
+                {/* Reviews hyperlink */}
+                {selectedGooglePlace.rating && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedGooglePlace.name + ' ' + selectedGooglePlace.city)}`}
+                    target="_blank" rel="noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 20, textDecoration: 'none' }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="#FBBF24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                    <span style={{ fontFamily: 'Open Sans', color: '#FBBF24', fontWeight: 700, fontSize: 13 }}>
+                      {selectedGooglePlace.rating}
+                    </span>
+                    <span style={{ fontFamily: 'Open Sans', color: 'rgba(147,197,253,0.9)', fontSize: 12, textDecoration: 'underline' }}>
+                      reviews ↗
+                    </span>
+                  </a>
+                )}
+
+                {/* Action buttons — Directions + Website */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedGooglePlace.name + ' ' + selectedGooglePlace.city)}`}
+                    target="_blank" rel="noreferrer"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 0', borderRadius: 14, textDecoration: 'none', background: '#0048f9', color: '#fff', fontFamily: 'Open Sans, sans-serif', fontWeight: 700, fontSize: 14 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 11l19-9-9 19-2-8-8-2z" />
+                    </svg>
+                    Directions
+                  </a>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedGooglePlace.name + ' ' + selectedGooglePlace.city)}`}
+                    target="_blank" rel="noreferrer"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 0', borderRadius: 14, textDecoration: 'none', background: 'rgba(255,255,255,0.07)', color: '#FAFBFF', border: '1px solid rgba(255,255,255,0.15)', fontFamily: 'Open Sans, sans-serif', fontWeight: 600, fontSize: 14 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" opacity={0.8} />
+                      <path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" strokeWidth="1.5" opacity={0.8} />
+                    </svg>
+                    Reviews
+                  </a>
+                </div>
                 <div style={{ height: 80 }} />
               </div>
             </motion.div>

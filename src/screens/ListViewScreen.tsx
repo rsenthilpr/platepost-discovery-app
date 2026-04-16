@@ -171,7 +171,6 @@ export default function ListViewScreen() {
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
   const [menuIframeUrl, setMenuIframeUrl] = useState<string | null>(null)
   const [listSearch, setListSearch] = useState(state.searchQuery ?? '')
-  const [showSearchBar, setShowSearchBar] = useState(false)
   const listSearchRef = useRef<HTMLInputElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -360,49 +359,31 @@ export default function ListViewScreen() {
                 ? (state.searchQuery ? `"${state.searchQuery}"` : 'Discover')
                 : activeFilter}
             </h1>
-            {/* Search toggle button */}
-            <button
-              onClick={() => { setShowSearchBar(s => !s); setTimeout(() => listSearchRef.current?.focus(), 100) }}
-              style={{ width: 36, height: 36, borderRadius: '50%', background: showSearchBar ? '#0048f9' : '#f3f4f6', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <circle cx="11" cy="11" r="8" stroke={showSearchBar ? '#fff' : '#071126'} strokeWidth="2" />
-                <path d="M21 21l-4.35-4.35" stroke={showSearchBar ? '#fff' : '#071126'} strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
           </div>
 
-          {/* Inline search bar — shown when search icon tapped */}
-          <AnimatePresence>
-            {showSearchBar && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                style={{ overflow: 'hidden', padding: '8px 16px 0' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', borderRadius: 12, padding: '9px 12px', border: '1.5px solid #e5e7eb' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
-                    <circle cx="11" cy="11" r="8" stroke="#071126" strokeWidth="2" />
-                    <path d="M21 21l-4.35-4.35" stroke="#071126" strokeWidth="2" strokeLinecap="round" />
+          {/* Always-visible search bar — no toggle needed */}
+          <div style={{ padding: '10px 16px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', borderRadius: 12, padding: '10px 14px', border: '1.5px solid #e5e7eb' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
+                <circle cx="11" cy="11" r="8" stroke="#071126" strokeWidth="2" />
+                <path d="M21 21l-4.35-4.35" stroke="#071126" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <input
+                ref={listSearchRef}
+                value={listSearch}
+                onChange={e => setListSearch(e.target.value)}
+                placeholder={`Search ${activeFilter === 'All' ? 'restaurants' : activeFilter + ' restaurants'}...`}
+                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'Open Sans', fontSize: 14, color: '#071126' }}
+              />
+              {listSearch && (
+                <button onClick={() => setListSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, padding: 0 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6l12 12" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" />
                   </svg>
-                  <input
-                    ref={listSearchRef}
-                    value={listSearch}
-                    onChange={e => setListSearch(e.target.value)}
-                    placeholder={`Search ${activeFilter === 'All' ? 'restaurants' : activeFilter + ' restaurants'}...`}
-                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'Open Sans', fontSize: 14, color: '#071126' }}
-                  />
-                  {listSearch && (
-                    <button onClick={() => setListSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, padding: 0 }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                        <path d="M18 6L6 18M6 6l12 12" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                </button>
+              )}
+            </div>
+          </div>
 
           {/* Filter chips */}
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '10px 16px 12px', scrollbarWidth: 'none' }}>
