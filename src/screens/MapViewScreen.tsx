@@ -108,10 +108,18 @@ export default function MapViewScreen() {
     finally { setLoadingPlaces(false) }
   }
 
+  // Only show Supabase restaurants that are near the current city
+  // This prevents LA restaurants appearing as pins when viewing NYC/Portland etc.
+  const CITY_RADIUS = 1.5 // ~165km in lat/lng degrees — generous enough for metro areas
+  const supabaseInCity = supabaseRestaurants.filter(r =>
+    Math.abs((r.latitude ?? 0) - city.lat) < CITY_RADIUS &&
+    Math.abs((r.longitude ?? 0) - city.lng) < CITY_RADIUS
+  )
+
   const allRestaurants = [
-    ...supabaseRestaurants,
+    ...supabaseInCity,
     ...googleRestaurants.filter(g =>
-      !supabaseRestaurants.some(s => s.name.toLowerCase().slice(0, 8) === g.name.toLowerCase().slice(0, 8))
+      !supabaseInCity.some(s => s.name.toLowerCase().slice(0, 8) === g.name.toLowerCase().slice(0, 8))
     ),
   ]
 

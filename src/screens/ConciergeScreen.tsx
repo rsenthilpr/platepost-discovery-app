@@ -356,9 +356,34 @@ RULES:
         .replace(/^#+\s*/gm, '')                  // remove headers
         .trim()
 
-      // Match IDs: numeric IDs match Supabase, strings match Google Places
+      // Match IDs: numeric IDs → Supabase restaurants, alphanumeric → Google Places by place_id or name
       const numericIds = recommendedIds.map(Number).filter((n: number) => !isNaN(n))
-      const recommendedRestaurants = restaurants.filter(r => numericIds.includes(r.id))
+      const stringIds = recommendedIds.filter((id: string) => isNaN(Number(id)))
+
+      const supabaseMatches = restaurants.filter(r => numericIds.includes(r.id))
+
+      // Match Google Places by place_id first, then fall back to name matching
+      const googleMatches = stringIds.length > 0
+        ? googleRestaurants.filter((p: any) =>
+            stringIds.some((id: string) =>
+              p.place_id === id ||
+              p.name?.toLowerCase().includes(id.toLowerCase().slice(0, 8))
+            )
+          ).map((p: any, i: number) => ({
+            id: -(i + 3000),
+            name: p.name,
+            cuisine: p.cuisine ?? 'Restaurant',
+            city: city.name,
+            state: city.state,
+            rating: p.rating,
+            image_url: p.image_url ?? '',
+            address: p.address ?? '',
+            latitude: p.latitude ?? 0,
+            longitude: p.longitude ?? 0,
+          } as any))
+        : []
+
+      const recommendedRestaurants = [...supabaseMatches, ...googleMatches]
 
       conversationHistory.current.push({ role: 'assistant', content: cleanText })
       setMessages(prev => [...prev.filter(m => m.id !== 'loading'), {
