@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import BottomNav from '../components/BottomNav'
 import { useCityStore } from '../lib/cityStore'
+import CityPicker from '../components/CityPicker'
 
 interface TMEvent {
   id: string
@@ -99,6 +100,7 @@ export default function EventsScreen() {
   const [calMonth, setCalMonth] = useState(today.getMonth())
   const [calYear, setCalYear] = useState(today.getFullYear())
   const [selectedDate, setSelectedDate] = useState<string>(todayStr)
+  const [showCityPicker, setShowCityPicker] = useState(false)
 
   // Reload events when city changes
   useEffect(() => {
@@ -216,7 +218,7 @@ export default function EventsScreen() {
               <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="#071126" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          <div>
+          <div style={{ flex: 1 }}>
             <h1 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, fontSize: 22, color: '#071126', margin: 0 }}>
               Events
             </h1>
@@ -224,8 +226,23 @@ export default function EventsScreen() {
               {city.name} · Discover what's happening
             </p>
           </div>
+          {/* City picker button */}
+          <button
+            onClick={() => setShowCityPicker(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 999, background: 'rgba(0,72,249,0.07)', border: '1.5px solid rgba(0,72,249,0.2)', cursor: 'pointer', flexShrink: 0 }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#0048f9" />
+            </svg>
+            <span style={{ fontFamily: 'Open Sans', fontSize: 12, fontWeight: 600, color: '#0048f9', whiteSpace: 'nowrap' }}>{city.name}</span>
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+              <path d="M6 9l6 6 6-6" stroke="#0048f9" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
       </div>
+
+      <CityPicker isOpen={showCityPicker} onClose={() => setShowCityPicker(false)} currentCity={city} />
 
       {/* Calendar */}
       <div style={{ background: '#fff', margin: '12px 16px', borderRadius: 20, padding: '16px', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>

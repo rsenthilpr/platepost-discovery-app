@@ -715,13 +715,23 @@ function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, s
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
           <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>📍 {r.city}, {r.state}</span>
           {slide.rating && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ' ' + r.city + ' ' + r.state)}`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={e => e.stopPropagation()}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
+            >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="#FBBF24">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
               <span style={{ fontFamily: 'Open Sans', color: '#FBBF24', fontSize: 13, fontWeight: 700 }}>{slide.rating.toFixed(1)}</span>
-              {slide.reviewCount && <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>({slide.reviewCount.toLocaleString()})</span>}
-            </div>
+              {slide.reviewCount && (
+                <span style={{ fontFamily: 'Open Sans', color: 'rgba(147,197,253,0.9)', fontSize: 12, textDecoration: 'underline' }}>
+                  ({slide.reviewCount.toLocaleString()} reviews ↗)
+                </span>
+              )}
+            </a>
           )}
         </div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
@@ -735,7 +745,7 @@ function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, s
           <motion.button whileTap={{ scale: 0.92 }} onClick={onDirections}
             style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 0', borderRadius: 16, background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)', cursor: 'pointer' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="3 11 22 2 13 21 11 13 3 11" />
+              <path d="M3 11l19-9-9 19-2-8-8-2z" />
             </svg>
             <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 600 }}>Directions</span>
           </motion.button>

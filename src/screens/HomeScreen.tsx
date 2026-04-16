@@ -241,9 +241,16 @@ export default function HomeScreen() {
         style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.0) 35%, rgba(0,0,0,0.6) 68%, rgba(0,0,0,0.97) 100%)' }}
       />
 
-      {/* Top bar — sticky, logo switches white→dark when scrolled into white area */}
+      {/* Top bar — sticky, background appears on scroll, logo switches white→dark */}
       <div className="absolute top-0 left-0 right-0 z-50 pt-14 px-5 flex items-center justify-between pointer-events-none"
-        style={{ transition: 'background 0.3s ease' }}>
+        style={{
+          background: scrolled ? 'rgba(255,255,255,0.95)' : 'transparent',
+          backdropFilter: scrolled ? 'blur(12px)' : 'none',
+          WebkitBackdropFilter: scrolled ? 'blur(12px)' : 'none',
+          borderBottom: scrolled ? '1px solid rgba(0,0,0,0.06)' : 'none',
+          transition: 'background 0.3s ease, border-bottom 0.3s ease',
+          paddingBottom: scrolled ? 12 : 0,
+        }}>
         <a href="https://platepost.io" target="_blank" rel="noreferrer" className="pointer-events-auto" style={{ textDecoration: 'none' }}>
           {/* White logo over hero, dark blue logo over white content */}
           <img
