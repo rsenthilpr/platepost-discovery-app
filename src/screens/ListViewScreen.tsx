@@ -9,7 +9,6 @@ import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
 import { useCityStore } from '../lib/cityStore'
-import SurpriseOrb from '../components/SurpriseOrb'
 
 function loadFavorites(): Set<number> {
   try {
@@ -34,7 +33,6 @@ interface LocationState {
 }
 
 const VIDEO_QUERY_POOLS: Record<string, string[]> = {
-  // US restaurant-focused queries — avoid street food / overseas content
   Indian: [
     'indian restaurant butter chicken plating',
     'naan bread oven fresh baked',
@@ -137,11 +135,9 @@ function getVideoQuery(cuisine: string, restaurantName: string): string {
   return `${cuisine} restaurant food plating dining`
 }
 
-// Each restaurant gets a unique page offset so Pexels returns different results
-// even when two restaurants share the same cuisine query
 function getVideoPage(restaurantName: string): number {
   const hash = restaurantName.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  return (hash % 4) + 1 // pages 1-4, giving up to 60 different results (15 per page)
+  return (hash % 4) + 1
 }
 
 interface ReelSlide {
@@ -201,16 +197,14 @@ export default function ListViewScreen() {
       const matchingFilter = FILTERS.find(f => f.toLowerCase() === q)
       if (matchingFilter && matchingFilter !== 'All') setActiveFilter(matchingFilter)
     }
-  }, [city.name]) // reload when city changes
+  }, [city.name])
 
   async function fetchRestaurants() {
     setLoading(true)
 
-    // Always load Supabase restaurants (LA/OC curated)
     const { data: supabaseData } = await supabase.from('restaurants').select('*').order('tier').order('name')
     let list: Restaurant[] = supabaseData ?? []
 
-    // For non-LA cities, also pull Google Places restaurants
     const isLAArea = ['Los Angeles', 'Anaheim', 'Orange', 'Placentia', 'Westminster', 'Irvine'].includes(city.name)
     if (!isLAArea) {
       try {
@@ -239,7 +233,6 @@ export default function ListViewScreen() {
             hours: null,
             place_id: p.place_id,
           } as any))
-          // Use Google Places for non-LA cities instead of LA Supabase data
           list = googlePlaces
         }
       } catch (e) { console.error('Google Places feed error:', e) }
@@ -355,7 +348,6 @@ export default function ListViewScreen() {
     return () => observer.disconnect()
   }, [slides.length, isListView])
 
-  // Live search — refilter as user types
   const filteredList = applyFilter(allRestaurants, activeFilter)
 
   if (loading) {
@@ -374,7 +366,6 @@ export default function ListViewScreen() {
   if (isListView) {
     return (
       <div className="fixed inset-0 flex flex-col" style={{ background: '#f8f9fa' }}>
-        {/* Header — light bg, Open Sans (Emilia fix: no Bungee/cursive) */}
         <div style={{
           flexShrink: 0,
           background: '#fff',
@@ -398,7 +389,6 @@ export default function ListViewScreen() {
             </h1>
           </div>
 
-          {/* Always-visible search bar — no toggle needed */}
           <div style={{ padding: '10px 16px 0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', borderRadius: 12, padding: '10px 14px', border: '1.5px solid #e5e7eb' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
@@ -422,7 +412,6 @@ export default function ListViewScreen() {
             </div>
           </div>
 
-          {/* Filter chips */}
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '10px 16px 12px', scrollbarWidth: 'none' }}>
             {FILTERS.map(f => (
               <button key={f} onClick={() => { setActiveFilter(f); setListSearch('') }}
@@ -439,7 +428,6 @@ export default function ListViewScreen() {
           </div>
         </div>
 
-        {/* Result count */}
         <div style={{ padding: '8px 20px 4px', flexShrink: 0 }}>
           <p style={{ fontFamily: 'Open Sans', fontSize: 12, color: '#9ca3af', margin: 0 }}>
             {filteredList.length} place{filteredList.length !== 1 ? 's' : ''}
@@ -447,7 +435,6 @@ export default function ListViewScreen() {
           </p>
         </div>
 
-        {/* List */}
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pb-24" style={{ scrollbarWidth: 'none' }}>
           {filteredList.length === 0 ? (
             <div style={{ padding: '40px 0', textAlign: 'center' }}>
@@ -516,7 +503,6 @@ export default function ListViewScreen() {
           )}
         </AnimatePresence>
 
-        <SurpriseOrb />
         <BottomNav />
       </div>
     )
@@ -525,7 +511,6 @@ export default function ListViewScreen() {
   // ── REELS VIEW ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0" style={{ background: '#000' }}>
-      {/* Back button — always visible top left */}
       <button
         onClick={() => navigate(-1)}
         style={{
@@ -540,7 +525,6 @@ export default function ListViewScreen() {
         </svg>
       </button>
 
-      {/* Swipe hint — shows briefly on first load */}
       {currentIndex === 0 && slides.length > 1 && (
         <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -621,7 +605,6 @@ export default function ListViewScreen() {
         )}
       </AnimatePresence>
 
-      <SurpriseOrb />
       <BottomNav />
 
       <style>{`
@@ -674,7 +657,6 @@ function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, s
       data-index={index}
       style={{ position: 'relative', width: '100%', flexShrink: 0, overflow: 'hidden', height: '100dvh', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
     >
-      {/* Background — video if loaded, photo fallback with kenBurns */}
       {slide.videoUrl ? (
         <video
           src={slide.videoUrl}

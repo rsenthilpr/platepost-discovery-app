@@ -5,10 +5,10 @@ import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
-import SurpriseOrb from '../components/SurpriseOrb'
 import CityPicker from '../components/CityPicker'
 import { useCityStore } from '../lib/cityStore'
 import VideoBackground from '../components/VideoBackground'
+import AskPlatePostPill from '../components/AskPlatePostPill'
 
 function getSearchHistory(): string[] {
   try { return JSON.parse(localStorage.getItem('pp_search_history') ?? '[]') } catch { return [] }
@@ -52,7 +52,6 @@ function RestaurantCard({ restaurant, onClick }: { restaurant: Restaurant | Plac
         boxShadow: '0 2px 12px rgba(0,0,0,0.08)', cursor: 'pointer', textAlign: 'left', padding: 0,
       }}
     >
-      {/* Video thumbnail — plays on hover/focus */}
       <div style={{ position: 'relative', height: 110, background: '#e5e7eb', overflow: 'hidden' }}>
         <VideoBackground
           cuisine={r.cuisine ?? 'Restaurant'}
@@ -60,7 +59,6 @@ function RestaurantCard({ restaurant, onClick }: { restaurant: Restaurant | Plac
           isActive={hovered}
         />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.3) 0%, transparent 60%)', zIndex: 1 }} />
-        {/* Play indicator */}
         {!hovered && (
           <div style={{
             position: 'absolute', bottom: 6, right: 6, zIndex: 2,
@@ -113,12 +111,10 @@ export default function HomeScreen() {
   const [searchHistory, setSearchHistory] = useState<string[]>(getSearchHistory)
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [selectedGooglePlace, setSelectedGooglePlace] = useState<PlaceRestaurant | null>(null)
-  // Hero video cycling — rotates through different cuisine videos
   const HERO_CUISINES = ['Restaurant', 'Italian', 'Japanese', 'American', 'Coffee']
   const [heroCuisineIndex, setHeroCuisineIndex] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  // Cycle hero video every 10 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       setHeroCuisineIndex(i => (i + 1) % HERO_CUISINES.length)
@@ -126,7 +122,6 @@ export default function HomeScreen() {
     return () => clearInterval(interval)
   }, [])
 
-  // Load Supabase restaurants for search + hero images
   useEffect(() => {
     async function load() {
       const { data } = await supabase.from('restaurants').select('*')
@@ -142,7 +137,6 @@ export default function HomeScreen() {
     load()
   }, [])
 
-  // Load Google Places for selected city carousel
   useEffect(() => {
     loadCityPlaces()
   }, [city.name])
@@ -203,7 +197,6 @@ export default function HomeScreen() {
 
   const [scrolled, setScrolled] = useState(false)
 
-  // Hide logo when white content area scrolls up past the hero
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
     const scrollTop = e.currentTarget.scrollTop
     const heroHeight = window.innerHeight * 0.48
@@ -241,7 +234,7 @@ export default function HomeScreen() {
         style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.0) 35%, rgba(0,0,0,0.6) 68%, rgba(0,0,0,0.97) 100%)' }}
       />
 
-      {/* Top bar — sticky, background appears on scroll, logo switches white→dark */}
+      {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 z-50 pt-14 px-5 flex items-center justify-between pointer-events-none"
         style={{
           background: scrolled ? 'rgba(255,255,255,0.95)' : 'transparent',
@@ -252,7 +245,6 @@ export default function HomeScreen() {
           paddingBottom: scrolled ? 12 : 0,
         }}>
         <a href="https://platepost.io" target="_blank" rel="noreferrer" className="pointer-events-auto" style={{ textDecoration: 'none' }}>
-          {/* White logo over hero, dark blue logo over white content */}
           <img
             src="/pp-logo.png"
             alt="PlatePost"
@@ -264,7 +256,6 @@ export default function HomeScreen() {
               objectFit: 'contain',
               objectPosition: 'left center',
               display: 'block',
-              // White on dark hero, dark navy on white background
               filter: scrolled
                 ? 'brightness(0) saturate(100%) invert(13%) sepia(84%) saturate(1800%) hue-rotate(214deg) brightness(90%)'
                 : 'brightness(0) invert(1)',
@@ -303,7 +294,7 @@ export default function HomeScreen() {
       <div className="absolute inset-0 z-20 overflow-y-auto" style={{ scrollbarWidth: 'none' }} onScroll={handleScroll}>
         <div style={{ height: '48vh' }} />
 
-        {/* Hero text + 3 action chips — ONLY these, no duplicate buttons */}
+        {/* Hero text + Ask PlatePost pill + action chips */}
         <div className="px-5 pb-5">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="mb-4">
             <p style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 6 }}>
@@ -314,8 +305,19 @@ export default function HomeScreen() {
             </h1>
           </motion.div>
 
-          {/* 3 quick action chips */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }} className="flex gap-2">
+          {/* Ask PlatePost pill — the new AI concierge entry point.
+              Replaces the center Piggy FAB that lived in the bottom nav. */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="mb-4"
+          >
+            <AskPlatePostPill variant="on-hero" />
+          </motion.div>
+
+          {/* Quick action chips */}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="flex gap-2">
             <motion.button whileTap={{ scale: 0.93 }}
               onClick={() => navigate('/list', { state: { filter: 'All', openNow: true, listView: true } })}
               style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 999, background: 'rgba(16,185,129,0.9)', border: 'none', color: '#fff', fontFamily: 'Open Sans', fontWeight: 600, fontSize: 12, cursor: 'pointer', backdropFilter: 'blur(12px)' }}>
@@ -339,10 +341,10 @@ export default function HomeScreen() {
           </motion.div>
         </div>
 
-        {/* White content area — search + carousel + explore */}
+        {/* White content area */}
         <div style={{ background: '#f8f9fa', borderRadius: '24px 24px 0 0', minHeight: '55vh', paddingTop: 20 }}>
 
-          {/* Single search bar */}
+          {/* Search bar */}
           <div className="px-5 mb-5">
             <button
               onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }}
@@ -360,7 +362,7 @@ export default function HomeScreen() {
             </button>
           </div>
 
-          {/* City restaurants carousel — Google Places real data */}
+          {/* City restaurants carousel */}
           <div className="pb-6">
             <div className="px-5 mb-3 flex items-center justify-between">
               <div>
@@ -384,7 +386,6 @@ export default function HomeScreen() {
             </div>
 
             {loadingPlaces ? (
-              // Skeleton loader
               <div className="flex gap-3 pl-5 pr-5 overflow-hidden">
                 {[1, 2, 3, 4].map(i => (
                   <div key={i} style={{ flexShrink: 0, width: 155, borderRadius: 18, overflow: 'hidden', background: '#fff', border: '1px solid #f0f0f0' }}>
@@ -407,7 +408,6 @@ export default function HomeScreen() {
                 ))}
               </div>
             ) : (
-              // Fallback to Supabase restaurants if Google Places fails
               <div id="city-carousel" className="flex gap-3 overflow-x-auto pl-5 pr-5 pb-1"
                 style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
                 {allRestaurants
@@ -423,7 +423,7 @@ export default function HomeScreen() {
             )}
           </div>
 
-          {/* Explore grid — cuisine categories */}
+          {/* Explore grid */}
           <div className="px-5 pb-8">
             <h2 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#071126', fontSize: 20, marginBottom: 12 }}>Explore</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -602,7 +602,6 @@ export default function HomeScreen() {
                   </div>
                 )}
 
-                {/* Reviews hyperlink */}
                 {selectedGooglePlace.rating && (
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedGooglePlace.name + ' ' + selectedGooglePlace.city)}`}
@@ -621,7 +620,6 @@ export default function HomeScreen() {
                   </a>
                 )}
 
-                {/* Action buttons — Directions + Website */}
                 <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedGooglePlace.name + ' ' + selectedGooglePlace.city)}`}
@@ -650,7 +648,6 @@ export default function HomeScreen() {
         )}
       </AnimatePresence>
 
-      <SurpriseOrb />
       <BottomNav />
 
       <CityPicker

@@ -6,7 +6,6 @@ import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
-import SurpriseOrb from '../components/SurpriseOrb'
 import { useCityStore } from '../lib/cityStore'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? import.meta.env.VITE_GOOGLE_PLACES_KEY
@@ -53,9 +52,7 @@ export default function MapViewScreen() {
   const [suggestions, setSuggestions] = useState<Restaurant[]>([])
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [currentZoom, setCurrentZoom] = useState(11)
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied' | 'unavailable'>('idle')
-  const [locationToast, setLocationToast] = useState<string | null>(null)
+  const [userLocation, _setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [trayOpen, setTrayOpen] = useState(true)
   const [loadingPlaces, setLoadingPlaces] = useState(false)
   const topBarRef = useRef<HTMLDivElement>(null)
@@ -110,9 +107,7 @@ export default function MapViewScreen() {
     finally { setLoadingPlaces(false) }
   }
 
-  // Only show Supabase restaurants that are near the current city
-  // This prevents LA restaurants appearing as pins when viewing NYC/Portland etc.
-  const CITY_RADIUS = 1.5 // ~165km in lat/lng degrees — generous enough for metro areas
+  const CITY_RADIUS = 1.5
   const supabaseInCity = supabaseRestaurants.filter(r =>
     Math.abs((r.latitude ?? 0) - city.lat) < CITY_RADIUS &&
     Math.abs((r.longitude ?? 0) - city.lng) < CITY_RADIUS
@@ -126,7 +121,6 @@ export default function MapViewScreen() {
   ]
 
   const filtered = allRestaurants.filter(r => {
-    // Must have valid coordinates to appear on map
     if (!r.latitude || !r.longitude || r.latitude === 0 || r.longitude === 0) return false
     if (activeFilter === 'Saved') return favorites.has(r.id)
     if (activeFilter !== 'All' && r.cuisine.toLowerCase() !== activeFilter.toLowerCase()) return false
@@ -145,7 +139,6 @@ export default function MapViewScreen() {
       return da - db
     }).slice(0, 20)
 
-  // Show more pins — Google Places gives us more data for major cities
   const pinsToShow = currentZoom >= 13 ? filtered
     : currentZoom >= 11 ? [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 40)
     : [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 20)
@@ -164,51 +157,6 @@ export default function MapViewScreen() {
       if (next.has(id)) next.delete(id); else next.add(id)
       saveFavorites(next); return next
     })
-  }
-
-  // "Near Me" — uses native browser geolocation. Works for the team scattered
-  // across the US (Brandon in Portland, etc.) and anywhere globally. The blue
-  // dot renders via the OverlayView block below; the tray re-sorts by distance
-  // from userLocation automatically because mapCenter falls back to userLocation.
-  function handleNearMe() {
-    if (locationStatus === 'loading') return
-
-    if (!('geolocation' in navigator)) {
-      setLocationStatus('unavailable')
-      setLocationToast("Your browser doesn't support location — showing all restaurants")
-      setTimeout(() => setLocationToast(null), 4000)
-      return
-    }
-
-    setLocationStatus('loading')
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        setUserLocation(coords)
-        setLocationStatus('idle')
-        if (map) {
-          map.panTo(coords)
-          map.setZoom(13)
-        }
-      },
-      (err) => {
-        // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
-        if (err.code === 1) {
-          setLocationStatus('denied')
-          setLocationToast('Location access denied — showing all restaurants')
-        } else {
-          setLocationStatus('unavailable')
-          setLocationToast("Couldn't get your location — showing all restaurants")
-        }
-        setTimeout(() => setLocationToast(null), 4000)
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
-      }
-    )
   }
 
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
@@ -275,27 +223,6 @@ export default function MapViewScreen() {
         </div>
       </div>
 
-      {/* Location toast — shows briefly when geolocation is denied or unavailable */}
-      <AnimatePresence>
-        {locationToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            style={{
-              position: 'absolute', top: topBarHeight + 12, left: '50%', transform: 'translateX(-50%)',
-              zIndex: 250, background: 'rgba(17,24,39,0.97)', backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10,
-              padding: '10px 16px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-              fontFamily: 'Open Sans', fontSize: 12, color: 'rgba(255,255,255,0.9)',
-              maxWidth: 'calc(100% - 32px)', textAlign: 'center', whiteSpace: 'nowrap',
-              overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>
-            {locationToast}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Map */}
       <div style={{ position: 'absolute', inset: 0, top: topBarHeight, bottom: trayHeight + 64 }}>
         {isLoaded ? (
@@ -307,7 +234,6 @@ export default function MapViewScreen() {
               const emoji = CUISINE_EMOJI[r.cuisine] ?? '🍽️'
               return (
                 <OverlayView key={r.id} position={{ lat: r.latitude, lng: r.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                  {/* iPhone-compatible tap — native event listener bypasses Google Maps touch blocking */}
                   <div
                     style={{ position: 'absolute', transform: 'translate(-50%, -50%)', cursor: 'pointer', touchAction: 'manipulation' }}
                     onClick={(e) => {
@@ -344,7 +270,6 @@ export default function MapViewScreen() {
                         : <span style={{ fontSize: isSelected ? 16 : 14, lineHeight: 1 }}>{emoji}</span>
                       }
                     </div>
-                    {/* Name tooltip only when selected */}
                     {isSelected && (
                       <div style={{
                         position: 'absolute', bottom: '110%', left: '50%',
@@ -382,7 +307,6 @@ export default function MapViewScreen() {
           style={{ width: 40, height: 40, borderRadius: 10, background: '#1f2937', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
           +
         </button>
-        {/* Recenter button — returns to city default view */}
         <button
           onClick={() => {
             if (map) {
@@ -396,30 +320,6 @@ export default function MapViewScreen() {
             <path d="M12 8a4 4 0 100 8 4 4 0 000-8z" fill="white" opacity="0.9"/>
             <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" strokeLinecap="round" />
           </svg>
-        </button>
-        {/* Near Me button — uses geolocation to pan to the user's location and render a blue dot */}
-        <button
-          onClick={handleNearMe}
-          disabled={locationStatus === 'loading'}
-          title="Near me"
-          style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: userLocation ? '#0048f9' : '#1f2937',
-            border: `1px solid ${userLocation ? '#0048f9' : 'rgba(255,255,255,0.15)'}`,
-            cursor: locationStatus === 'loading' ? 'wait' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: userLocation ? '0 2px 12px rgba(0,72,249,0.5)' : '0 2px 8px rgba(0,0,0,0.4)',
-            transition: 'all 0.2s ease',
-          }}>
-          {locationStatus === 'loading' ? (
-            <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.25)', borderTopColor: '#fff', animation: 'spin 1s linear infinite' }} />
-          ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="3" fill="white" />
-              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="12" cy="12" r="8" stroke="white" strokeWidth="1.5" opacity="0.5" />
-            </svg>
-          )}
         </button>
         <button
           onClick={() => { if (map) map.setZoom((map.getZoom() ?? 12) - 1) }}
@@ -481,7 +381,6 @@ export default function MapViewScreen() {
         )}
       </AnimatePresence>
 
-      <SurpriseOrb />
       <BottomNav />
     </div>
   )
