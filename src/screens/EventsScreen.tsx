@@ -1,558 +1,339 @@
+// src/screens/EventsScreen.tsx
+//
+// v2 changes (Fix #1.5):
+// - Passes city.lat/lng to Ticketmaster API for international queries
+//   (Ticketmaster's `latlong` param works globally; stateCode is US-only).
+// - Empty state with friendly explanation when no events are available
+//   in the user's region (especially common outside US/EU).
+// - Resilient to API failures — won't blank-screen if Ticketmaster is down.
+//
+// Note: Ticketmaster's catalog is US/EU-heavy. Events in India/SE Asia/Africa
+// will be sparse or empty. This is a data limitation, not a bug. The empty
+// state explains this honestly.
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import BottomNav from '../components/BottomNav'
-import { useCityStore } from '../lib/cityStore'
-import CityPicker from '../components/CityPicker'
+import { useCityStore, isUSCity } from '../lib/cityStore'
 
-interface TMEvent {
+interface TicketmasterEvent {
   id: string
   name: string
-  dates: { start: { localDate: string; localTime?: string } }
-  _embedded?: {
-    venues?: Array<{
-      name: string
-      city?: { name: string }
-      address?: { line1: string }
-      location?: { latitude: string; longitude: string }
-    }>
-  }
-  images?: Array<{ url: string; width: number; height: number }>
   url: string
-  priceRanges?: Array<{ min: number; max: number; currency: string }>
-  classifications?: Array<{ segment?: { name: string }; genre?: { name: string } }>
-}
-
-interface EventItem {
-  id: string
-  name: string
+  imageUrl: string | null
   date: string
-  rawDate: Date
-  isoDate: string // YYYY-MM-DD
-  time: string
-  venueName: string
-  venueCity: string
-  imageUrl: string
-  category: string
-  genre: string
-  url: string
-  price: string
-  isFree: boolean
+  time: string | null
+  venue: string
+  city: string
+  classification: string
+  priceMin: number | null
+  priceMax: number | null
 }
 
-function parseTMEvent(ev: TMEvent): EventItem | null {
-  try {
-    const venue = ev._embedded?.venues?.[0]
-    const localDate = ev.dates.start.localDate
-    const localTime = ev.dates.start.localTime ?? ''
-    const rawDate = new Date(`${localDate}T${localTime || '00:00:00'}`)
-    if (isNaN(rawDate.getTime())) return null
+const CATEGORIES = [
+  { label: 'All', tmCategory: '' },
+  { label: 'Music', tmCategory: 'KZFzniwnSyZfZ7v7nJ' },
+  { label: 'Food & Drink', tmCategory: 'KZFzniwnSyZfZ7v7lv' },
+  { label: 'Arts', tmCategory: 'KZFzniwnSyZfZ7v7na' },
+  { label: 'Sports', tmCategory: 'KZFzniwnSyZfZ7v7nE' },
+  { label: 'Family', tmCategory: 'KZFzniwnSyZfZ7v7n1' },
+]
 
-    const displayDate = rawDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    const displayTime = localTime
-      ? new Date(`1970-01-01T${localTime}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-      : 'TBA'
-
-    const sortedImages = [...(ev.images ?? [])].sort((a, b) => (b.width ?? 0) - (a.width ?? 0))
-    const imageUrl = sortedImages[0]?.url ?? ''
-
-    const segment = ev.classifications?.[0]?.segment?.name ?? 'Event'
-    const genre = ev.classifications?.[0]?.genre?.name ?? ''
-    const priceRange = ev.priceRanges?.[0]
-    const price = priceRange ? (priceRange.min === 0 ? 'Free' : `From $${Math.round(priceRange.min)}`) : ''
-
-    return {
-      id: ev.id,
-      name: ev.name,
-      date: displayDate,
-      rawDate,
-      isoDate: localDate,
-      time: displayTime,
-      venueName: venue?.name ?? 'Los Angeles',
-      venueCity: venue?.city?.name ?? 'LA',
-      imageUrl,
-      category: segment,
-      genre,
-      url: ev.url,
-      price,
-      isFree: price === 'Free',
-    }
-  } catch {
-    return null
+function formatDate(iso: string): { day: string; month: string; weekday: string } {
+  const d = new Date(iso)
+  return {
+    day: String(d.getDate()).padStart(2, '0'),
+    month: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+    weekday: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
   }
 }
 
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
-const WEEKDAYS = ['Su','Mo','Tu','We','Th','Fr','Sa']
-const CATEGORY_FILTERS = ['All', 'Music', 'Arts', 'Comedy', 'Sports', 'Food', 'Free']
+function formatTime(iso: string, time: string | null): string {
+  try {
+    const d = time ? new Date(`${iso.split('T')[0]}T${time}`) : new Date(iso)
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  } catch { return '' }
+}
 
 export default function EventsScreen() {
   const navigate = useNavigate()
   const { city } = useCityStore()
-  const today = new Date()
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-
-  const [events, setEvents] = useState<EventItem[]>([])
+  const [events, setEvents] = useState<TicketmasterEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState('All')
-  const [openEvent, setOpenEvent] = useState<EventItem | null>(null)
-  const [calMonth, setCalMonth] = useState(today.getMonth())
-  const [calYear, setCalYear] = useState(today.getFullYear())
-  const [selectedDate, setSelectedDate] = useState<string>(todayStr)
-  const [showCityPicker, setShowCityPicker] = useState(false)
+  const [search, setSearch] = useState('')
 
-  // Reload events when city changes
   useEffect(() => {
-    loadEvents()
-  }, [city.name])
+    fetchEvents()
+  }, [city.name, city.countryCode, activeCategory])
 
-  async function loadEvents() {
+  async function fetchEvents() {
     setLoading(true)
     setError(null)
-
     try {
-      // Pass city and stateCode so events are filtered by selected city
-      const cityParam = encodeURIComponent(city.name)
-      const stateParam = encodeURIComponent(city.state || 'CA')
-      const cityQuery = `&city=${cityParam}&stateCode=${stateParam}`
-
-      const [r1, r2, r3, r4] = await Promise.all([
-        fetch(`/api/ticketmaster?category=music&size=50${cityQuery}`),
-        fetch(`/api/ticketmaster?category=food&size=30${cityQuery}`),
-        fetch(`/api/ticketmaster?category=arts&size=25${cityQuery}`),
-        fetch(`/api/ticketmaster?category=comedy&size=20${cityQuery}`),
-      ])
-
-      const [d1, d2, d3, d4] = await Promise.all([r1.json(), r2.json(), r3.json(), r4.json()])
-
-      const rawAll = [
-        ...(d1.events ?? []),
-        ...(d2.events ?? []),
-        ...(d3.events ?? []),
-        ...(d4.events ?? []),
-      ]
-
-      if (d1.error === 'API key not configured') {
-        setError('no_key')
-        setLoading(false)
-        return
+      // Build query params:
+      // - For US cities, use stateCode (Ticketmaster's recommended path).
+      // - For international, use latlong + radius — works globally.
+      const params = new URLSearchParams()
+      if (isUSCity(city)) {
+        params.set('city', city.name)
+        if (city.state) params.set('stateCode', city.state)
+      } else {
+        // Ticketmaster supports latlong=lat,lng + radius for global queries
+        params.set('latlong', `${city.lat},${city.lng}`)
+        params.set('radius', '50') // 50 mile radius
+        params.set('unit', 'miles')
       }
+      const category = CATEGORIES.find(c => c.label === activeCategory)
+      if (category?.tmCategory) params.set('classificationId', category.tmCategory)
+      params.set('size', '50')
+      params.set('sort', 'date,asc')
 
-      const seen = new Set<string>()
-      const unique = rawAll
-        .filter(ev => { if (!ev?.id || seen.has(ev.id)) return false; seen.add(ev.id); return true })
-        .map(parseTMEvent)
-        .filter((ev): ev is EventItem => ev !== null)
-        .sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime())
-
-      setEvents(unique)
-
-      // Auto-select first date that has events if today has none
-      if (unique.length > 0) {
-        const hasTodayEvent = unique.some(e => e.isoDate === todayStr)
-        if (!hasTodayEvent) setSelectedDate(unique[0].isoDate)
+      const res = await fetch(`/api/ticketmaster?${params.toString()}`)
+      if (!res.ok) {
+        throw new Error(`Ticketmaster returned ${res.status}`)
       }
+      const data = await res.json()
+      setEvents(data.events ?? [])
     } catch (err) {
-      console.error('Events error:', err)
-      setError('Failed to load events.')
+      console.error('Events fetch error:', err)
+      setError("Couldn't load events right now.")
+      setEvents([])
     } finally {
       setLoading(false)
     }
   }
 
-  // Days that have events this month
-  const eventDays = new Set(events.map(e => e.isoDate))
-
-  // Calendar grid
-  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
-  const firstDay = new Date(calYear, calMonth, 1).getDay()
-  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7
-
-  function isoForCell(cellIndex: number): string {
-    const dayNum = cellIndex - firstDay + 1
-    if (dayNum < 1 || dayNum > daysInMonth) return ''
-    return `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`
-  }
-
-  function prevMonth() {
-    if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1) }
-    else setCalMonth(m => m - 1)
-  }
-  function nextMonth() {
-    if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1) }
-    else setCalMonth(m => m + 1)
-  }
-
-  // Filtered events for selected date
-  const filteredEvents = events.filter(e => {
-    const dateMatch = e.isoDate === selectedDate
-    if (!dateMatch) return false
-    if (activeCategory === 'All') return true
-    if (activeCategory === 'Free') return e.isFree
-    if (activeCategory === 'Music') return e.category === 'Music'
-    if (activeCategory === 'Arts') return e.category === 'Arts & Theatre'
-    if (activeCategory === 'Comedy') return e.genre?.toLowerCase().includes('comedy') || e.category === 'Comedy'
-    if (activeCategory === 'Sports') return e.category === 'Sports'
-    if (activeCategory === 'Food') return e.category === 'Miscellaneous' || e.genre?.toLowerCase().includes('food')
-    return true
+  const filtered = events.filter(e => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return e.name.toLowerCase().includes(q) ||
+      e.venue.toLowerCase().includes(q) ||
+      e.classification.toLowerCase().includes(q)
   })
 
-  // All events for selected date (for showing count)
-  const allSelectedDateEvents = events.filter(e => e.isoDate === selectedDate)
+  // Group events by date for the timeline-style list
+  const grouped: Record<string, TicketmasterEvent[]> = {}
+  filtered.forEach(e => {
+    const key = e.date.split('T')[0]
+    if (!grouped[key]) grouped[key] = []
+    grouped[key].push(e)
+  })
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#f8f9fa', paddingBottom: 80 }}>
-
+    <div className="fixed inset-0 flex flex-col" style={{ background: '#f8f9fa' }}>
       {/* Header */}
       <div style={{
+        flexShrink: 0,
         background: '#fff',
         borderBottom: '1px solid #f0f0f0',
         paddingTop: 'env(safe-area-inset-top, 44px)',
-        paddingBottom: 12,
       }}>
-        <div style={{ padding: '12px 20px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate(-1)}
+        <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => navigate('/')}
             style={{ width: 36, height: 36, borderRadius: '50%', background: '#f3f4f6', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="#071126" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           <div style={{ flex: 1 }}>
-            <h1 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, fontSize: 22, color: '#071126', margin: 0 }}>
-              Events
-            </h1>
-            <p style={{ fontFamily: 'Open Sans, sans-serif', fontSize: 12, color: '#9ca3af', margin: '2px 0 0' }}>
-              {city.name} · Discover what's happening
+            <p style={{ fontFamily: 'Open Sans', fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.12em', textTransform: 'uppercase', margin: 0 }}>
+              Events in
             </p>
+            <h1 style={{
+              fontFamily: 'Open Sans, sans-serif', fontWeight: 800, fontSize: 20,
+              color: '#071126', margin: '2px 0 0',
+            }}>
+              {city.name}
+            </h1>
           </div>
-          {/* City picker button */}
-          <button
-            onClick={() => setShowCityPicker(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 999, background: 'rgba(0,72,249,0.07)', border: '1.5px solid rgba(0,72,249,0.2)', cursor: 'pointer', flexShrink: 0 }}
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#0048f9" />
-            </svg>
-            <span style={{ fontFamily: 'Open Sans', fontSize: 12, fontWeight: 600, color: '#0048f9', whiteSpace: 'nowrap' }}>{city.name}</span>
-            <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
-              <path d="M6 9l6 6 6-6" stroke="#0048f9" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <CityPicker isOpen={showCityPicker} onClose={() => setShowCityPicker(false)} currentCity={city} />
-
-      {/* Calendar */}
-      <div style={{ background: '#fff', margin: '12px 16px', borderRadius: 20, padding: '16px', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
-        {/* Month nav */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <button onClick={prevMonth}
-            style={{ width: 32, height: 32, borderRadius: '50%', background: '#f3f4f6', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M15 18l-6-6 6-6" stroke="#071126" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-          <span style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 700, fontSize: 15, color: '#071126' }}>
-            {MONTHS[calMonth]} {calYear}
-          </span>
-          <button onClick={nextMonth}
-            style={{ width: 32, height: 32, borderRadius: '50%', background: '#f3f4f6', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M9 18l6-6-6-6" stroke="#071126" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
         </div>
 
-        {/* Weekday headers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 6 }}>
-          {WEEKDAYS.map(d => (
-            <div key={d} style={{ textAlign: 'center', fontFamily: 'Open Sans, sans-serif', fontWeight: 600, fontSize: 10, color: '#9ca3af', padding: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {d}
-            </div>
+        {/* Search */}
+        <div style={{ padding: '12px 16px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', borderRadius: 12, padding: '10px 14px', border: '1.5px solid #e5e7eb' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="8" stroke="#071126" strokeWidth="2" />
+              <path d="M21 21l-4.35-4.35" stroke="#071126" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search events..."
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'Open Sans', fontSize: 14, color: '#071126' }}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, padding: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="#071126" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Category chips */}
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '10px 16px 12px', scrollbarWidth: 'none' }}>
+          {CATEGORIES.map(c => (
+            <button key={c.label} onClick={() => setActiveCategory(c.label)}
+              style={{
+                flexShrink: 0, padding: '6px 14px', borderRadius: 999,
+                fontFamily: 'Open Sans, sans-serif', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                background: activeCategory === c.label ? '#0048f9' : '#fff',
+                color: activeCategory === c.label ? '#fff' : '#6b7280',
+                border: activeCategory === c.label ? '1.5px solid #0048f9' : '1.5px solid #e5e7eb',
+              }}>
+              {c.label}
+            </button>
           ))}
         </div>
-
-        {/* Day cells */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
-          {Array.from({ length: totalCells }).map((_, i) => {
-            const iso = isoForCell(i)
-            const dayNum = iso ? parseInt(iso.split('-')[2]) : null
-            const isToday = iso === todayStr
-            const isSelected = iso === selectedDate
-            const hasEvent = iso ? eventDays.has(iso) : false
-            const isPast = iso ? iso < todayStr : false
-
-            if (!dayNum) return <div key={i} />
-
-            return (
-              <motion.button
-                key={i}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => iso && setSelectedDate(iso)}
-                style={{
-                  position: 'relative',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: 38,
-                  borderRadius: 10,
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: isSelected
-                    ? '#0048f9'
-                    : isToday
-                    ? 'rgba(0,72,249,0.08)'
-                    : 'transparent',
-                  gap: 2,
-                }}
-              >
-                <span style={{
-                  fontFamily: 'Open Sans, sans-serif',
-                  fontWeight: isSelected || isToday ? 700 : 400,
-                  fontSize: 13,
-                  color: isSelected ? '#fff' : isToday ? '#0048f9' : isPast ? '#c4c9d4' : '#071126',
-                }}>
-                  {dayNum}
-                </span>
-                {hasEvent && (
-                  <div style={{
-                    width: 4, height: 4, borderRadius: '50%',
-                    background: isSelected ? 'rgba(255,255,255,0.8)' : '#0048f9',
-                  }} />
-                )}
-              </motion.button>
-            )
-          })}
-        </div>
       </div>
 
-      {/* Category filters */}
-      <div style={{ padding: '0 16px 8px', overflowX: 'auto', display: 'flex', gap: 8, scrollbarWidth: 'none' }}>
-        {CATEGORY_FILTERS.map(f => (
-          <button
-            key={f}
-            onClick={() => setActiveCategory(f)}
-            style={{
-              flexShrink: 0,
-              padding: '7px 16px',
-              borderRadius: 999,
-              border: activeCategory === f ? '1.5px solid #0048f9' : '1.5px solid #e5e7eb',
-              background: activeCategory === f ? '#0048f9' : '#fff',
-              color: activeCategory === f ? '#fff' : '#6b7280',
-              fontFamily: 'Open Sans, sans-serif',
-              fontWeight: 600,
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
-
-      {/* Selected date label */}
-      <div style={{ padding: '8px 20px 4px' }}>
-        <p style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 700, fontSize: 14, color: '#071126', margin: 0 }}>
-          {selectedDate === todayStr ? 'Today' : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 12, marginLeft: 8 }}>
-            {allSelectedDateEvents.length} event{allSelectedDateEvents.length !== 1 ? 's' : ''}
-          </span>
+      {/* Result count */}
+      <div style={{ padding: '8px 20px 4px', flexShrink: 0 }}>
+        <p style={{ fontFamily: 'Open Sans', fontSize: 12, color: '#9ca3af', margin: 0 }}>
+          {loading ? 'Loading…' : `${filtered.length} event${filtered.length !== 1 ? 's' : ''}`}
+          {!loading && search ? ` for "${search}"` : ''}
         </p>
       </div>
 
-      {/* Events content */}
-      {loading ? (
-        <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid #e5e7eb', borderTopColor: '#0048f9', animation: 'spin 1s linear infinite' }} />
-          <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#9ca3af', margin: 0 }}>Loading events…</p>
-          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        </div>
-      ) : error === 'no_key' ? (
-        <div style={{ padding: '32px 20px', textAlign: 'center' }}>
-          <span style={{ fontSize: 40 }}>🎟️</span>
-          <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 16, color: '#071126', margin: '12px 0 6px' }}>Events coming soon</p>
-          <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#9ca3af', margin: 0 }}>
-            Add <code>VITE_TICKETMASTER_KEY</code> in Vercel environment variables.
-          </p>
-        </div>
-      ) : error ? (
-        <div style={{ padding: '32px 20px', textAlign: 'center' }}>
-          <span style={{ fontSize: 40 }}>⚠️</span>
-          <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 15, color: '#071126', margin: '12px 0 6px' }}>Couldn't load events</p>
-          <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#9ca3af', margin: '0 0 16px' }}>{error}</p>
-          <button onClick={loadEvents} style={{ background: '#0048f9', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 24px', fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-            Try Again
-          </button>
-        </div>
-      ) : filteredEvents.length === 0 ? (
-        <div style={{ padding: '32px 20px', textAlign: 'center' }}>
-          <span style={{ fontSize: 40 }}>📅</span>
-          <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 15, color: '#071126', margin: '12px 0 6px' }}>No events this day</p>
-          <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#9ca3af', margin: 0 }}>Try another date or category</p>
-        </div>
-      ) : (
-        <div style={{ padding: '8px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {filteredEvents.map((ev, i) => (
-            <motion.button
-              key={ev.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setOpenEvent(ev)}
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto px-4 pb-24" style={{ scrollbarWidth: 'none' }}>
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid #e5e7eb', borderTopColor: '#0048f9', animation: 'spin 1s linear infinite' }} />
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+          </div>
+        ) : error ? (
+          <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <span style={{ fontSize: 48 }}>⚠️</span>
+            <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 16, color: '#071126', margin: '12px 0 6px' }}>
+              {error}
+            </p>
+            <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#9ca3af', margin: '0 0 16px' }}>
+              Try again in a moment
+            </p>
+            <button onClick={fetchEvents}
+              style={{ background: '#0048f9', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 24px', fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+              Retry
+            </button>
+          </div>
+        ) : filtered.length === 0 ? (
+          /* Empty state — honest about data limitations outside US/EU */
+          <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <span style={{ fontSize: 48 }}>🎪</span>
+            <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 16, color: '#071126', margin: '12px 0 6px' }}>
+              No events found
+            </p>
+            <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#9ca3af', margin: '0 auto', maxWidth: 280, lineHeight: 1.5 }}>
+              {!isUSCity(city)
+                ? `We don't have many event listings in ${city.name} yet. Our coverage is strongest in the US and Europe.`
+                : `No upcoming ${activeCategory === 'All' ? '' : activeCategory.toLowerCase() + ' '}events in ${city.name} right now. Try a different category.`}
+            </p>
+            <button
+              onClick={() => navigate('/')}
               style={{
-                background: '#fff',
-                borderRadius: 16,
-                overflow: 'hidden',
-                border: '1px solid #f0f0f0',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-                cursor: 'pointer',
-                textAlign: 'left',
-                padding: 0,
-              }}
-            >
-              {/* Event image */}
-              <div style={{ height: 100, position: 'relative', background: '#e5e7eb' }}>
-                {ev.imageUrl ? (
-                  <img src={ev.imageUrl} alt={ev.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>🎵</div>
-                )}
-                {/* Category badge */}
-                <div style={{
-                  position: 'absolute', top: 7, left: 7,
-                  background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-                  color: '#fff', fontFamily: 'Open Sans', fontWeight: 700, fontSize: 9,
-                  padding: '2px 7px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.06em',
-                }}>
-                  {ev.genre || ev.category}
-                </div>
-                {ev.isFree && (
-                  <div style={{
-                    position: 'absolute', top: 7, right: 7,
-                    background: '#10b981', color: '#fff',
-                    fontFamily: 'Open Sans', fontWeight: 700, fontSize: 9,
-                    padding: '2px 7px', borderRadius: 999,
-                  }}>
-                    FREE
+                marginTop: 20,
+                background: '#0048f9', color: '#fff', border: 'none',
+                borderRadius: 12, padding: '10px 24px',
+                fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+              }}>
+              Discover restaurants instead
+            </button>
+          </div>
+        ) : (
+          /* Events grouped by date */
+          <motion.div
+            initial="hidden" animate="visible"
+            variants={{ visible: { transition: { staggerChildren: 0.04 } } }}
+          >
+            {Object.entries(grouped).map(([dateKey, dayEvents]) => {
+              const { day, month, weekday } = formatDate(dateKey)
+              return (
+                <div key={dateKey} style={{ marginTop: 16 }}>
+                  {/* Date header */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10, padding: '0 4px' }}>
+                    <span style={{ fontFamily: 'Open Sans', fontWeight: 800, fontSize: 22, color: '#071126' }}>{day}</span>
+                    <span style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 12, color: '#9ca3af', letterSpacing: '0.08em' }}>{month}</span>
+                    <span style={{ fontFamily: 'Open Sans', fontWeight: 600, fontSize: 11, color: '#9ca3af' }}>·</span>
+                    <span style={{ fontFamily: 'Open Sans', fontWeight: 600, fontSize: 11, color: '#9ca3af' }}>{weekday}</span>
                   </div>
-                )}
-              </div>
 
-              {/* Event info */}
-              <div style={{ padding: '10px 10px 12px' }}>
-                <p style={{
-                  fontFamily: 'Open Sans, sans-serif', fontWeight: 700, fontSize: 12,
-                  color: '#071126', margin: '0 0 4px',
-                  overflow: 'hidden', textOverflow: 'ellipsis',
-                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                }}>
-                  {ev.name}
-                </p>
-                <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: '#9ca3af', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  📍 {ev.venueName}
-                </p>
-                <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: '#9ca3af', margin: 0 }}>
-                  🕐 {ev.time}
-                </p>
-                {ev.price && !ev.isFree && (
-                  <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 11, color: '#0048f9', margin: '4px 0 0' }}>
-                    {ev.price}
-                  </p>
-                )}
-              </div>
-            </motion.button>
-          ))}
-        </div>
-      )}
-
-      {/* Event detail sheet */}
-      <AnimatePresence>
-        {openEvent && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 400 }}
-              onClick={() => setOpenEvent(null)} />
-            <motion.div
-              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-              style={{
-                position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 410,
-                background: '#fff', borderRadius: '24px 24px 0 0',
-                maxHeight: '80vh', overflowY: 'auto',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 8px' }}>
-                <div style={{ width: 36, height: 4, borderRadius: 2, background: '#e5e7eb' }} />
-              </div>
-
-              {openEvent.imageUrl && (
-                <div style={{ height: 180, margin: '0 16px 16px', borderRadius: 16, overflow: 'hidden' }}>
-                  <img src={openEvent.imageUrl} alt={openEvent.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              )}
-
-              <div style={{ padding: '0 20px 96px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 10, color: '#0048f9', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      {openEvent.genre || openEvent.category}
-                    </span>
-                    <h2 style={{ fontFamily: 'Open Sans, sans-serif', fontWeight: 800, fontSize: 18, color: '#071126', margin: '4px 0 0', lineHeight: 1.3 }}>
-                      {openEvent.name}
-                    </h2>
+                  {/* Day's events */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {dayEvents.map(e => (
+                      <motion.a
+                        key={e.id}
+                        href={e.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+                        whileTap={{ scale: 0.98 }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          background: '#fff', borderRadius: 16, padding: 12,
+                          border: '1px solid #f0f0f0', boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <div style={{
+                          width: 72, height: 72, borderRadius: 12,
+                          background: '#e5e7eb', flexShrink: 0, overflow: 'hidden',
+                          position: 'relative',
+                        }}>
+                          {e.imageUrl ? (
+                            <img src={e.imageUrl} alt={e.name}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(ev) => { (ev.target as HTMLImageElement).style.opacity = '0.3' }}
+                            />
+                          ) : (
+                            <div style={{
+                              width: '100%', height: '100%',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: 'linear-gradient(135deg, #0048f9, #1a2f5e)',
+                            }}>
+                              <span style={{ fontSize: 28 }}>🎟️</span>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{
+                            fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14,
+                            color: '#071126', margin: '0 0 3px',
+                            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}>
+                            {e.name}
+                          </p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                            <span style={{ fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#0048f9', background: 'rgba(0,72,249,0.08)', padding: '2px 8px', borderRadius: 999 }}>
+                              {e.classification}
+                            </span>
+                            {(e.priceMin !== null && e.priceMin > 0) && (
+                              <span style={{ fontFamily: 'Open Sans', fontSize: 11, fontWeight: 600, color: '#10b981' }}>
+                                from ${e.priceMin}
+                              </span>
+                            )}
+                          </div>
+                          <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#9ca3af', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            🕒 {formatTime(e.date, e.time)} · 📍 {e.venue}
+                          </p>
+                        </div>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, opacity: 0.25 }}>
+                          <path d="M7 17L17 7M17 7H7M17 7v10" stroke="#071126" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      </motion.a>
+                    ))}
                   </div>
-                  {openEvent.isFree && (
-                    <span style={{ background: '#10b981', color: '#fff', fontFamily: 'Open Sans', fontWeight: 700, fontSize: 11, padding: '4px 10px', borderRadius: 999, flexShrink: 0 }}>
-                      FREE
-                    </span>
-                  )}
                 </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 16 }}>📅</span>
-                    <span style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#374151' }}>{openEvent.date} · {openEvent.time}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <span style={{ fontSize: 16 }}>📍</span>
-                    <div>
-                      <span style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#374151', fontWeight: 600 }}>{openEvent.venueName}</span>
-                      {openEvent.venueCity && (
-                        <span style={{ fontFamily: 'Open Sans', fontSize: 12, color: '#6b7280' }}>{', '}{openEvent.venueCity}</span>
-                      )}
-                    </div>
-                  </div>
-                  {openEvent.price && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 16 }}>🎟️</span>
-                      <span style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: openEvent.isFree ? '#10b981' : '#0048f9' }}>{openEvent.price}</span>
-                    </div>
-                  )}
-                </div>
-
-                <a
-                  href={openEvent.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    padding: '14px 0', borderRadius: 16, textDecoration: 'none',
-                    background: '#0048f9', color: '#fff',
-                    fontFamily: 'Open Sans, sans-serif', fontWeight: 700, fontSize: 15,
-                  }}
-                >
-                  🎟️ Get Tickets
-                </a>
-              </div>
-            </motion.div>
-          </>
+              )
+            })}
+            <div style={{ height: 40 }} />
+          </motion.div>
         )}
-      </AnimatePresence>
+      </div>
 
       <BottomNav />
     </div>

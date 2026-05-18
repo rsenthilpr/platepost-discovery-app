@@ -1,3 +1,14 @@
+// src/screens/MapViewScreen.tsx
+//
+// v2 changes (Fix #1.5):
+// - Real user-location pin via the new geolocation library.
+// - Map auto-centers on detected user location when permission granted.
+// - "My location" button on the right rail (already there as recenter — now
+//   it actually centers on you, not just the default city).
+// - International cities work — Supabase filter uses isLAArea() instead
+//   of a hardcoded city list.
+// - More forgiving on Supabase failures — Google Places fully sufficient.
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -6,7 +17,8 @@ import { supabase } from '../lib/supabase'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
-import { useCityStore } from '../lib/cityStore'
+import { useCityStore, isLAArea, setSelectedCity } from '../lib/cityStore'
+import { getCurrentCoords, detectUserCity } from '../lib/geolocation'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? import.meta.env.VITE_GOOGLE_PLACES_KEY
 const PLATEPOST_IDS = new Set([4, 5, 17, 18])
@@ -52,7 +64,8 @@ export default function MapViewScreen() {
   const [suggestions, setSuggestions] = useState<Restaurant[]>([])
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [currentZoom, setCurrentZoom] = useState(11)
-  const [userLocation, _setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [detectingLocation, setDetectingLocation] = useState(false)
   const [trayOpen, setTrayOpen] = useState(true)
   const [loadingPlaces, setLoadingPlaces] = useState(false)
   const topBarRef = useRef<HTMLDivElement>(null)
@@ -63,11 +76,32 @@ export default function MapViewScreen() {
     libraries: GOOGLE_MAPS_LIBRARIES,
   })
 
+  // Supabase load — never blocks if it fails
   useEffect(() => {
-    supabase.from('restaurants').select('*').then(({ data }) => setSupabaseRestaurants(data ?? []))
+    (async () => {
+      try {
+        const { data, error } = await supabase.from('restaurants').select('*')
+        if (error) {
+          console.warn('Supabase failed on Map, continuing with Google Places:', error.message)
+          return
+        }
+        setSupabaseRestaurants(data ?? [])
+      } catch (err) {
+        console.warn('Supabase threw on Map:', err)
+      }
+    })()
   }, [])
 
-  useEffect(() => { fetchGooglePlaces() }, [city.name])
+  useEffect(() => { fetchGooglePlaces() }, [city.name, city.countryCode])
+
+  // Silent location detection on first load — if permission is already granted,
+  // pin the user's spot on the map for instant context.
+  useEffect(() => {
+    (async () => {
+      const coords = await getCurrentCoords()
+      if (coords) setUserLocation(coords)
+    })()
+  }, [])
 
   useEffect(() => {
     if (topBarRef.current) setTopBarHeight(topBarRef.current.offsetHeight)
@@ -107,11 +141,45 @@ export default function MapViewScreen() {
     finally { setLoadingPlaces(false) }
   }
 
-  const CITY_RADIUS = 1.5
-  const supabaseInCity = supabaseRestaurants.filter(r =>
-    Math.abs((r.latitude ?? 0) - city.lat) < CITY_RADIUS &&
-    Math.abs((r.longitude ?? 0) - city.lng) < CITY_RADIUS
-  )
+  /**
+   * "My Location" button — triggers full geolocation flow:
+   * 1. Get fresh coords
+   * 2. Reverse geocode to update the city (if user has moved)
+   * 3. Center the map on user
+   *
+   * This makes the button actually useful for international users instead
+   * of just snapping back to whatever city was hardcoded.
+   */
+  async function handleMyLocation() {
+    setDetectingLocation(true)
+    const detected = await detectUserCity(true)
+    setDetectingLocation(false)
+
+    if (detected) {
+      setUserLocation({ lat: detected.lat, lng: detected.lng })
+      // If detected city is different, switch to it
+      if (detected.name !== city.name) {
+        setSelectedCity(detected)
+      }
+      if (map) {
+        map.setCenter({ lat: detected.lat, lng: detected.lng })
+        map.setZoom(13)
+      }
+    } else if (map) {
+      // Permission denied — at least recenter on current city
+      map.setCenter({ lat: city.lat, lng: city.lng })
+      map.setZoom(11)
+    }
+  }
+
+  // Only show Supabase restaurants when in LA area — they're geographically
+  // tied to LA/OC, so they don't belong on the Madurai map.
+  const supabaseInCity = isLAArea(city)
+    ? supabaseRestaurants.filter(r =>
+        Math.abs((r.latitude ?? 0) - city.lat) < 1.5 &&
+        Math.abs((r.longitude ?? 0) - city.lng) < 1.5,
+      )
+    : []
 
   const allRestaurants = [
     ...supabaseInCity,
@@ -165,9 +233,15 @@ export default function MapViewScreen() {
     mapInstance.addListener('click', () => setSelectedRestaurant(null))
   }, [])
 
+  // Recenter map when city changes, but prefer user location if available and close
   useEffect(() => {
-    if (map && !userLocation) { map.setCenter({ lat: city.lat, lng: city.lng }); map.setZoom(12) }
-  }, [city, map])
+    if (!map) return
+    const center = userLocation && Math.abs(userLocation.lat - city.lat) < 2
+      ? userLocation
+      : { lat: city.lat, lng: city.lng }
+    map.setCenter(center)
+    map.setZoom(12)
+  }, [city.name, city.countryCode, map])
 
   if (loadError) return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a2e' }}>
@@ -241,9 +315,7 @@ export default function MapViewScreen() {
                       setSelectedRestaurant(isSelected ? null : r)
                       if (map) map.panTo({ lat: r.latitude, lng: r.longitude })
                     }}
-                    onTouchStart={(e) => {
-                      e.stopPropagation()
-                    }}
+                    onTouchStart={(e) => { e.stopPropagation() }}
                     onTouchEnd={(e) => {
                       e.stopPropagation()
                       e.preventDefault()
@@ -287,9 +359,16 @@ export default function MapViewScreen() {
                 </OverlayView>
               )
             })}
+            {/* User location pin — blue pulsing dot */}
             {userLocation && (
               <OverlayView position={userLocation} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#0048f9', border: '3px solid #fff', boxShadow: '0 0 0 4px rgba(0,72,249,0.3)', transform: 'translate(-50%, -50%)' }} />
+                <div style={{ position: 'absolute', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}>
+                  <div style={{
+                    width: 16, height: 16, borderRadius: '50%',
+                    background: '#0048f9', border: '3px solid #fff',
+                    boxShadow: '0 0 0 4px rgba(0,72,249,0.3), 0 2px 8px rgba(0,0,0,0.4)',
+                  }} />
+                </div>
               </OverlayView>
             )}
           </GoogleMap>
@@ -298,9 +377,28 @@ export default function MapViewScreen() {
             <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: '#0048f9', animation: 'spin 1s linear infinite' }} />
           </div>
         )}
+
+        {/* Empty state when there are no pins to show */}
+        {isLoaded && filtered.length === 0 && !loadingPlaces && (
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'rgba(17,24,39,0.92)', backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 14, padding: '14px 18px', maxWidth: 260, textAlign: 'center',
+            pointerEvents: 'none',
+          }}>
+            <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 13, color: '#fff', margin: '0 0 4px' }}>
+              No restaurants found
+            </p>
+            <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: 'rgba(255,255,255,0.5)', margin: 0 }}>
+              {activeFilter === 'Saved' ? 'Tap the heart on a restaurant to save it.' : `Try a different filter or city.`}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Zoom + Recenter */}
+      {/* Zoom + My Location */}
       <div style={{ position: 'absolute', right: 16, bottom: trayHeight + 80, zIndex: 200, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <button
           onClick={() => { if (map) map.setZoom((map.getZoom() ?? 12) + 1) }}
@@ -308,18 +406,26 @@ export default function MapViewScreen() {
           +
         </button>
         <button
-          onClick={() => {
-            if (map) {
-              map.setCenter({ lat: city.lat, lng: city.lng })
-              map.setZoom(11)
-            }
-          }}
-          title="Recenter map"
-          style={{ width: 40, height: 40, borderRadius: 10, background: '#1f2937', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M12 8a4 4 0 100 8 4 4 0 000-8z" fill="white" opacity="0.9"/>
-            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+          onClick={handleMyLocation}
+          disabled={detectingLocation}
+          title="Go to my location"
+          style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: detectingLocation ? '#0048f9' : '#1f2937',
+            border: '1px solid rgba(255,255,255,0.15)',
+            cursor: detectingLocation ? 'wait' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+          }}>
+          {detectingLocation ? (
+            <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} />
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="3" fill="white" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="12" cy="12" r="7" stroke="white" strokeWidth="1.5" opacity="0.6" />
+            </svg>
+          )}
         </button>
         <button
           onClick={() => { if (map) map.setZoom((map.getZoom() ?? 12) - 1) }}
@@ -349,7 +455,16 @@ export default function MapViewScreen() {
             scrollbarWidth: 'none', msOverflowStyle: 'none', height: 150,
             WebkitOverflowScrolling: 'touch',
           } as React.CSSProperties}>
-            {nearbyRestaurants.map(r => (
+            {nearbyRestaurants.length === 0 ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 4 }}>
+                <p style={{ fontFamily: 'Open Sans', fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: 0 }}>
+                  No places nearby
+                </p>
+                <p style={{ fontFamily: 'Open Sans', fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: 0 }}>
+                  Tap "My Location" to search around you
+                </p>
+              </div>
+            ) : nearbyRestaurants.map(r => (
               <button key={r.id}
                 onClick={() => { setSelectedRestaurant(r); if (map) map.panTo({ lat: r.latitude, lng: r.longitude }) }}
                 style={{

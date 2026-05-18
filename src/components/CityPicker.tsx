@@ -1,43 +1,70 @@
 // src/components/CityPicker.tsx
+// v2 changes (Fix #1.5):
+// - "Use my current location" now calls detectUserCity() which reverse-
+//   geocodes the user's real coordinates instead of snapping to the
+//   nearest US city. Works globally.
+// - Added loading state for the geolocation flow.
+// - Added an "International" section so the picker isn't US-centric.
+
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { setSelectedCity, CityInfo } from '../lib/cityStore'
+import { detectUserCity } from '../lib/geolocation'
 
 // Cities where PlatePost has curated Supabase restaurants (pro customers)
 const PLATEPOST_CITIES: CityInfo[] = [
-  { name: 'Los Angeles', state: 'CA', lat: 34.0522, lng: -118.2437 },
-  { name: 'Anaheim', state: 'CA', lat: 33.8353, lng: -117.9145 },
-  { name: 'Orange', state: 'CA', lat: 33.7879, lng: -117.8531 },
-  { name: 'Placentia', state: 'CA', lat: 33.8722, lng: -117.8703 },
-  { name: 'Westminster', state: 'CA', lat: 33.7514, lng: -118.0040 },
-  { name: 'Irvine', state: 'CA', lat: 33.6846, lng: -117.8265 },
+  { name: 'Los Angeles', state: 'CA', lat: 34.0522, lng: -118.2437, country: 'United States', countryCode: 'US' },
+  { name: 'Anaheim', state: 'CA', lat: 33.8353, lng: -117.9145, country: 'United States', countryCode: 'US' },
+  { name: 'Orange', state: 'CA', lat: 33.7879, lng: -117.8531, country: 'United States', countryCode: 'US' },
+  { name: 'Placentia', state: 'CA', lat: 33.8722, lng: -117.8703, country: 'United States', countryCode: 'US' },
+  { name: 'Westminster', state: 'CA', lat: 33.7514, lng: -118.0040, country: 'United States', countryCode: 'US' },
+  { name: 'Irvine', state: 'CA', lat: 33.6846, lng: -117.8265, country: 'United States', countryCode: 'US' },
 ]
 
-// Major US cities — fully selectable, real restaurant data via Google Places API
-const MAJOR_CITIES: CityInfo[] = [
-  { name: 'New York', state: 'NY', lat: 40.7128, lng: -74.0060 },
-  { name: 'Chicago', state: 'IL', lat: 41.8781, lng: -87.6298 },
-  { name: 'Houston', state: 'TX', lat: 29.7604, lng: -95.3698 },
-  { name: 'Miami', state: 'FL', lat: 25.7617, lng: -80.1918 },
-  { name: 'San Francisco', state: 'CA', lat: 37.7749, lng: -122.4194 },
-  { name: 'Seattle', state: 'WA', lat: 47.6062, lng: -122.3321 },
-  { name: 'Austin', state: 'TX', lat: 30.2672, lng: -97.7431 },
-  { name: 'Las Vegas', state: 'NV', lat: 36.1699, lng: -115.1398 },
-  { name: 'Dallas', state: 'TX', lat: 32.7767, lng: -96.7970 },
-  { name: 'Atlanta', state: 'GA', lat: 33.7490, lng: -84.3880 },
-  { name: 'Boston', state: 'MA', lat: 42.3601, lng: -71.0589 },
-  { name: 'Nashville', state: 'TN', lat: 36.1627, lng: -86.7816 },
-  { name: 'Portland', state: 'OR', lat: 45.5051, lng: -122.6750 },
-  { name: 'Denver', state: 'CO', lat: 39.7392, lng: -104.9903 },
-  { name: 'Phoenix', state: 'AZ', lat: 33.4484, lng: -112.0740 },
-  { name: 'San Diego', state: 'CA', lat: 32.7157, lng: -117.1611 },
+// Major US cities — selectable via Google Places API
+const MAJOR_US_CITIES: CityInfo[] = [
+  { name: 'New York', state: 'NY', lat: 40.7128, lng: -74.0060, country: 'United States', countryCode: 'US' },
+  { name: 'Chicago', state: 'IL', lat: 41.8781, lng: -87.6298, country: 'United States', countryCode: 'US' },
+  { name: 'Houston', state: 'TX', lat: 29.7604, lng: -95.3698, country: 'United States', countryCode: 'US' },
+  { name: 'Miami', state: 'FL', lat: 25.7617, lng: -80.1918, country: 'United States', countryCode: 'US' },
+  { name: 'San Francisco', state: 'CA', lat: 37.7749, lng: -122.4194, country: 'United States', countryCode: 'US' },
+  { name: 'Seattle', state: 'WA', lat: 47.6062, lng: -122.3321, country: 'United States', countryCode: 'US' },
+  { name: 'Austin', state: 'TX', lat: 30.2672, lng: -97.7431, country: 'United States', countryCode: 'US' },
+  { name: 'Las Vegas', state: 'NV', lat: 36.1699, lng: -115.1398, country: 'United States', countryCode: 'US' },
+  { name: 'Dallas', state: 'TX', lat: 32.7767, lng: -96.7970, country: 'United States', countryCode: 'US' },
+  { name: 'Atlanta', state: 'GA', lat: 33.7490, lng: -84.3880, country: 'United States', countryCode: 'US' },
+  { name: 'Boston', state: 'MA', lat: 42.3601, lng: -71.0589, country: 'United States', countryCode: 'US' },
+  { name: 'Nashville', state: 'TN', lat: 36.1627, lng: -86.7816, country: 'United States', countryCode: 'US' },
+  { name: 'Portland', state: 'OR', lat: 45.5051, lng: -122.6750, country: 'United States', countryCode: 'US' },
+  { name: 'Denver', state: 'CO', lat: 39.7392, lng: -104.9903, country: 'United States', countryCode: 'US' },
+  { name: 'Phoenix', state: 'AZ', lat: 33.4484, lng: -112.0740, country: 'United States', countryCode: 'US' },
+  { name: 'San Diego', state: 'CA', lat: 32.7157, lng: -117.1611, country: 'United States', countryCode: 'US' },
 ]
 
-// All cities — PlatePost cities first, then major cities
-const ALL_CITIES: CityInfo[] = [...PLATEPOST_CITIES, ...MAJOR_CITIES]
+// International cities — shows users globally that the app works for them
+const INTL_CITIES: CityInfo[] = [
+  { name: 'London', state: 'England', lat: 51.5074, lng: -0.1278, country: 'United Kingdom', countryCode: 'GB' },
+  { name: 'Paris', state: 'Île-de-France', lat: 48.8566, lng: 2.3522, country: 'France', countryCode: 'FR' },
+  { name: 'Tokyo', state: 'Tokyo', lat: 35.6762, lng: 139.6503, country: 'Japan', countryCode: 'JP' },
+  { name: 'Singapore', state: '', lat: 1.3521, lng: 103.8198, country: 'Singapore', countryCode: 'SG' },
+  { name: 'Dubai', state: 'Dubai', lat: 25.2048, lng: 55.2708, country: 'United Arab Emirates', countryCode: 'AE' },
+  { name: 'Mumbai', state: 'MH', lat: 19.0760, lng: 72.8777, country: 'India', countryCode: 'IN' },
+  { name: 'Bangalore', state: 'KA', lat: 12.9716, lng: 77.5946, country: 'India', countryCode: 'IN' },
+  { name: 'Chennai', state: 'TN', lat: 13.0827, lng: 80.2707, country: 'India', countryCode: 'IN' },
+  { name: 'Madurai', state: 'TN', lat: 9.9252, lng: 78.1198, country: 'India', countryCode: 'IN' },
+  { name: 'Toronto', state: 'ON', lat: 43.6532, lng: -79.3832, country: 'Canada', countryCode: 'CA' },
+  { name: 'Sydney', state: 'NSW', lat: -33.8688, lng: 151.2093, country: 'Australia', countryCode: 'AU' },
+  { name: 'Mexico City', state: 'CDMX', lat: 19.4326, lng: -99.1332, country: 'Mexico', countryCode: 'MX' },
+]
+
+const ALL_CITIES: CityInfo[] = [...PLATEPOST_CITIES, ...MAJOR_US_CITIES, ...INTL_CITIES]
 
 function isPlatePostCity(city: CityInfo) {
-  return PLATEPOST_CITIES.some(c => c.name === city.name)
+  return PLATEPOST_CITIES.some(c => c.name === city.name && c.countryCode === c.countryCode)
+}
+
+function isUSCity(city: CityInfo) {
+  return city.countryCode === 'US'
 }
 
 interface Props {
@@ -48,39 +75,51 @@ interface Props {
 
 export default function CityPicker({ isOpen, onClose, currentCity }: Props) {
   const [search, setSearch] = useState('')
+  const [detecting, setDetecting] = useState(false)
+  const [geoError, setGeoError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (isOpen) { setSearch(''); setTimeout(() => inputRef.current?.focus(), 150) }
+    if (isOpen) {
+      setSearch('')
+      setGeoError(null)
+      setTimeout(() => inputRef.current?.focus(), 150)
+    }
   }, [isOpen])
 
-  const allCities = ALL_CITIES
   const filtered = search.trim().length > 1
-    ? allCities.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.state.toLowerCase().includes(search.toLowerCase()))
-    : allCities
+    ? ALL_CITIES.filter(c =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.state.toLowerCase().includes(search.toLowerCase()) ||
+        (c.country ?? '').toLowerCase().includes(search.toLowerCase())
+      )
+    : ALL_CITIES
 
   function selectCity(city: CityInfo) {
-    // All cities are selectable — real data from Google Places API
     setSelectedCity(city)
     onClose()
   }
 
-  function handleNearMe() {
-    if (!navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const { latitude: lat, longitude: lng } = pos.coords
-      // Find the closest city from our list
-      let closest = ALL_CITIES[0]
-      let minDist = Infinity
-      for (const c of ALL_CITIES) {
-        const dist = Math.sqrt(Math.pow(lat - c.lat, 2) + Math.pow(lng - c.lng, 2))
-        if (dist < minDist) { minDist = dist; closest = c }
-      }
-      setSelectedCity({ ...closest, lat, lng })
-      onClose()
-    }, () => {
-      // Geolocation denied — do nothing
-    })
+  /**
+   * Real "Use my current location" — reverse geocodes the browser's coords
+   * and sets that as the city, even if it's not in our hardcoded list.
+   * Works anywhere in the world.
+   */
+  async function handleNearMe() {
+    setDetecting(true)
+    setGeoError(null)
+
+    const detected = await detectUserCity(true /* force fresh */)
+
+    setDetecting(false)
+
+    if (!detected) {
+      setGeoError("Couldn't get your location. Check browser permissions.")
+      return
+    }
+
+    setSelectedCity(detected)
+    onClose()
   }
 
   return (
@@ -120,21 +159,52 @@ export default function CityPicker({ isOpen, onClose, currentCity }: Props) {
               </div>
             </div>
 
-            {/* Near Me */}
+            {/* Near Me — now does real reverse geocoding */}
             <div style={{ padding: '0 20px 8px' }}>
-              <button onClick={handleNearMe} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 14, cursor: 'pointer', background: 'rgba(0,72,249,0.06)', border: '1.5px solid rgba(0,72,249,0.2)' }}>
+              <button
+                onClick={handleNearMe}
+                disabled={detecting}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px', borderRadius: 14,
+                  cursor: detecting ? 'wait' : 'pointer',
+                  background: 'rgba(0,72,249,0.06)',
+                  border: '1.5px solid rgba(0,72,249,0.2)',
+                  opacity: detecting ? 0.7 : 1,
+                  transition: 'opacity 0.2s',
+                }}
+              >
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#0048f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="3" fill="white" />
-                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                    <circle cx="12" cy="12" r="7" stroke="white" strokeWidth="1.5" opacity="0.6" />
-                  </svg>
+                  {detecting ? (
+                    <div style={{
+                      width: 14, height: 14, borderRadius: '50%',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: '#fff',
+                      animation: 'pp-spin 0.8s linear infinite',
+                    }} />
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="3" fill="white" />
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                      <circle cx="12" cy="12" r="7" stroke="white" strokeWidth="1.5" opacity="0.6" />
+                    </svg>
+                  )}
                 </div>
-                <div style={{ textAlign: 'left' }}>
-                  <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, color: '#0048f9', margin: 0 }}>Use my current location</p>
-                  <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#9ca3af', margin: 0 }}>Detect your city automatically</p>
+                <div style={{ textAlign: 'left', flex: 1 }}>
+                  <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, color: '#0048f9', margin: 0 }}>
+                    {detecting ? 'Detecting your location…' : 'Use my current location'}
+                  </p>
+                  <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#9ca3af', margin: 0 }}>
+                    {detecting ? 'This takes a few seconds' : 'Detect your city automatically'}
+                  </p>
                 </div>
               </button>
+              {geoError && (
+                <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#ef4444', margin: '8px 4px 0' }}>
+                  {geoError}
+                </p>
+              )}
+              <style>{`@keyframes pp-spin { to { transform: rotate(360deg); } }`}</style>
             </div>
 
             <div style={{ height: 1, background: '#f0f0f0', margin: '4px 20px 8px' }} />
@@ -143,18 +213,28 @@ export default function CityPicker({ isOpen, onClose, currentCity }: Props) {
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 80px', scrollbarWidth: 'none' }}>
               {filtered.map((city, idx) => {
                 const isPro = isPlatePostCity(city)
-                const isSelected = city.name === currentCity.name
-                const firstMajor = !isPro && (idx === 0 || isPlatePostCity(filtered[idx - 1]))
+                const isSelected = city.name === currentCity.name && city.countryCode === currentCity.countryCode
+                const isUS = isUSCity(city)
+                const prev = filtered[idx - 1]
+                const firstPro = isPro && (!prev || !isPlatePostCity(prev))
+                const firstMajorUS = !isPro && isUS && (!prev || isPlatePostCity(prev))
+                const firstIntl = !isUS && (!prev || isUSCity(prev))
+
                 return (
-                  <div key={`${city.name}-${city.state}`}>
-                    {idx === 0 && isPro && (
+                  <div key={`${city.name}-${city.countryCode}`}>
+                    {firstPro && (
                       <p style={{ fontFamily: 'Open Sans', fontSize: 10, fontWeight: 700, color: '#0048f9', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '8px 0 8px' }}>
                         ▶ PlatePost Live
                       </p>
                     )}
-                    {firstMajor && (
+                    {firstMajorUS && (
                       <p style={{ fontFamily: 'Open Sans', fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '16px 0 8px' }}>
-                        🌎 Major Cities
+                        🇺🇸 Major US Cities
+                      </p>
+                    )}
+                    {firstIntl && (
+                      <p style={{ fontFamily: 'Open Sans', fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '16px 0 8px' }}>
+                        🌍 International
                       </p>
                     )}
                     <button
@@ -171,7 +251,8 @@ export default function CityPicker({ isOpen, onClose, currentCity }: Props) {
                           {city.name}
                         </p>
                         <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#9ca3af', margin: 0 }}>
-                          {city.state}{isPro ? ' · PlatePost Pro restaurants' : ''}
+                          {isUS ? city.state : (city.country ?? city.state)}
+                          {isPro ? ' · PlatePost Pro restaurants' : ''}
                         </p>
                       </div>
                       {isSelected && (

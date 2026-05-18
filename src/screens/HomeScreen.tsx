@@ -1,3 +1,14 @@
+// src/screens/HomeScreen.tsx
+//
+// v2 changes (Fix #1.5):
+// - Added "Near Me" chip in place of "Events" (Events is now in tab bar).
+//   Tapping it triggers geolocation flow via detectUserCity().
+// - Auto-detect city on first load if user has no stored city AND has
+//   already granted geolocation permission (silent — no prompt).
+// - Resilient to Supabase failures: if Supabase returns nothing, the
+//   carousel falls back to Google Places. No more blank screens.
+// - Hero video has a static-image fallback when Pexels is unavailable.
+
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -6,9 +17,10 @@ import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
 import CityPicker from '../components/CityPicker'
-import { useCityStore } from '../lib/cityStore'
+import { useCityStore, setSelectedCity, hasStoredCity } from '../lib/cityStore'
 import VideoBackground from '../components/VideoBackground'
 import AskPlatePostPill from '../components/AskPlatePostPill'
+import { detectUserCity, hasGeolocationPermission } from '../lib/geolocation'
 
 function getSearchHistory(): string[] {
   try { return JSON.parse(localStorage.getItem('pp_search_history') ?? '[]') } catch { return [] }
@@ -53,6 +65,16 @@ function RestaurantCard({ restaurant, onClick }: { restaurant: Restaurant | Plac
       }}
     >
       <div style={{ position: 'relative', height: 110, background: '#e5e7eb', overflow: 'hidden' }}>
+        {/* Always render the static image as the base — VideoBackground sits on top
+            and the image shows through when the video fails or hasn't loaded. */}
+        {r.image_url && (
+          <img
+            src={r.image_url}
+            alt=""
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
+        )}
         <VideoBackground
           cuisine={r.cuisine ?? 'Restaurant'}
           fallbackImage={r.image_url ?? ''}
@@ -104,6 +126,7 @@ export default function HomeScreen() {
   const [heroImages, setHeroImages] = useState<string[]>([])
   const [featuredPlaces, setFeaturedPlaces] = useState<PlaceRestaurant[]>([])
   const [loadingPlaces, setLoadingPlaces] = useState(false)
+  const [detectingNearMe, setDetectingNearMe] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Restaurant[]>([])
@@ -115,6 +138,7 @@ export default function HomeScreen() {
   const [heroCuisineIndex, setHeroCuisineIndex] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
+  // Cycle hero video
   useEffect(() => {
     const interval = setInterval(() => {
       setHeroCuisineIndex(i => (i + 1) % HERO_CUISINES.length)
@@ -122,24 +146,52 @@ export default function HomeScreen() {
     return () => clearInterval(interval)
   }, [])
 
+  // Auto-detect city on first load — silent, only if permission already granted.
+  // If user has never visited or denied permission, we just use the default LA.
+  // This makes the first-run experience feel magical for users who've already
+  // opted in (e.g. coming back to the app), without prompting cold users.
+  useEffect(() => {
+    if (hasStoredCity()) return
+    let cancelled = false
+    ;(async () => {
+      const granted = await hasGeolocationPermission()
+      if (!granted) return
+      const detected = await detectUserCity()
+      if (detected && !cancelled) setSelectedCity(detected)
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Load restaurants for search + hero images.
+  // Don't block on Supabase — if it fails, we'll get data from Google Places.
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('restaurants').select('*')
-      const list = data ?? []
-      setAllRestaurants(list)
-      const images = list
-        .filter(r => r.image_url)
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 6)
-        .map(r => r.image_url)
-      setHeroImages(images)
+      try {
+        const { data, error } = await supabase.from('restaurants').select('*')
+        if (error) {
+          console.warn('Supabase unavailable, continuing with Google Places only:', error.message)
+          return
+        }
+        const list = data ?? []
+        setAllRestaurants(list)
+        const images = list
+          .filter(r => r.image_url)
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 6)
+          .map(r => r.image_url)
+        setHeroImages(images)
+      } catch (err) {
+        console.warn('Supabase fetch threw, continuing:', err)
+      }
     }
     load()
   }, [])
 
+  // Load Google Places for the selected city carousel.
+  // Also serves as a backup hero-image source when Supabase is down.
   useEffect(() => {
     loadCityPlaces()
-  }, [city.name])
+  }, [city.name, city.countryCode])
 
   async function loadCityPlaces() {
     setLoadingPlaces(true)
@@ -164,11 +216,29 @@ export default function HomeScreen() {
             place_id: p.place_id,
           }))
         setFeaturedPlaces(places)
+
+        // Backfill hero images from Google Places if Supabase is empty
+        if (heroImages.length === 0 && places.length > 0) {
+          setHeroImages(places.slice(0, 6).map(p => p.image_url ?? '').filter(Boolean))
+        }
       }
     } catch (e) {
       console.error('Places load error:', e)
     } finally {
       setLoadingPlaces(false)
+    }
+  }
+
+  /** Near Me handler — used by the home-screen chip. */
+  async function handleNearMe() {
+    setDetectingNearMe(true)
+    const detected = await detectUserCity(true)
+    setDetectingNearMe(false)
+    if (detected) {
+      setSelectedCity(detected)
+    } else {
+      // Permission denied or unavailable — open the picker so they can pick manually
+      setShowCityPicker(true)
     }
   }
 
@@ -206,8 +276,30 @@ export default function HomeScreen() {
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: '#fff' }}>
 
-      {/* Hero — full-bleed autoplay video, cycles every 10s */}
+      {/* Hero — cycling video over a base image gradient.
+          Even if every video API fails, we have heroImages from Google Places
+          or Supabase. Even if those fail, the gradient is the final fallback. */}
       <div className="absolute inset-0">
+        {/* Base gradient — always visible, never black */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #0a1628, #1a2f5e)' }} />
+
+        {/* Static image fallback for first paint, fills underneath the video */}
+        {heroImages[heroCuisineIndex] && (
+          <img
+            src={heroImages[heroCuisineIndex]}
+            alt=""
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              animation: 'kenBurns 12s ease-in-out infinite alternate',
+            }}
+          />
+        )}
+
+        {/* Cycling videos layered on top */}
         {HERO_CUISINES.map((cuisine, i) => (
           <div key={cuisine} style={{
             position: 'absolute', inset: 0,
@@ -224,9 +316,6 @@ export default function HomeScreen() {
             />
           </div>
         ))}
-        {heroImages.length === 0 && (
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #0a1628, #1a2f5e)' }} />
-        )}
       </div>
 
       {/* Gradient overlay */}
@@ -298,15 +387,14 @@ export default function HomeScreen() {
         <div className="px-5 pb-5">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="mb-4">
             <p style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 6 }}>
-              Discover
+              {city.isUserLocation ? 'Near you in' : 'Discover'}
             </p>
             <h1 style={{ fontFamily: 'Open Sans', fontWeight: 800, color: '#fff', fontSize: 'clamp(2rem, 9vw, 3.2rem)', lineHeight: 1.05, textShadow: '0 2px 20px rgba(0,0,0,0.4)' }}>
               {city.name}<br />Restaurants
             </h1>
           </motion.div>
 
-          {/* Ask PlatePost pill — the new AI concierge entry point.
-              Replaces the center Piggy FAB that lived in the bottom nav. */}
+          {/* Ask PlatePost pill */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -316,7 +404,8 @@ export default function HomeScreen() {
             <AskPlatePostPill variant="on-hero" />
           </motion.div>
 
-          {/* Quick action chips */}
+          {/* Action chips — Open Now, Near Me, Search.
+              Events removed (it's in the bottom tab bar now). */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="flex gap-2">
             <motion.button whileTap={{ scale: 0.93 }}
               onClick={() => navigate('/list', { state: { filter: 'All', openNow: true, listView: true } })}
@@ -325,9 +414,32 @@ export default function HomeScreen() {
               Open Now
             </motion.button>
             <motion.button whileTap={{ scale: 0.93 }}
-              onClick={() => navigate('/events')}
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 999, background: 'rgba(245,158,11,0.9)', border: 'none', color: '#fff', fontFamily: 'Open Sans', fontWeight: 600, fontSize: 12, cursor: 'pointer', backdropFilter: 'blur(12px)' }}>
-              🎟️ Events
+              onClick={handleNearMe}
+              disabled={detectingNearMe}
+              style={{
+                flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 14px', borderRadius: 999,
+                background: 'rgba(0,72,249,0.9)', border: 'none', color: '#fff',
+                fontFamily: 'Open Sans', fontWeight: 600, fontSize: 12,
+                cursor: detectingNearMe ? 'wait' : 'pointer',
+                backdropFilter: 'blur(12px)',
+                opacity: detectingNearMe ? 0.7 : 1,
+              }}>
+              {detectingNearMe ? (
+                <div style={{
+                  width: 11, height: 11, borderRadius: '50%',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: '#fff',
+                  animation: 'kenBurns-spin 0.8s linear infinite',
+                }} />
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="3" fill="white" />
+                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                  <circle cx="12" cy="12" r="7" stroke="white" strokeWidth="1.5" opacity="0.6" />
+                </svg>
+              )}
+              {detectingNearMe ? 'Locating…' : 'Near Me'}
             </motion.button>
             <motion.button whileTap={{ scale: 0.93 }}
               onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 100) }}
@@ -407,7 +519,7 @@ export default function HomeScreen() {
                   </div>
                 ))}
               </div>
-            ) : (
+            ) : allRestaurants.length > 0 ? (
               <div id="city-carousel" className="flex gap-3 overflow-x-auto pl-5 pr-5 pb-1"
                 style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
                 {allRestaurants
@@ -419,6 +531,17 @@ export default function HomeScreen() {
                       <RestaurantCard restaurant={r} onClick={() => setSelectedRestaurant(r)} />
                     </div>
                   ))}
+              </div>
+            ) : (
+              /* Both data sources empty — show a friendly empty state */
+              <div className="px-5 py-8 text-center">
+                <span style={{ fontSize: 32 }}>🍽️</span>
+                <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, color: '#071126', margin: '8px 0 4px' }}>
+                  No restaurants loaded yet
+                </p>
+                <p style={{ fontFamily: 'Open Sans', fontSize: 12, color: '#9ca3af', margin: 0 }}>
+                  Try changing your city or pulling to refresh
+                </p>
               </div>
             )}
           </div>
@@ -655,6 +778,16 @@ export default function HomeScreen() {
         onClose={() => setShowCityPicker(false)}
         currentCity={city}
       />
+
+      <style>{`
+        @keyframes kenBurns {
+          from { transform: scale(1) translate(0, 0); }
+          to { transform: scale(1.08) translate(-1%, -1%); }
+        }
+        @keyframes kenBurns-spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

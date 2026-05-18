@@ -1,3 +1,13 @@
+// src/screens/ListViewScreen.tsx
+//
+// v2 changes (Fix #1.5):
+// - Feed tab no longer goes blank when Supabase is unreachable OR empty.
+//   Previously the Google Places fallback only kicked in when city wasn't
+//   in the LA whitelist. Now it kicks in whenever Supabase fails or
+//   returns nothing. This is the fix for the blank black /list screen.
+// - Empty state when both data sources are empty — no more silent failures.
+// - Reels view falls back to image with Ken Burns when Pexels is null.
+
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -8,7 +18,7 @@ import { searchEventbriteEvents } from '../lib/eventbrite'
 import type { Restaurant } from '../types'
 import RestaurantDetail from '../components/RestaurantDetail'
 import BottomNav from '../components/BottomNav'
-import { useCityStore } from '../lib/cityStore'
+import { useCityStore, isLAArea } from '../lib/cityStore'
 
 function loadFavorites(): Set<number> {
   try {
@@ -33,90 +43,18 @@ interface LocationState {
 }
 
 const VIDEO_QUERY_POOLS: Record<string, string[]> = {
-  Indian: [
-    'indian restaurant butter chicken plating',
-    'naan bread oven fresh baked',
-    'indian curry restaurant dining',
-    'tikka masala restaurant cooking',
-    'indian restaurant fine dining interior',
-  ],
-  Japanese: [
-    'sushi chef plating restaurant',
-    'ramen bowl restaurant',
-    'japanese restaurant dining experience',
-    'sashimi plating fresh',
-    'japanese food restaurant interior',
-  ],
-  Italian: [
-    'pasta restaurant plating',
-    'pizza restaurant wood fired',
-    'italian restaurant dining',
-    'risotto restaurant cooking',
-    'italian fine dining interior',
-  ],
-  American: [
-    'burger restaurant gourmet plating',
-    'bbq restaurant smoke meat',
-    'american restaurant dining',
-    'cocktail bar restaurant mixing',
-    'upscale american restaurant interior',
-  ],
-  Coffee: [
-    'latte art coffee shop',
-    'espresso machine barista',
-    'coffee shop pour over',
-    'specialty coffee shop interior',
-    'cappuccino barista craft',
-  ],
-  Cafe: [
-    'cafe brunch restaurant',
-    'bakery cafe morning',
-    'cozy cafe interior dining',
-    'cafe breakfast plating',
-    'coffee shop cafe ambiance',
-  ],
-  Mexican: [
-    'mexican restaurant tacos plating',
-    'mexican restaurant interior dining',
-    'guacamole fresh restaurant',
-    'margarita restaurant bar',
-    'mexican food restaurant upscale',
-  ],
-  Korean: [
-    'korean bbq restaurant dining',
-    'korean restaurant grill table',
-    'korean food restaurant plating',
-    'korean fried chicken restaurant',
-    'korean restaurant interior',
-  ],
-  Thai: [
-    'thai restaurant food plating',
-    'thai restaurant dining interior',
-    'pad thai restaurant cooking',
-    'thai cuisine restaurant',
-    'thai food noodles restaurant',
-  ],
-  Vietnamese: [
-    'vietnamese restaurant pho bowl',
-    'vietnamese restaurant dining',
-    'pho restaurant noodles',
-    'vietnamese food restaurant plating',
-    'vietnamese restaurant interior',
-  ],
-  Chinese: [
-    'chinese restaurant dim sum',
-    'chinese restaurant dining interior',
-    'chinese food restaurant wok',
-    'dim sum restaurant service',
-    'chinese cuisine restaurant plating',
-  ],
-  Mediterranean: [
-    'mediterranean restaurant grilled food',
-    'mediterranean dining interior',
-    'mediterranean food restaurant plating',
-    'greek restaurant food',
-    'mediterranean cuisine restaurant',
-  ],
+  Indian: ['indian restaurant butter chicken plating', 'naan bread oven fresh baked', 'indian curry restaurant dining', 'tikka masala restaurant cooking', 'indian restaurant fine dining interior'],
+  Japanese: ['sushi chef plating restaurant', 'ramen bowl restaurant', 'japanese restaurant dining experience', 'sashimi plating fresh', 'japanese food restaurant interior'],
+  Italian: ['pasta restaurant plating', 'pizza restaurant wood fired', 'italian restaurant dining', 'risotto restaurant cooking', 'italian fine dining interior'],
+  American: ['burger restaurant gourmet plating', 'bbq restaurant smoke meat', 'american restaurant dining', 'cocktail bar restaurant mixing', 'upscale american restaurant interior'],
+  Coffee: ['latte art coffee shop', 'espresso machine barista', 'coffee shop pour over', 'specialty coffee shop interior', 'cappuccino barista craft'],
+  Cafe: ['cafe brunch restaurant', 'bakery cafe morning', 'cozy cafe interior dining', 'cafe breakfast plating', 'coffee shop cafe ambiance'],
+  Mexican: ['mexican restaurant tacos plating', 'mexican restaurant interior dining', 'guacamole fresh restaurant', 'margarita restaurant bar', 'mexican food restaurant upscale'],
+  Korean: ['korean bbq restaurant dining', 'korean restaurant grill table', 'korean food restaurant plating', 'korean fried chicken restaurant', 'korean restaurant interior'],
+  Thai: ['thai restaurant food plating', 'thai restaurant dining interior', 'pad thai restaurant cooking', 'thai cuisine restaurant', 'thai food noodles restaurant'],
+  Vietnamese: ['vietnamese restaurant pho bowl', 'vietnamese restaurant dining', 'pho restaurant noodles', 'vietnamese food restaurant plating', 'vietnamese restaurant interior'],
+  Chinese: ['chinese restaurant dim sum', 'chinese restaurant dining interior', 'chinese food restaurant wok', 'dim sum restaurant service', 'chinese cuisine restaurant plating'],
+  Mediterranean: ['mediterranean restaurant grilled food', 'mediterranean dining interior', 'mediterranean food restaurant plating', 'greek restaurant food', 'mediterranean cuisine restaurant'],
 }
 
 const PLATEPOST_MENU_URLS: Record<number, string> = {
@@ -152,6 +90,35 @@ interface ReelSlide {
 
 const FILTERS = ['All', 'Coffee', 'Japanese', 'Italian', 'American', 'Cafe', 'Korean', 'Mexican', 'Thai', 'Vietnamese', 'Chinese', 'Indian', 'Mediterranean']
 
+/**
+ * Normalize a Google Places API response into our Restaurant shape.
+ * Used as the fallback data source when Supabase is unavailable.
+ */
+function normalizeGooglePlace(p: any, index: number, cityName: string, stateCode: string): Restaurant {
+  return {
+    id: -(index + 2000), // negative IDs to avoid colliding with Supabase IDs
+    name: p.name,
+    cuisine: p.cuisine ?? 'Restaurant',
+    city: cityName,
+    state: stateCode,
+    latitude: p.latitude ?? 0,
+    longitude: p.longitude ?? 0,
+    rating: p.rating,
+    review_count: p.review_count,
+    image_url: p.image_url ?? '',
+    description: p.description ?? '',
+    address: p.address ?? '',
+    phone: p.phone ?? '',
+    website_url: p.website_url ?? '',
+    platepost_menu_url: '',
+    tier: 'basic',
+    neighborhood: undefined,
+    price_level: p.price_level,
+    hours: undefined,
+    place_id: p.place_id,
+  } as Restaurant
+}
+
 export default function ListViewScreen() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -163,6 +130,7 @@ export default function ListViewScreen() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null)
   const [loading, setLoading] = useState(true)
+  const [dataSourceError, setDataSourceError] = useState<string | null>(null)
   const [activeFilter, setActiveFilter] = useState(state.filter ?? 'All')
   const [favorites, setFavorites] = useState<Set<number>>(loadFavorites)
   const [menuIframeUrl, setMenuIframeUrl] = useState<string | null>(null)
@@ -197,50 +165,87 @@ export default function ListViewScreen() {
       const matchingFilter = FILTERS.find(f => f.toLowerCase() === q)
       if (matchingFilter && matchingFilter !== 'All') setActiveFilter(matchingFilter)
     }
-  }, [city.name])
+  }, [city.name, city.countryCode])
 
+  /**
+   * Core data-loading function.
+   *
+   * Strategy:
+   * 1. Always try Supabase first — it has our curated PRO data.
+   * 2. ALWAYS also fetch Google Places — these are the international fallback
+   *    and the primary source for cities outside LA/OC.
+   * 3. If we're in LA/OC, prefer Supabase results; otherwise prefer Google.
+   * 4. If both sources return empty, surface a friendly error (not a blank screen).
+   */
   async function fetchRestaurants() {
     setLoading(true)
+    setDataSourceError(null)
 
-    const { data: supabaseData } = await supabase.from('restaurants').select('*').order('tier').order('name')
-    let list: Restaurant[] = supabaseData ?? []
+    let supabaseList: Restaurant[] = []
+    let googleList: Restaurant[] = []
 
-    const isLAArea = ['Los Angeles', 'Anaheim', 'Orange', 'Placentia', 'Westminster', 'Irvine'].includes(city.name)
-    if (!isLAArea) {
-      try {
-        const res = await fetch(`/api/places-search?city=${encodeURIComponent(city.name)}&lat=${city.lat}&lng=${city.lng}`)
-        if (res.ok) {
-          const data = await res.json()
-          const googlePlaces: Restaurant[] = (data.places ?? []).map((p: any, i: number) => ({
-            id: -(i + 2000),
-            name: p.name,
-            cuisine: p.cuisine ?? 'Restaurant',
-            city: city.name,
-            state: city.state,
-            latitude: p.latitude ?? 0,
-            longitude: p.longitude ?? 0,
-            rating: p.rating,
-            review_count: p.review_count,
-            image_url: p.image_url ?? '',
-            description: p.description ?? '',
-            address: p.address ?? '',
-            phone: p.phone ?? '',
-            website_url: p.website_url ?? '',
-            platepost_menu_url: null,
-            tier: 'standard',
-            neighborhood: null,
-            price_level: p.price_level,
-            hours: null,
-            place_id: p.place_id,
-          } as any))
-          list = googlePlaces
-        }
-      } catch (e) { console.error('Google Places feed error:', e) }
+    // Try Supabase — never throw, just log and continue
+    try {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select('*')
+        .order('tier')
+        .order('name')
+      if (error) {
+        console.warn('Supabase error:', error.message)
+      } else {
+        supabaseList = data ?? []
+      }
+    } catch (err) {
+      console.warn('Supabase threw:', err)
     }
 
-    setAllRestaurants(list)
+    // ALWAYS try Google Places too — this is the international source
+    // and acts as Supabase's safety net.
+    try {
+      const res = await fetch(
+        `/api/places-search?city=${encodeURIComponent(city.name)}&lat=${city.lat}&lng=${city.lng}`,
+      )
+      if (res.ok) {
+        const data = await res.json()
+        googleList = (data.places ?? []).map((p: any, i: number) =>
+          normalizeGooglePlace(p, i, city.name, city.state),
+        )
+      }
+    } catch (err) {
+      console.warn('Google Places error:', err)
+    }
 
-    const baseFiltered = applyFilter(list, state.filter ?? 'All')
+    // Combine intelligently based on city.
+    // In LA/OC: PRO Supabase pinned, then Google Places fills the rest (deduped).
+    // Elsewhere: Google Places only (no point showing LA restaurants in Madurai).
+    let combined: Restaurant[]
+    if (isLAArea(city) && supabaseList.length > 0) {
+      // Filter Supabase to ones in this city, then add Google places not in Supabase
+      const supabaseInCity = supabaseList.filter(r =>
+        r.city?.toLowerCase().includes(city.name.toLowerCase()) ||
+        Math.abs((r.latitude ?? 0) - city.lat) < 0.5,
+      )
+      const supabaseNames = new Set(supabaseInCity.map(r => r.name.toLowerCase().slice(0, 12)))
+      const googleDeduped = googleList.filter(g => !supabaseNames.has(g.name.toLowerCase().slice(0, 12)))
+      combined = [...supabaseInCity, ...googleDeduped]
+    } else {
+      combined = googleList
+    }
+
+    setAllRestaurants(combined)
+
+    if (combined.length === 0) {
+      setDataSourceError(
+        `Couldn't load restaurants for ${city.name}. ` +
+        `Try changing your city or check your connection.`,
+      )
+      setSlides([])
+      setLoading(false)
+      return
+    }
+
+    const baseFiltered = applyFilter(combined, state.filter ?? 'All')
     const filtered = baseFiltered.sort((a, b) => {
       const scoreA = (a.rating ?? 0) * Math.log10((a.review_count ?? 1) + 1)
       const scoreB = (b.rating ?? 0) * Math.log10((b.review_count ?? 1) + 1)
@@ -289,36 +294,43 @@ export default function ListViewScreen() {
   }
 
   function initSlides(filtered: Restaurant[]) {
+    loadedIndices.current = new Set()
     const initial: ReelSlide[] = filtered.map(r => ({
-      restaurant: r, videoUrl: null, rating: null, reviewCount: null,
+      restaurant: r, videoUrl: null, rating: r.rating ?? null, reviewCount: r.review_count ?? null,
       heroImage: r.image_url, hasEvents: false, loaded: false,
     }))
     setSlides(initial)
-    filtered.slice(0, 3).forEach((r, i) => loadSlideData(r, i, initial))
+    // Preload first 3 slides' enriched data (video, place details, events)
+    filtered.slice(0, 3).forEach((r, i) => loadSlideData(r, i))
   }
 
-  async function loadSlideData(r: Restaurant, index: number, _currentSlides?: ReelSlide[]) {
+  async function loadSlideData(r: Restaurant, index: number) {
     if (loadedIndices.current.has(index)) return
     loadedIndices.current.add(index)
+
+    // All three fetches in parallel; none should crash the slide if they fail.
     const [videoResult, placeResult, events] = await Promise.all([
-      fetchPexelsPortraitVideo(getVideoQuery(r.cuisine, r.name), getVideoPage(r.name)),
-      fetchPlaceDetails(r.name, r.city),
-      searchEventbriteEvents(r.name, r.city, r.state),
+      fetchPexelsPortraitVideo(getVideoQuery(r.cuisine, r.name), getVideoPage(r.name)).catch(() => null),
+      fetchPlaceDetails(r.name, r.city).catch(() => ({})),
+      searchEventbriteEvents(r.name, r.city, r.state).catch(() => []),
     ])
+
     let yelpPhotos: string[] = []
     try {
       const yelpRes = await fetch(`/api/yelp?name=${encodeURIComponent(r.name)}&city=${encodeURIComponent(r.city)}`)
       if (yelpRes.ok) { const d = await yelpRes.json(); yelpPhotos = d.photos || [] }
     } catch {}
-    const bestImage = placeResult?.photoUrl || yelpPhotos[0] || r.image_url
+
+    const bestImage = (placeResult as any)?.photoUrl || yelpPhotos[0] || r.image_url
+
     setSlides(prev => {
       const next = [...prev]
       if (next[index]) {
         next[index] = {
           ...next[index],
           videoUrl: videoResult?.url ?? null,
-          rating: (r.rating ?? placeResult?.rating) ?? null,
-          reviewCount: (r.review_count ?? placeResult?.userRatingsTotal) ?? null,
+          rating: (r.rating ?? (placeResult as any)?.rating) ?? null,
+          reviewCount: (r.review_count ?? (placeResult as any)?.userRatingsTotal) ?? null,
           heroImage: bestImage,
           hasEvents: events.length > 0,
           loaded: true,
@@ -355,7 +367,7 @@ export default function ListViewScreen() {
       <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#f8f9fa' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid #e5e7eb', borderTopColor: '#0048f9', animation: 'spin 1s linear infinite' }} />
-          <p style={{ color: '#9ca3af', fontFamily: 'Open Sans, sans-serif', fontSize: 13 }}>Loading…</p>
+          <p style={{ color: '#9ca3af', fontFamily: 'Open Sans, sans-serif', fontSize: 13 }}>Loading restaurants in {city.name}…</p>
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       </div>
@@ -436,7 +448,16 @@ export default function ListViewScreen() {
         </div>
 
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pb-24" style={{ scrollbarWidth: 'none' }}>
-          {filteredList.length === 0 ? (
+          {dataSourceError && filteredList.length === 0 ? (
+            <div style={{ padding: '40px 0', textAlign: 'center' }}>
+              <span style={{ fontSize: 40 }}>🌐</span>
+              <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 16, color: '#071126', margin: '12px 0 6px' }}>Can't reach restaurants</p>
+              <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: '#9ca3af', margin: '0 0 16px', maxWidth: 280, marginLeft: 'auto', marginRight: 'auto' }}>{dataSourceError}</p>
+              <button onClick={fetchRestaurants} style={{ background: '#0048f9', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 24px', fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                Retry
+              </button>
+            </div>
+          ) : filteredList.length === 0 ? (
             <div style={{ padding: '40px 0', textAlign: 'center' }}>
               <span style={{ fontSize: 40 }}>🔍</span>
               <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 16, color: '#071126', margin: '12px 0 6px' }}>No results</p>
@@ -462,7 +483,9 @@ export default function ListViewScreen() {
                   }}
                 >
                   <img src={r.image_url} alt={r.name}
-                    style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />
+                    style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', flexShrink: 0, background: '#e5e7eb' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.3' }}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14, color: '#071126', margin: '0 0 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {r.name}
@@ -479,7 +502,7 @@ export default function ListViewScreen() {
                       )}
                     </div>
                     <p style={{ fontFamily: 'Open Sans', fontSize: 11, color: '#9ca3af', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      📍 {r.city}, {r.state}
+                      📍 {r.city}{r.state ? `, ${r.state}` : ''}
                       {r.rating ? ` · ★ ${r.rating.toFixed(1)}` : ''}
                     </p>
                   </div>
@@ -509,6 +532,49 @@ export default function ListViewScreen() {
   }
 
   // ── REELS VIEW ────────────────────────────────────────────────────────────────
+  // Empty-state guard: previously this rendered a black screen with no slides.
+  // Now we show a useful message and a CTA back to switch cities.
+  if (slides.length === 0) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#000' }}>
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            position: 'fixed', top: 52, left: 16, zIndex: 60,
+            width: 36, height: 36, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+          </svg>
+        </button>
+        <div style={{ textAlign: 'center', padding: 24, maxWidth: 320 }}>
+          <span style={{ fontSize: 48 }}>📭</span>
+          <p style={{ fontFamily: 'Open Sans', fontWeight: 700, fontSize: 18, color: '#fff', margin: '12px 0 6px' }}>
+            No reels available
+          </p>
+          <p style={{ fontFamily: 'Open Sans', fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '0 0 20px', lineHeight: 1.5 }}>
+            {dataSourceError ?? `We don't have restaurant videos for ${city.name} yet. Try a different city.`}
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            style={{
+              background: '#0048f9', color: '#fff', border: 'none',
+              borderRadius: 12, padding: '12px 28px',
+              fontFamily: 'Open Sans', fontWeight: 700, fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            Back to home
+          </button>
+        </div>
+        <BottomNav />
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0" style={{ background: '#000' }}>
       <button
@@ -636,6 +702,7 @@ function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, s
   const r = slide.restaurant
   const [showFavPopup, setShowFavPopup] = useState(false)
   const [kenBurnsKey, setKenBurnsKey] = useState(0)
+  const [videoErrored, setVideoErrored] = useState(false)
 
   useEffect(() => {
     if (isActive) setKenBurnsKey(k => k + 1)
@@ -650,6 +717,7 @@ function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, s
   }
 
   const bgImage = slide.heroImage ?? r.image_url
+  const showVideo = slide.videoUrl && !videoErrored
 
   return (
     <div
@@ -657,21 +725,29 @@ function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, s
       data-index={index}
       style={{ position: 'relative', width: '100%', flexShrink: 0, overflow: 'hidden', height: '100dvh', scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
     >
-      {slide.videoUrl ? (
+      {/* Always render the image as the base layer.
+          Video sits on top and fades in when ready.
+          If video fails, image stays visible — no black screen ever. */}
+      <img
+        key={kenBurnsKey}
+        src={bgImage}
+        alt={r.name}
+        style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          objectFit: 'cover',
+          animation: isActive ? 'kenBurns 8s ease-in-out infinite alternate' : 'none',
+        }}
+        onError={(e) => { (e.target as HTMLImageElement).style.background = '#1a2f5e' }}
+      />
+      {showVideo && (
         <video
-          src={slide.videoUrl}
+          src={slide.videoUrl!}
           autoPlay
           muted
           loop
           playsInline
+          onError={() => setVideoErrored(true)}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      ) : (
-        <img
-          key={kenBurnsKey}
-          src={bgImage}
-          alt={r.name}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: isActive ? 'kenBurns 8s ease-in-out infinite alternate' : 'none' }}
         />
       )}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140, background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)', pointerEvents: 'none' }} />
@@ -713,7 +789,7 @@ function ReelSlideCard({ slide, index, isActive, isFavorite, onToggleFavorite, s
           {r.name}
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>📍 {r.city}, {r.state}</span>
+          <span style={{ fontFamily: 'Open Sans', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>📍 {r.city}{r.state ? `, ${r.state}` : ''}</span>
           {slide.rating && (
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ' ' + r.city + ' ' + r.state)}`}
